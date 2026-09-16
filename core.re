@@ -152,6 +152,18 @@ module Theorem : {
 
 module PartialDerivation : {
     type t; 
+    let init : judgment => t;
+    let focused : t => judgment;
+    let skip : t => t; 
+    let hyp : (t, int) => t;
+    let in_formation : (t, tm) => t;
+    let in_elimination : (t, tm) => t;
+    let cut : (t, name, tm) => t;
+    let typ_formation : t => t;
+    let arrow_formation : t => t;
+    let ap : (t, name, tm, tm) => t;
+    let arrow_introduction : t => t;
+
 } = {
     type t = {
         skipped : list(judgment),
@@ -163,6 +175,13 @@ module PartialDerivation : {
         skipped : [],
         focused : [j],
         root : j
+    }
+
+    let focused (s : t) : judgment = {
+        switch(s.focused) {
+            | [h, ... t] => h
+            | [] => failwith("nothing focused")
+        }
     }
 
     let skip (s : t) : t = {
@@ -245,3 +264,48 @@ module PartialDerivation : {
         }
     })
 }
+
+type demo = 
+    | Hole
+    | Hyp(int)
+    | InForm(tm, demo, demo)
+    | InElim(tm, demo)
+    | Have(name, demo, demo)
+    | Suffices(name, demo, demo)
+    | TypFormn
+    | ArrowForm(demo, demo)
+    | Ap(name, tm, tm, demo, demo)
+    | ArrowIntro(demo)
+    | Obvious
+
+type demo_check_report = {
+    open_goals : list(judgment),
+    errors : list(string)
+}
+
+let report (open_goals : list(judgment), errors : list(string)) : demo_check_report = {
+    open_goals, errors
+}
+
+let rec check_demo(d : demo, s : PartialDerivation.t) : (demo_check_report, PartialDerivation.t) = {
+    switch(d) {
+    | Hole => (report([PartialDerivation.focused(s)],[]), PartialDerivation.skip(s))
+    // | Hyp(int)
+    // | InForm(tm, demo, demo)
+    // | InElim(tm, demo)
+    // | Have(name, demo, demo)
+    // | Suffices(name, demo, demo)
+    // | TypFormn
+    // | ArrowForm(demo, demo)
+    // | Ap(name, tm, tm, demo, demo)
+    | ArrowIntro(d) => {
+        let s' = PartialDerivation.arrow_introduction(s);
+        let (report, s'') = check_demo(d, s');
+        (report, s'')
+    }
+    // | Obvious
+    | _ => failwith("todo")
+    }
+}
+
+let check_demo_root(d : demo, root : judgment) = check_demo(d, PartialDerivation.init(root))
