@@ -16,7 +16,14 @@ type judgment = J(ctx, tm);
 
 module Theorem : {
     type t; 
-    let hyp : ctx => int => t;
+    let hyp : (ctx, int) => t;
+    let in_formation : (tm, t, t) => t;
+    let in_elimination : t => t;
+    let cut : (t, t) => t;
+    let typ_formation : ctx => t;
+    let arrow_formation : (t, t) => t;
+    let ap : (t, t) => t;
+    let arrow_introduction : t => t;
 } = {
     type t = judgment;
 
@@ -130,3 +137,7 @@ module Theorem : {
         }
     }
 };
+
+// module PartialDerivation : {
+
+// }
