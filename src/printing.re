@@ -1,20 +1,29 @@
 open Core
 open Demo
 
-// todo: use names
-let rec string_of_term(a : tm) : string = {
+
+let rec string_of_var(c : ctx, x : int) : string = switch(c) {
+    | Cons(_, y, _) when x == 0 => y
+    | Cons(c, y, _) when x > 0 => {
+        let y' = string_of_var(c, x-1);
+        if (y' == y) { y ++ " (shadowed)"} else y'
+    }
+    | _ => failwith("impossible: string of var")
+}
+
+let rec string_of_term(c : ctx, a : tm) : string = {
     switch(a) {
     | Typ => "type"
-    | In(a, ty) => string_of_term(a) ++ " : " ++ string_of_term(ty)
-    | Arrow(x, ty1, ty2) => "(" ++ x ++ " : " ++ string_of_term(ty1) ++ ") -> " ++ string_of_term(ty2)
-    | Var(x) => "v" ++ string_of_int(x)
-    | Ap(a1, a2) => string_of_term(a1) ++ " " ++ string_of_term(a2)
+    | In(a, ty) => string_of_term(c, a) ++ " : " ++ string_of_term(c, ty)
+    | Arrow(x, ty1, ty2) => "(" ++ x ++ " : " ++ string_of_term(c, ty1) ++ ") -> " ++ string_of_term(Cons(c, x, ty1), ty2)
+    | Var(x) => string_of_var(c, x)
+    | Ap(a1, a2) => string_of_term(c, a1) ++ " " ++ string_of_term(c, a2)
     }
 }
 
 let string_of_judgment_short(j : judgment) : string = {
     switch(j) {
-    | J(_c, a) => string_of_term(a) //++ " -| " ++ string_of_ctx(c)
+    | J(c, a) => string_of_term(c, a) //++ " -| " ++ string_of_ctx(c)
     }
 }
 
