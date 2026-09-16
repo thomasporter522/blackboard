@@ -12,18 +12,10 @@ type ctx =
     | Empty 
     | Cons(ctx, name, tm);
 
-let rec lookup_index (c : ctx, x : int) : tm = {
-        switch(c, x) {
-        | (Cons(c, _, t), 0) => t
-        | (Cons(c, _, _), x) when x > 0 => lookup_index(c, x-1)
-        | _ => failwith("Context lookup out of bounds")
-        }
-    }
-
-let rec lookup_name (c : ctx, x : name) : tm = {
+let rec index_of_name(c : ctx, x : name) : int = {
     switch(c, x) {
-    | (Cons(c, y, t), x) when y == x => t
-    | (Cons(c, _, _), x) => lookup_name(c, x)
+    | (Cons(_, y, _), x) when y == x => 0
+    | (Cons(c, _, _), x) => 1+index_of_name(c, x)
     | _ => failwith("Context lookup unbound name")
     }
 }
@@ -64,12 +56,28 @@ let rec subst (a1 : tm, a : tm, x : int) : tm = {
     }
 }
 
+let rec lookup_index (c : ctx, x : int) : tm = {
+    switch(c, x) {
+    | (Cons(_, _, t), 0) => shift(t, 0)
+    | (Cons(c, _, _), x) when x > 0 => shift(lookup_index(c, x-1), 0)
+    | _ => failwith("Context lookup out of bounds")
+    }
+}
+
+// let rec lookup_name (c : ctx, x : name) : tm = {
+//     switch(c, x) {
+//     | (Cons(c, y, t), x) when y == x => shift(t, 0)
+//     | (Cons(c, _, _), x) => shift(lookup_name(c, x), 0)
+//     | _ => failwith("Context lookup unbound name")
+//     }
+// }
+
 type judgment = J(ctx, tm);
 
 module Theorem : {
     type t; 
     let hyp : (ctx, int) => t;
-    let in_formation : (tm, t, t) => t;
+    let in_formation : (t, t) => t;
     let in_elimination : t => t;
     let cut : (t, t) => t;
     let typ_formation : ctx => t;
@@ -83,9 +91,9 @@ module Theorem : {
         J(c, lookup_index(c, x))
     };
 
-    let in_formation (ty2 : tm, d1 : t, d2 : t) : t = {
+    let in_formation (d1 : t, d2 : t) : t = {
         switch(d1, d2) {
-        | (J(c, In(ty1, Typ)), J(c', In(a, ty2))) 
+        | (J(c, In(ty1, Typ)), J(c', In(a, _))) 
             when c' == c
         => J(c, In(In(a, ty1),Typ))
         | _ => failwith("invalid premises: in_formation")
@@ -94,7 +102,7 @@ module Theorem : {
 
     let in_elimination (d : t) : t = {
         switch(d) {
-        | J(c, In(a, ty))  
+        | J(c, In(_, ty))  
         => J(c, ty)
         | _ => failwith("invalid premises: in_elimination")
         }
@@ -112,7 +120,7 @@ module Theorem : {
 
     let cut (d1 : t, d2 : t) : t = {
         switch(d1, d2) {
-        | (J(c, ty1), J(Cons(c', x, ty1'), ty2)) 
+        | (J(c, ty1), J(Cons(c', _, ty1'), ty2)) 
             when ty1' == ty1 && c' == c && no_x(ty2, 0)
         => J(c, ty2)
         | _ => failwith("invalid premises: cut")
@@ -134,7 +142,7 @@ module Theorem : {
 
     let ap (d1 : t, d2 : t) : t = {
         switch(d1, d2) {
-        | (J(c, In(a1, Arrow(x, ty1, ty2))), J(c', In(a2, ty1')))
+        | (J(c, In(_, Arrow(_, ty1, ty2))), J(c', In(a2, ty1')))
             when c' == c && ty1' == ty1
         => J(c, subst(ty2, a2, 0))
         | _ => failwith("invalid premises: ap")
@@ -179,7 +187,7 @@ module PartialDerivation : {
 
     let focused (s : t) : judgment = {
         switch(s.focused) {
-            | [h, ... t] => h
+            | [h, ..._] => h
             | [] => failwith("nothing focused")
         }
     }
@@ -237,7 +245,7 @@ module PartialDerivation : {
 
     let typ_formation (s : t)  : t = refine(s, j => {
         switch(j) {
-        | J(c, In(Typ, Typ)) => []
+        | J(_, In(Typ, Typ)) => []
         | _ => failwith("typ_formation failure")
         }
     })
@@ -264,49 +272,3 @@ module PartialDerivation : {
         }
     })
 }
-
-type demo = 
-    | Hole
-    | Hyp(int)
-    | InForm(tm, demo, demo)
-    | InElim(tm, demo)
-    | Have(name, demo, demo)
-    | Suffices(name, demo, demo)
-    | TypFormn
-    | ArrowForm(demo, demo)
-    | Ap(name, tm, tm, demo, demo)
-    | ArrowIntro(demo)
-    | Obvious
-
-type demo_check_report = {
-    open_goals : list(judgment),
-    errors : list(string)
-}
-
-let report (open_goals : list(judgment), errors : list(string)) : demo_check_report = {
-    open_goals, errors
-}
-
-let rec check_demo(d : demo, s : PartialDerivation.t) : (demo_check_report, PartialDerivation.t) = {
-    switch(d) {
-    | Hole => (report([PartialDerivation.focused(s)],[]), PartialDerivation.skip(s))
-    // | Hyp(int)
-    // | InForm(tm, demo, demo)
-    // | InElim(tm, demo)
-    // | Have(name, demo, demo)
-    // | Suffices(name, demo, demo)
-    // | TypFormn
-    // | ArrowForm(demo, demo)
-    // | Ap(name, tm, tm, demo, demo)
-    | ArrowIntro(d) => {
-        let s' = PartialDerivation.arrow_introduction(s);
-        let (report, s'') = check_demo(d, s');
-        (report, s'')
-    }
-    // | Obvious
-    | _ => failwith("todo")
-    }
-}
-
-let check_demo_root(d : demo, root : judgment) : demo_check_report = 
-    fst(check_demo(d, PartialDerivation.init(root)))

@@ -1,4 +1,5 @@
 open Core
+open Demo
 
 // todo: use names
 let rec string_of_term(a : tm) : string = {
@@ -13,11 +14,12 @@ let rec string_of_term(a : tm) : string = {
 
 let string_of_judgment_short(j : judgment) : string = {
     switch(j) {
-    | J(c, a) => string_of_term(a) //++ " -| " ++ string_of_ctx(c)
+    | J(_c, a) => string_of_term(a) //++ " -| " ++ string_of_ctx(c)
     }
 }
 
 let string_of_report(r : demo_check_report) : string = {
+    if (r.open_goals == [] && r.errors == []) "Proven!" else
     "Goals:\n\n" ++ String.concat("\n", List.map(string_of_judgment_short, r.open_goals))
     ++ "\n\nErrors:\n\n" ++ String.concat("\n", r.errors)
 }
