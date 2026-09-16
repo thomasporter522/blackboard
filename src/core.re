@@ -12,11 +12,13 @@ type ctx =
     | Empty 
     | Cons(ctx, name, tm);
 
-let rec index_of_name(c : ctx, x : name) : int = {
+type error = string;
+
+let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     switch(c, x) {
-    | (Cons(_, y, _), x) when y == x => 0
-    | (Cons(c, _, _), x) => 1+index_of_name(c, x)
-    | _ => failwith("Context lookup unbound name")
+    | (Cons(_, y, _), x) when y == x => Ok(0)
+    | (Cons(c, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
+    | _ => Error("Context lookup unbound name")
     }
 }
 
@@ -73,6 +75,10 @@ let rec lookup_index (c : ctx, x : int) : tm = {
 // }
 
 type judgment = J(ctx, tm);
+
+let ctx_of_judgment (j : judgment) : ctx = switch(j) {
+    | J(c, _) => c
+}
 
 module Theorem : {
     type t; 
@@ -161,16 +167,17 @@ module Theorem : {
 module PartialDerivation : {
     type t; 
     let init : judgment => t;
-    let focused : t => judgment;
-    let skip : t => t; 
-    let hyp : (t, int) => t;
-    let in_formation : (t, tm) => t;
-    let in_elimination : (t, tm) => t;
-    let cut : (t, name, tm) => t;
-    let typ_formation : t => t;
-    let arrow_formation : t => t;
-    let ap : (t, name, tm, tm) => t;
-    let arrow_introduction : t => t;
+    let verify : (t, judgment) => bool;
+    let focused : t => result(judgment, error);
+    let skip : t => result(t, error);
+    let hyp : (t, int) => result(t, error);
+    let in_formation : (t, tm) => result(t, error);
+    let in_elimination : (t, tm) => result(t, error);
+    let cut : (t, name, tm) => result(t, error);
+    let typ_formation : t => result(t, error);
+    let arrow_formation : t => result(t, error);
+    let ap : (t, name, tm, tm) => result(t, error);
+    let arrow_introduction : t => result(t, error);
 
 } = {
     type t = {
@@ -185,90 +192,95 @@ module PartialDerivation : {
         root : j
     }
 
-    let focused (s : t) : judgment = {
+    let verify (s : t, j : judgment) = {
+        s.focused == [] && s.root == j
+    }
+
+    let focused (s : t) : result(judgment, error) = {
         switch(s.focused) {
-            | [h, ..._] => h
-            | [] => failwith("nothing focused")
+            | [h, ..._] => Ok(h)
+            | [] => Error("nothing focused")
         }
     }
 
-    let skip (s : t) : t = {
+    let skip (s : t) : result(t, error) = {
         switch(s.focused) {
-            | [h, ... t] => {
+            | [h, ... t] => Ok({
                 skipped: [h, ...s.skipped],
                 focused: t,
                 root: s.root
-            }
-            | [] => failwith("nothing to skip")
+            })
+            | [] => Error("nothing to skip")
         }
     }
 
-    let refine (s : t, f : judgment => list(judgment)) : t = {
+    let refine (s : t, f : judgment => result(list(judgment), error)) : result(t, error) = {
         switch(s.focused) {
-            | [h, ... t] => {
-                skipped: s.skipped,
-                focused: f(h) @ t,
-                root: s.root
-            }
-            | [] => failwith("nothing to refine")
+            | [h, ... t] => 
+                Result.map(fh => {
+                    skipped: s.skipped,
+                    focused: fh @ t,
+                    root: s.root
+                }, f(h))
+            | [] => Error("nothing to refine")
         }
     }
 
-    let hyp (s : t, x : int) : t = refine(s, j => {
+    let hyp (s : t, x : int) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, ty) => 
             let found = lookup_index(c, x);
-            if (equiv(found, ty)) [] else failwith("hyp failure")
+            if (equiv(found, ty)) Ok([]) else Error("hyp failure")
         }
     })
 
-    let in_formation (s : t, ty2 : tm) : t = refine(s, j => {
+    let in_formation (s : t, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(In(a, ty1), Typ)) => {
-            [J(c, In(ty1, Typ)), J(c, In(a, ty2))]
+            Ok([J(c, In(ty1, Typ)), J(c, In(a, ty2))])
         }
-        | _ => failwith("in_formation failure")
+        | _ => Error("in_formation failure")
         }
     })
 
-    let in_elimination (s : t, a : tm)  : t = refine(s, j => {
+    let in_elimination (s : t, a : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, ty) => [J(c, In(a, ty))]
+        | J(c, ty) => Ok([J(c, In(a, ty))])
         }
     })
 
-    let cut (s : t, x : name, ty1 : tm)  : t = refine(s, j => {
+    let cut (s : t, x : name, ty1 : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, ty2) => [J(c, ty1), J(Cons(c, x, ty1), shift(ty2, 0))]
+        | J(c, ty2) => Ok([J(c, ty1), J(Cons(c, x, ty1), shift(ty2, 0))])
         }
     })
 
-    let typ_formation (s : t)  : t = refine(s, j => {
+    let typ_formation (s : t)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(_, In(Typ, Typ)) => []
-        | _ => failwith("typ_formation failure")
+        | J(_, In(Typ, Typ)) => Ok([])
+        | _ => Error("typ_formation failure")
         }
     })
 
-    let arrow_formation (s : t)  : t = refine(s, j => {
+    let arrow_formation (s : t)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Arrow(x, ty1, ty2), Typ)) => [J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))]
-        | _ => failwith("arrow_formation failure")
+        | J(c, In(Arrow(x, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))])
+        | _ => Error("arrow_formation failure")
         }
     })
 
-    let ap (s : t, x : name, ty1 : tm, ty2 : tm)  : t = refine(s, j => {
+    let ap (s : t, x : name, ty1 : tm, ty2 : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Ap(a1, a2), ty2_sub)) when subst(ty2, a2, 0) == ty2_sub => 
-            [J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))]
-        | _ => failwith("ap failure")
+            Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
+        | _ => Error("ap failure")
         }
     })
 
-    let arrow_introduction (s : t)  : t = refine(s, j => {
+    let arrow_introduction (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, Arrow(x, ty1, ty2)) => [J(Cons(c, x, ty1), ty2)]
-        | _ => failwith("arrow_introduction failure")
+        | J(c, Arrow(x, ty1, ty2)) => Ok([J(Cons(c, x, ty1), ty2)])
+        | _ => Error("arrow_introduction failure")
         }
     })
 }
