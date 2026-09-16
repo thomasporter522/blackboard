@@ -1,0 +1,8 @@
+lib: [
+  "_build/install/default/lib/blackboard/META"
+  "_build/install/default/lib/blackboard/dune-package"
+  "_build/install/default/lib/blackboard/opam"
+]
+bin: [
+  "_build/install/default/bin/blackboard"
+]

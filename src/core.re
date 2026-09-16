@@ -308,4 +308,5 @@ let rec check_demo(d : demo, s : PartialDerivation.t) : (demo_check_report, Part
     }
 }
 
-let check_demo_root(d : demo, root : judgment) = check_demo(d, PartialDerivation.init(root))
+let check_demo_root(d : demo, root : judgment) : demo_check_report = 
+    fst(check_demo(d, PartialDerivation.init(root)))
