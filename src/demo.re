@@ -6,9 +6,9 @@ type demo =
     | Hyp(name)
     | InForm(tm, demo, demo)
     | InElim(tm, demo)
-    | Have(name, demo, demo)
-    | Suffices(name, demo, demo)
-    | TypFormn
+    | Have(name, tm, demo, demo)
+    | Suffices(name, tm, demo, demo)
+    | TypForm
     | ArrowForm(demo, demo)
     | Ap(name, tm, tm, demo, demo)
     | ArrowIntro(demo)
@@ -28,32 +28,84 @@ let merge_reports(r1 : demo_check_report, r2 : demo_check_report) : demo_check_r
     errors : r1.errors @ r2.errors
 }
 
-// invariant: the root of returned PD.t is the same as that of the provided one
-// invariant: the focused of returned PD.t is the tail of that of the provided one
+let skip_and_error(s : t, e : error) : (t, demo_check_report) {
+    let s' = Result.get_ok(skip(s));
+    (s', report([], [e]))
+}
+
+let attempt(s : t, v : result('a, error), f : 'a => (t, demo_check_report)) : (t, demo_check_report) = {
+    switch(v) {
+    | Ok(v) => f(v)
+    | Error(e) => skip_and_error(s, e)
+    }
+}
+
+// precondition: the [s.focused] is nonempty
+// invariant: the root of returned PD.t is the same as that of [s]
+// invariant: the focused of returned PD.t is the tail of that of [s]
 let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
     switch(d) {
-    | Hole => (skip(s), report([focused(s)],[]))
+    | Hole =>
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', report([j], []))
     | Hyp(x) =>
-        let n = index_of_name(ctx_of_judgment(focused(s)), x);
-        (hyp(s, n), report([], []))
+        let f = Result.get_ok(focused(s));
+        attempt(s, index_of_name(ctx_of_judgment(f), x), n => 
+            attempt(s, hyp(s, n), s' => 
+                (s', report([], []))))
     | InForm(ty, d1, d2) => 
-        let s' = in_formation(s, ty);
-        let (s'', r1) = check_demo(s', d1);
-        let (s''', r2) = check_demo(s'', d2);
-        (s''', merge_reports(r1, r2))
-    // | InElim(tm, demo)
-    // | Have(name, demo, demo)
-    // | Suffices(name, demo, demo)
-    // | TypFormn
-    // | ArrowForm(demo, demo)
-    // | Ap(name, tm, tm, demo, demo)
-    | ArrowIntro(d) => {
-        let s' = arrow_introduction(s);
-        let (s'', r) = check_demo(s', d);
-        (s'', r)
+        attempt(s, in_formation(s, ty), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
+        });
+    | InElim(a, d) => {
+        attempt(s, in_elimination(s, a), s' => {
+            let (s'', r1) = check_demo(s', d);
+            (s'', r1)
+        });
     }
-    // | Obvious
-    | _ => failwith("todo")
+    | Have(x, ty, d1, d2) => {
+        attempt(s, cut(s, x, ty), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
+        });
+    }
+    // ideally, d1 would be checked first, in case we have non-independent PD edits like refining a metavar
+    | Suffices(x, ty, d1, d2) => {
+        attempt(s, cut(s, x, ty), s' => {
+            let (s'', r1) = check_demo(s', d2);
+            let (s''', r2) = check_demo(s'', d1);
+            (s''', merge_reports(r1, r2))
+        });
+    }
+    | TypForm =>
+        attempt(s, typ_formation(s), s' => (s', report([], [])))
+    | ArrowForm(d1, d2) => 
+        attempt(s, arrow_formation(s), s' => {
+            let (s'', r1) = check_demo(s', d2);
+            let (s''', r2) = check_demo(s'', d1);
+            (s''', merge_reports(r1, r2))
+        });
+    | Ap(x, ty1, ty2, d1, d2) => {
+        attempt(s, ap(s, x, ty1, ty2), s' => {
+            let (s'', r1) = check_demo(s', d2);
+            let (s''', r2) = check_demo(s'', d1);
+            (s''', merge_reports(r1, r2))
+        });
+    }
+    | ArrowIntro(d) => {
+        attempt(s, arrow_introduction(s), s' => {
+            let (s'', r) = check_demo(s', d);
+            (s'', r)
+        })
+    }
+    | Obvious => {
+        let s' = Result.get_ok(skip(s));
+        (s', report([], ["not obvious"]))
+    }
     }
 }
 

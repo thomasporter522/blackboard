@@ -66,14 +66,6 @@ let rec lookup_index (c : ctx, x : int) : tm = {
     }
 }
 
-// let rec lookup_name (c : ctx, x : name) : tm = {
-//     switch(c, x) {
-//     | (Cons(c, y, t), x) when y == x => shift(t, 0)
-//     | (Cons(c, _, _), x) => shift(lookup_name(c, x), 0)
-//     | _ => failwith("Context lookup unbound name")
-//     }
-// }
-
 type judgment = J(ctx, tm);
 
 let ctx_of_judgment (j : judgment) : ctx = switch(j) {
