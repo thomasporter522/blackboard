@@ -73,7 +73,7 @@ let attempt(s : t, v : result('a, error), f : 'a => (t, demo_check_report)) : (t
 let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
     | Cons(_, y, _) when x == y => 0 
     | Cons(c, _, _) => 1+var_of_surface(c, x)
-    | Empty => failwith("impossible var_of_surface")
+    | Empty => failwith("unbound variable")
 }
 
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
@@ -223,27 +223,27 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
             (s3, merge_report_list([r1, r2]))
         });
     }
-    | Use(_x, _ds) => 
-        failwith("todo")
-        // switch(ds){
-        // | [] => failwith("impossible")
-        // | [d] => {
-        //     let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-        //     attempt(s, index_of_name(c, x), n => {
-        //         switch(lookup_index(c, n)) {
-        //         | Arrow(_, ty_a, ty_b) when no_x(ty_b, 0) => {
-        //             attempt(s, cut(s, "#a", ty_a), s' => {
-        //                 let (s'', r1) = check_demo(s', d);
-
-        //                 failwith("todo")
-        //             })
-        //         }
-        //         | _ => skip_and_error(s, "head isn't an implication")
-        //         }
-        //     })
-        // }
-        // | [_d, ... _ds] => failwith("todo")
-    // }
+    | Use(x, ds) => 
+        // failwith("todo")
+        switch(ds){
+        | [] => failwith("impossible")
+        | [d] => {
+            let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+            attempt(s, index_of_name(c, x), n => {
+                switch(lookup_index(c, n)) {
+                | Arrow(_, ty_a, ty_b) when no_x(ty_b, 0) => {
+                    attempt(s, modus_ponens(s, ty_a), s' => {
+                        let (s2, r1) = check_demo(s', Hyp(x));
+                        let (s3, r2) = check_demo(s2, d);
+                        (s3, merge_report_list([r1, r2]))
+                    })
+                }
+                | _ => skip_and_error(s, "head isn't an implication")
+                }
+            })
+        }
+        | [_d, ... _ds] => failwith("todo")
+    }
     | Obvious => {
         attempt_option(typ_formation(s), s' => (s', report([], [])), 
         attempt_option(assumed(s), s' => (s', report([], [])), 

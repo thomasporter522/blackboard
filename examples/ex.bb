@@ -1,8 +1,10 @@
 prove
-(A B : type) -> (A -> B) -> (A -> B)
+(A B C : type) -> (A -> B -> C) -> (B -> A -> C)
 by
 given A : type [valid by type-type],
 given B : type,
-given h : (A -> B) [valid by ?],
+given C : type,
+given h : (A -> B -> C) [valid by ?],
+given b : B,
 given a : A,
-MP A ? ?
+?
