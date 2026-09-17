@@ -34,17 +34,23 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     }
 }
 
-// increments each variable in [a] greater than or equal to [n]
-let rec shift (a : tm, x : int) : tm = {
+// applies f to each variable in [a] greater than or equal to [n]
+let rec varmap (a : tm, x : int, f : int => int) : tm = {
     switch(a) {
     | Typ => Typ
-    | In(a, ty) => In(shift(a, x), shift(ty, x))
-    | Arrow(y, ty1, ty2) => Arrow(y, shift(ty1, x), shift(ty2, x+1))
-    | Var(y) when y >= x => Var(y+1)
+    | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
+    | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
+    | Var(y) when y >= x => Var(f(y))
     | Var(y) => Var(y)
-    | Ap(a1, a2) => Ap(shift(a1, x), shift(a2, x))
+    | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
     }
 }
+
+// increments each variable in [a] greater than or equal to [n]
+let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
+
+// decrements each variable in [a] greater than or equal to [n]
+let downshift (a : tm, x : int) : tm = varmap(a, x, n => n-1)
 
 // replaces all occurrences of [x] with [a]
 let rec subst (a1 : tm, a : tm, x : int) : tm = {
@@ -66,6 +72,16 @@ let rec lookup_index (c : ctx, x : int) : tm = {
     }
 }
 
+let rec no_x (a : tm, x : int) : bool = {
+    switch(a) {
+    | Typ => true
+    | In(a, ty) => no_x(a, x) && no_x(ty, x)
+    | Arrow(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
+    | Var(y) => y != x
+    | Ap(a1, a2) => no_x(a1, x) && no_x(a2, x)
+    }
+}
+
 type judgment = J(ctx, tm);
 
 let pair_of_judgment (j : judgment) : (ctx, tm) = switch(j) {
@@ -81,6 +97,8 @@ module PartialDerivation : {
     let verify : (t, judgment) => bool;
     let focused : t => result(judgment, error);
     let skip : t => result(t, error);
+    let swap : t => result(t, error);
+    let weaken : t => result(t, error);
     let hyp : t => result(t, error);
     let in_formation : (t, tm) => result(t, error);
     let in_elimination : (t, tm) => result(t, error);
@@ -125,6 +143,18 @@ module PartialDerivation : {
         }
     }
 
+    let swap (s : t) : result(t, error) = {
+        switch(s.focused) {
+            | [h1, h2, ... t] => Ok({
+                skipped: s.skipped,
+                focused: [h2, h1, ... t],
+                root: s.root
+            })
+            | _ => Error("nothing to swap")
+        }
+    }
+
+
     let refine (s : t, f : judgment => result(list(judgment), error)) : result(t, error) = {
         switch(s.focused) {
             | [h, ... t] => 
@@ -136,6 +166,14 @@ module PartialDerivation : {
             | [] => Error("nothing to refine")
         }
     }
+
+    let weaken (s : t) : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(Cons(c, _, _), ty) when no_x(ty, 0) => 
+            Ok([J(c, downshift(ty, 0))])
+        | _ => Error("weaken failure")
+        }
+    })
 
     let hyp (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
@@ -183,7 +221,7 @@ module PartialDerivation : {
 
     let ap (s : t, x : name, ty1 : tm, ty2 : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Ap(a1, a2), ty2_sub)) when subst(ty2, a2, 0) == ty2_sub => 
+        | J(c, In(Ap(a1, a2), ty2_sub)) when subst(ty2, a2, 0) == shift(ty2_sub,0) => 
             Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
         | _ => Error("ap failure")
         }

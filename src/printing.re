@@ -1,14 +1,20 @@
 open Core
 open Demo
 
+let show_indices = false;
 
-let rec string_of_var(c : ctx, x : int) : string = switch(c) {
+
+let rec text_of_var(c : ctx, x : int) : string = switch(c) {
     | Cons(_, y, _) when x == 0 => y
     | Cons(c, y, _) when x > 0 => {
-        let y' = string_of_var(c, x-1);
+        let y' = text_of_var(c, x-1);
         if (y' == y) { y ++ " (shadowed)"} else y'
     }
     | _ => failwith("impossible: string of var")
+}
+
+let string_of_var(c : ctx, x : int) : string = {
+    text_of_var(c, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
 }
 
 let rec string_of_term(c : ctx, a : tm) : string = {
@@ -23,9 +29,15 @@ let rec string_of_term(c : ctx, a : tm) : string = {
     }
 }
 
+let rec string_of_ctx(c : ctx) : string = switch(c) {
+    | Empty => ""
+    | Cons(Empty, x, ty) => x ++ " : " ++ string_of_term(c, ty)
+    | Cons(c, x, ty) => string_of_ctx(c) ++ ", " ++ x ++ " : " ++ string_of_term(c, ty)
+}
+
 let string_of_judgment_short(j : judgment) : string = {
     switch(j) {
-    | J(c, a) => string_of_term(c, a) //++ " -| " ++ string_of_ctx(c)
+    | J(c, a) =>  string_of_ctx(c) ++ " |- " ++string_of_term(c, a)
     }
 }
 

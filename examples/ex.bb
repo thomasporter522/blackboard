@@ -1,7 +1,8 @@
 prove
-(A B : type) -> A -> A
+(A B : type) -> (A -> B) -> (A -> B)
 by
-given myA : type [valid by type-type],
-given myB : type [valid by type-type],
-given x : myA [valid by type-of myA],
-x
+given A : type [valid by type-type],
+given B : type,
+given h : (A -> B) [valid by ?],
+given a : A,
+MP A ? ?
