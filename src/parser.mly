@@ -26,6 +26,7 @@ open Program
 %token TYPEOF "type-of"
 %token OBVIOUS "obvious"
 %token CLAIM "claim"
+%token SUFFICES "suffices"
 
 %start <Program.surface_program> prog
 %%
@@ -79,4 +80,5 @@ let demo :=
   | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }
+  | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }

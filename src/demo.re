@@ -16,7 +16,7 @@ type demo =
     | InForm(tm, demo, demo)
     | InElim(tm, demo)
     | Claim(name, surface_tm, demo, demo)
-    | Suffices(name, tm, demo, demo)
+    | Suffices(name, surface_tm, demo, demo)
     | TypForm
     | ArrowForm(demo, demo)
     | Ap(name, tm, tm, demo, demo)
@@ -180,7 +180,9 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         });
     }
     | Suffices(x, ty, d1, d2) => {
-        attempt(s, cut(s, x, ty), s' => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let ty_elab = tm_of_surface(c, ty);
+        attempt(s, cut(s, x, ty_elab), s' => {
             attempt(s', swap(s'), s'' => {
                 let (s''', r1) = check_demo(s'', d1);
                 let (s'''', r2) = check_demo(s''', d2);

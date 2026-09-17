@@ -7,6 +7,6 @@ given C : type,
 given h1 : (A -> B) [valid by ?],
 given h2 : (B -> C) [valid by ?],
 given a : A,
-claim l1 : B by 
-    h1 a,
-h2 l1
+suffices l1 : B by 
+    h2 l1,
+h1 a
