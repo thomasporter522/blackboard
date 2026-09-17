@@ -15,10 +15,10 @@ open Program
 %token BY "by"
 
 
-%token ASSUME "assume"
+%token GIVEN "given"
 %token HOLE "?"
 
-%start <Program.alpha_program> prog
+%start <Program.surface_program> prog
 %%
 
 let prog :=
@@ -34,11 +34,16 @@ let applicable :=
   | x = atom; { x }
   | t1 = applicable; t2 = atom; { Ap (t1, t2) }
 
+let id_list := 
+  | x = ID; { [x] }
+  | x = ID; xs = id_list; { x :: xs }
+
 let term :=
-  | LPAREN; x = ID; COLON; t1 = term; RPAREN; ARROW; t2 = term; { Arrow (x, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { Arrow (xs, t1, t2) }
+  | t1 = term; ARROW; t2 = term; { SimpleArrow (t1, t2) }
   | x = applicable; { x }
 
 let demo :=
-  | x = HOLE; { Hole }
-  | ASSUME; d = demo; { ArrowIntro d }
+  | _ = HOLE; { Hole }
+  | GIVEN; x = ID; COLON; t = term; d = demo; { Given (x, t, Obvious, d) }
   | x = ID; { Hyp x }

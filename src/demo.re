@@ -11,7 +11,7 @@ type demo =
     | TypForm
     | ArrowForm(demo, demo)
     | Ap(name, tm, tm, demo, demo)
-    | ArrowIntro(demo)
+    | Given(name, tm, demo, demo)
     | Obvious
 
 type demo_check_report = {
@@ -85,26 +85,33 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
         attempt(s, typ_formation(s), s' => (s', report([], [])))
     | ArrowForm(d1, d2) => 
         attempt(s, arrow_formation(s), s' => {
-            let (s'', r1) = check_demo(s', d2);
-            let (s''', r2) = check_demo(s'', d1);
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
         });
     | Ap(x, ty1, ty2, d1, d2) => {
         attempt(s, ap(s, x, ty1, ty2), s' => {
-            let (s'', r1) = check_demo(s', d2);
-            let (s''', r2) = check_demo(s'', d1);
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
         });
     }
-    | ArrowIntro(d) => {
-        attempt(s, arrow_introduction(s), s' => {
-            let (s'', r) = check_demo(s', d);
-            (s'', r)
+    | Given(x, ty, d1, d2) => {
+        // first check that the types line up
+
+        let ty_goal = typ_of_judgment(Result.get_ok(focused(s)));
+        if (!equiv(ty, ty_goal)) {
+            skip_and_error(s, "wrong given type")
+        } else {
+            attempt(s, arrow_introduction(x, s), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
         })
+        }
     }
     | Obvious => {
-        let s' = Result.get_ok(skip(s));
-        (s', report([], ["not obvious"]))
+        skip_and_error(s,"not obvious")
     }
     }
 }

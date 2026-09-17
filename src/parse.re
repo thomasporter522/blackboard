@@ -1,12 +1,10 @@
 
-open Parser 
-open Lexer
 open Program
 
 let parse_program(s : string) : program = {
     let lexbuf = Lexing.from_string(s);
-    let alpha_p = Parser.prog(Lexer.read, lexbuf);
-    program_of_alpha(alpha_p)
+    let p = Parser.prog(Lexer.read, lexbuf);
+    program_of_surface(p)
 }
 
 let program_of_file(filename : string) = {

@@ -15,7 +15,9 @@ let rec string_of_term(c : ctx, a : tm) : string = {
     switch(a) {
     | Typ => "type"
     | In(a, ty) => string_of_term(c, a) ++ " : " ++ string_of_term(c, ty)
-    | Arrow(x, ty1, ty2) => "(" ++ x ++ " : " ++ string_of_term(c, ty1) ++ ") -> " ++ string_of_term(Cons(c, x, ty1), ty2)
+    | Arrow(x, ty1, ty2) => 
+        ((x == "_") ? string_of_term(c, ty1) : "(" ++ x ++ " : " ++ string_of_term(c, ty1) ++ ")")
+        ++ " -> " ++ string_of_term(Cons(c, x, ty1), ty2)
     | Var(x) => string_of_var(c, x)
     | Ap(a1, a2) => string_of_term(c, a1) ++ " " ++ string_of_term(c, a2)
     }

@@ -19,6 +19,6 @@ rule read =
   | "prove" { PROVE }
   | "by" { BY }
   | "?" { HOLE }
-  | "assume" { ASSUME }
+  | "given" { GIVEN }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }

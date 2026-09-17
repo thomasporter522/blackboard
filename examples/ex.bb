@@ -1,6 +1,6 @@
-prove 
-(A : type) -> (x : A) -> A
+prove
+(A B : type) -> A -> A
 by
-assume
-assume
-x
+given A : type
+?
+
