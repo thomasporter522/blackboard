@@ -12,6 +12,7 @@ type surface_tm =
 type demo = 
     | Hole
     | Hyp(name)
+    | HypTyp(name)
     | InForm(tm, demo, demo)
     | InElim(tm, demo)
     | Have(name, tm, demo, demo)
@@ -76,8 +77,21 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
     | Hyp(x) =>
         let f = Result.get_ok(focused(s));
         attempt(s, index_of_name(ctx_of_judgment(f), x), n => 
-            attempt(s, hyp(s, n), s' => 
-                (s', report([], []))))
+            attempt(s, in_elimination(s, Var(n)), s' => 
+                attempt(s', hyp(s'), s'' => 
+                    (s'', report([], [])))))
+    | HypTyp(x) =>
+        let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+        attempt(s, index_of_name(c, x), n => {
+            switch(ty_goal) {
+            | In(Var(n'), _) when n' == n => {
+                attempt(s, hyp(s), s' => 
+                    (s', report([], [])))
+            }
+            | _ => skip_and_error(s, "typ-of failure")
+            }
+        })
+
     | InForm(ty, d1, d2) => 
         attempt(s, in_formation(s, ty), s' => {
             let (s'', r1) = check_demo(s', d1);
@@ -122,7 +136,6 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
     }
     | Given(x, ty, d1, d2) => {
         // first check that the types line up
-
         let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
         switch(ty_goal) {
             | Arrow(_, ty1, _) => 

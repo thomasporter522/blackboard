@@ -6,6 +6,8 @@ open Program
 %token <string> ID
 %token LPAREN "("
 %token RPAREN ")"
+%token LSQAREN "["
+%token RSQAREN "]"
 %token EOF
 
 %token TYPE "type"
@@ -17,8 +19,11 @@ open Program
 
 
 %token GIVEN "given"
+%token VALID "valid"
 %token COMMA ","
 %token HOLE "?"
+%token TYPETYPE "type-type"
+%token TYPEOF "type-of"
 
 %start <Program.surface_program> prog
 %%
@@ -47,5 +52,9 @@ let term :=
 
 let demo :=
   | _ = HOLE; { Hole }
+  | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | x = ID; { Hyp x }
+  | TYPETYPE; { TypForm }
+  | TYPEOF; x = ID; { HypTyp (x) }
+  | LPAREN; d = demo; RPAREN; { d }

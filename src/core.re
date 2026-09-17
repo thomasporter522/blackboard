@@ -81,7 +81,7 @@ module PartialDerivation : {
     let verify : (t, judgment) => bool;
     let focused : t => result(judgment, error);
     let skip : t => result(t, error);
-    let hyp : (t, int) => result(t, error);
+    let hyp : t => result(t, error);
     let in_formation : (t, tm) => result(t, error);
     let in_elimination : (t, tm) => result(t, error);
     let cut : (t, name, tm) => result(t, error);
@@ -137,11 +137,12 @@ module PartialDerivation : {
         }
     }
 
-    let hyp (s : t, x : int) : result(t, error) = refine(s, j => {
+    let hyp (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, ty) => 
+        | J(c, In(Var(x), ty)) => 
             let found = lookup_index(c, x);
             if (equiv(found, ty)) Ok([]) else Error("hyp failure")
+        | _ => Error("hyp failure")
         }
     })
 
