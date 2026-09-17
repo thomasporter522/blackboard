@@ -1,10 +1,10 @@
 prove
-(A B C : type) -> (A -> B -> C) -> (B -> A -> C)
+(A B C : type) -> (A -> B) -> (B -> C) -> (A -> C)
 by
 given A : type [valid by type-type],
 given B : type,
 given C : type,
-given h : (A -> B -> C) [valid by ?],
-given b : B,
+given h1 : (A -> B) [valid by ?],
+given h2 : (B -> C) [valid by ?],
 given a : A,
-h a b
+h2 (h1 a)
