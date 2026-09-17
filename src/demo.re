@@ -15,7 +15,7 @@ type demo =
     | HypTyp(name)
     | InForm(tm, demo, demo)
     | InElim(tm, demo)
-    | Have(name, tm, demo, demo)
+    | Claim(name, surface_tm, demo, demo)
     | Suffices(name, tm, demo, demo)
     | TypForm
     | ArrowForm(demo, demo)
@@ -170,8 +170,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s'', r1)
         });
     }
-    | Have(x, ty, d1, d2) => {
-        attempt(s, cut(s, x, ty), s' => {
+    | Claim(x, ty, d1, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let ty_elab = tm_of_surface(c, ty);
+        attempt(s, cut(s, x, ty_elab), s' => {
             let (s'', r1) = check_demo(s', d1);
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))

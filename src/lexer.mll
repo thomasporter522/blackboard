@@ -28,5 +28,6 @@ rule read =
   | "type-type" { TYPETYPE }
   | "type-of" { TYPEOF }
   | "obvious" { OBVIOUS }
+  | "claim" { CLAIM }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }
