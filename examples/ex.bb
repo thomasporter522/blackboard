@@ -7,4 +7,4 @@ given C : type,
 given h : (A -> B -> C) [valid by ?],
 given b : B,
 given a : A,
-?
+h a b

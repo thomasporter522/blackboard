@@ -21,7 +21,6 @@ type demo =
     | ArrowForm(demo, demo)
     | Ap(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
-    | Mp(surface_tm, demo, demo)
     | Use(name, list(demo))
     | Obvious
 
@@ -124,10 +123,18 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     })
 }
 
+let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
+    switch(ty) {
+    | Arrow(_, ty1, ty2) when n == 1 && no_x(ty2, 0) => Ok(varmap(ty1, 0, x => x-downshift))
+    | Arrow(_, _, ty2) when n > 1 => nth_premise(ty2, n-1, downshift+1)
+    | _ => Error("head cannot be applied")
+    }
+}
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
-let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
+let rec check_demo(s : t, d : demo) : (t, demo_check_report) = 
     switch(d) {
     | Hole =>
         let s' = Result.get_ok(skip(s));
@@ -210,39 +217,13 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
                 })
                 }
             | _ => skip_and_error(s, "not an arrow")
-        }
-    }
-    | Mp(ty, d1, d2) => {
+        }}
+    | Use(x, ds) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        let ty_elab = tm_of_surface(c, ty);
-        attempt(s, modus_ponens(s, ty_elab), s' => {
-            let (s2, r1) = check_demo(s', d1);
-            let (s3, r2) = check_demo(s2, d2);
-            // let (s4, r3) = check_demo(s3, d3);
-            // let (s5, r4) = check_demo(s4, d4);
-            (s3, merge_report_list([r1, r2]))
-        });
-    }
-    | Use(x, ds) => 
-        // failwith("todo")
-        switch(ds){
-        | [] => failwith("impossible")
-        | [d] => {
-            let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-            attempt(s, index_of_name(c, x), n => {
-                switch(lookup_index(c, n)) {
-                | Arrow(_, ty_a, ty_b) when no_x(ty_b, 0) => {
-                    attempt(s, modus_ponens(s, ty_a), s' => {
-                        let (s2, r1) = check_demo(s', Hyp(x));
-                        let (s3, r2) = check_demo(s2, d);
-                        (s3, merge_report_list([r1, r2]))
-                    })
-                }
-                | _ => skip_and_error(s, "head isn't an implication")
-                }
-            })
-        }
-        | [_d, ... _ds] => failwith("todo")
+        attempt(s, index_of_name(c, x), n => {
+            // print_endline("found head! " ++ string_of_int(n));
+            use_with_reversed_args(s, x, lookup_index(c, n), List.rev(ds))
+        })
     }
     | Obvious => {
         attempt_option(typ_formation(s), s' => (s', report([], [])), 
@@ -250,6 +231,23 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
         attempt_option(hyp(s), s' => (s', report([], [])), 
         skip_and_error(s,"not obvious"))))
     }
+}
+
+and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
+    switch(ds){
+        | [] => check_demo(s, Hyp(x));
+        | [d,... other_ds] => {
+            switch(nth_premise(x_ty, List.length(ds), 0)) {
+                | Ok(premise) => {
+                    attempt(s, modus_ponens(s, premise), s' => {
+                        let (s2, r1) = use_with_reversed_args(s', x, x_ty, other_ds);
+                        let (s3, r2) = check_demo(s2, d);
+                        (s3, merge_report_list([r1, r2]))
+                    })
+                }
+                | Error(e) => skip_and_error(s, e)
+            };
+        }
     }
 }
 

@@ -4,17 +4,17 @@ open Demo
 let show_indices = false;
 
 
-let rec text_of_var(c : ctx, x : int) : string = switch(c) {
+let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
     | Cons(_, y, _) when x == 0 => y
     | Cons(c, y, _) when x > 0 => {
-        let y' = text_of_var(c, x-1);
+        let y' = text_of_var(c, x-1, original);
         if (y' == y) { y ++ " (shadowed)"} else y'
     }
-    | _ => failwith("impossible: string of var")
+    | _ => failwith("(impossible) variable out of range: " ++ string_of_int(original))
 }
 
 let string_of_var(c : ctx, x : int) : string = {
-    text_of_var(c, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
+    text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
 }
 
 let rec string_of_term(c : ctx, a : tm) : string = {

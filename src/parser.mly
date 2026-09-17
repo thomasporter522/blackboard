@@ -25,7 +25,6 @@ open Program
 %token TYPETYPE "type-type"
 %token TYPEOF "type-of"
 %token OBVIOUS "obvious"
-%token MP "MP"
 
 %start <Program.surface_program> prog
 %%
@@ -79,4 +78,3 @@ let demo :=
   | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | TYPEOF; x = ID; { HypTyp (x) }
-  | MP; t = atom; d1 = demo; d2 = demo; { Mp (t, d1, d2) }
