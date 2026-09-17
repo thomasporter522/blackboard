@@ -18,7 +18,7 @@ type demo =
     | Claim(name, surface_tm, demo, demo)
     | Suffices(name, surface_tm, demo, demo)
     | TypForm
-    | ArrowForm(demo, demo)
+    | ArrowForm(name, demo, demo)
     | Ap(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | Use(name, list(demo))
@@ -192,8 +192,8 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
     | TypForm =>
         attempt(s, typ_formation(s), s' => (s', report([], [])))
-    | ArrowForm(d1, d2) => 
-        attempt(s, arrow_formation(s), s' => {
+    | ArrowForm(x, d1, d2) => 
+        attempt(s, arrow_formation(s, x), s' => {
             let (s'', r1) = check_demo(s', d1);
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))

@@ -23,6 +23,7 @@ open Program
 %token COMMA ","
 %token HOLE "?"
 %token TYPETYPE "type-type"
+%token ARROWTYPE "arrow-type"
 %token TYPEOF "type-of"
 %token OBVIOUS "obvious"
 %token CLAIM "claim"
@@ -84,3 +85,4 @@ let demo :=
   | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
+  | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }

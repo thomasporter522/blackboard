@@ -26,6 +26,7 @@ rule read =
   | "valid" { VALID }
   | "," { COMMA }
   | "type-type" { TYPETYPE }
+  | "arrow-type" { ARROWTYPE }
   | "type-of" { TYPEOF }
   | "obvious" { OBVIOUS }
   | "claim" { CLAIM }

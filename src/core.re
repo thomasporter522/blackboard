@@ -104,7 +104,7 @@ module PartialDerivation : {
     let in_elimination : (t, tm) => result(t, error);
     let cut : (t, name, tm) => result(t, error);
     let typ_formation : t => result(t, error);
-    let arrow_formation : t => result(t, error);
+    let arrow_formation : (t, name) => result(t, error);
     let ap : (t, name, tm, tm) => result(t, error);
     let arrow_introduction : (name, t) => result(t, error);
 
@@ -212,9 +212,9 @@ module PartialDerivation : {
         }
     })
 
-    let arrow_formation (s : t)  : result(t, error) = refine(s, j => {
+    let arrow_formation (s : t, x : name)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Arrow(x, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))])
+        | J(c, In(Arrow(_x, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))])
         | _ => Error("arrow_formation failure")
         }
     })
