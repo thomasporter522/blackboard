@@ -1,4 +1,5 @@
 %{
+open Demo
 open Program
 %}
 
@@ -16,6 +17,7 @@ open Program
 
 
 %token GIVEN "given"
+%token COMMA ","
 %token HOLE "?"
 
 %start <Program.surface_program> prog
@@ -45,5 +47,5 @@ let term :=
 
 let demo :=
   | _ = HOLE; { Hole }
-  | GIVEN; x = ID; COLON; t = term; d = demo; { Given (x, t, Obvious, d) }
+  | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | x = ID; { Hyp x }

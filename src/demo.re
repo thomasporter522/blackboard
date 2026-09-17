@@ -1,6 +1,14 @@
 open Core
 open Core.PartialDerivation
 
+type surface_tm = 
+    | Typ 
+    | In(surface_tm, surface_tm)
+    | Arrow(list(name), surface_tm, surface_tm)
+    | SimpleArrow(surface_tm, surface_tm)
+    | Var(name)
+    | Ap(surface_tm, surface_tm);
+
 type demo = 
     | Hole
     | Hyp(name)
@@ -11,7 +19,7 @@ type demo =
     | TypForm
     | ArrowForm(demo, demo)
     | Ap(name, tm, tm, demo, demo)
-    | Given(name, tm, demo, demo)
+    | Given(name, surface_tm, demo, demo)
     | Obvious
 
 type demo_check_report = {
@@ -38,6 +46,22 @@ let attempt(s : t, v : result('a, error), f : 'a => (t, demo_check_report)) : (t
     | Ok(v) => f(v)
     | Error(e) => skip_and_error(s, e)
     }
+}
+
+let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
+    | Cons(_, y, _) when x == y => 0 
+    | Cons(c, _, _) => 1+var_of_surface(c, x)
+    | Empty => failwith("impossible var_of_surface")
+}
+
+let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
+    | Typ => Typ
+    | In(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
+    | Arrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), Arrow(xs, t1, t2)))
+    | Arrow([], _, t2) => tm_of_surface(c, t2)
+    | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
+    | Var(x) => Var(var_of_surface(c, x))
+    | Ap(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
 }
 
 // precondition: the [s.focused] is nonempty
@@ -99,15 +123,20 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) = {
     | Given(x, ty, d1, d2) => {
         // first check that the types line up
 
-        let ty_goal = typ_of_judgment(Result.get_ok(focused(s)));
-        if (!equiv(ty, ty_goal)) {
-            skip_and_error(s, "wrong given type")
-        } else {
-            attempt(s, arrow_introduction(x, s), s' => {
-            let (s'', r1) = check_demo(s', d1);
-            let (s''', r2) = check_demo(s'', d2);
-            (s''', merge_reports(r1, r2))
-        })
+        let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+        switch(ty_goal) {
+            | Arrow(_, ty1, _) => 
+                let ty_elab = tm_of_surface(c, ty);
+                if (!equiv(ty_elab, ty1)) {
+                    skip_and_error(s, "wrong given type")
+                } else {
+                    attempt(s, arrow_introduction(x, s), s' => {
+                    let (s'', r1) = check_demo(s', d1);
+                    let (s''', r2) = check_demo(s'', d2);
+                    (s''', merge_reports(r1, r2))
+                })
+                }
+            | _ => skip_and_error(s, "not an arrow")
         }
     }
     | Obvious => {

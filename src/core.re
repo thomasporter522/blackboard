@@ -68,13 +68,12 @@ let rec lookup_index (c : ctx, x : int) : tm = {
 
 type judgment = J(ctx, tm);
 
-let ctx_of_judgment (j : judgment) : ctx = switch(j) {
-    | J(c, _) => c
+let pair_of_judgment (j : judgment) : (ctx, tm) = switch(j) {
+    | J(c, ty) => (c, ty)
 }
 
-let typ_of_judgment (j : judgment) : tm = switch(j) {
-    | J(_, ty) => ty
-}
+let ctx_of_judgment (j : judgment) : ctx = fst(pair_of_judgment(j))
+let typ_of_judgment (j : judgment) : tm = snd(pair_of_judgment(j))
 
 module PartialDerivation : {
     type t; 

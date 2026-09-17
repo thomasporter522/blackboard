@@ -20,5 +20,6 @@ rule read =
   | "by" { BY }
   | "?" { HOLE }
   | "given" { GIVEN }
+  | "," { COMMA }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }
