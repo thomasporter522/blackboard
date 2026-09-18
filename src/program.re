@@ -66,14 +66,14 @@ let swap01 (x : int) : int = switch(x) {
 // M, b |- (a : b0) -> M2 (smartswap)
 
 
-let rec ty_arrow_of_sig (s : signature) : tm = switch(s) {
-    | [] => Var(0)
-    | [(x, ty), ...s] => Arrow(x, shift(ty, 0), smartvarmap(ty_arrow_of_sig(s), 0, swap01))
+let rec ty_arrow_of_sig (s : signature, depth : int) : tm = switch(s) {
+    | [] => Var(depth)
+    | [(x, ty), ...s] => Arrow(x, varmap(ty, depth, x => x+1), ty_arrow_of_sig(s, depth+1))
 }
 
 // let ty_arrow_of_sig (_s : signature, _m : int) : tm = Typ
 
-let ty_of_sig (s : signature) : tm = Arrow("M", Typ, Arrow("_", ty_arrow_of_sig(s), Var(1)))
+let ty_of_sig (s : signature) : tm = Arrow("M", Typ, Arrow("_", ty_arrow_of_sig(s, 0), Var(1)))
 
 // let ty_of_sig (_s : signature) : tm = Typ
 
