@@ -36,7 +36,7 @@ open Program
 
 let prog :=
   | EOF; { Empty }
-  | ASSUME; s = signature; BY; d = demo; p = prog; { Assume (s, d, p) }
+  | ASSUME; s = signature; VALID; BY; d = demo; p = prog; { Assume (s, d, p) }
   | CONSTRUCT; s = signature; BY; d = demo; p = prog; { Construct (s, d, p) }
   | PROVE; t = term; BY; d = demo; p = prog; { Prove (t, d, p) }
 
@@ -88,7 +88,7 @@ let demo :=
   | d = demo_atom; { d }
   // | t = atom; { Term(t) }
   | x = ID; ds = demo_list; { Use(x, ds) }
-  | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
+  | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }
   | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim (x, t, Obvious, d2) }

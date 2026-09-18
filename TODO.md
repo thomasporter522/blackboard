@@ -1,6 +1,5 @@
 [] error localization and better reporting
 [] hole display
-[] assume/construct
 [] type checking
 [] usage-style forall elimination
-[] replace [use] with terms as demos
+[] factor construction obligation (or general doc structure) through core so that its generation isn't trusted code
