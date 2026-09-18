@@ -16,6 +16,7 @@ open Program
 
 %token PROVE "prove"
 %token BY "by"
+%token ASSUME "assume"
 
 
 %token GIVEN "given"
@@ -34,16 +35,21 @@ open Program
 
 let prog :=
   | EOF; { Empty }
+  | ASSUME; s = signature; BY; d = demo; p = prog; { Assume (s, d, p) }
   | PROVE; t = term; BY; d = demo; p = prog; { Prove (t, d, p) }
+
+let signature := 
+  | x = ID; COLON; t = term; { (x, t) :: [] }
+  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
 
 let atom := 
   | x = ID; { Var x }
   | TYPE; { Typ }
   | LPAREN; t = term; RPAREN; { t }
 
-let applicable := 
+let atom_list := 
   | x = atom; { x }
-  | t1 = applicable; t2 = atom; { Ap (t1, t2) }
+  | t1 = atom_list; t2 = atom; { Ap (t1, t2) }
 
 let id_list := 
   | x = ID; { [x] }
@@ -51,8 +57,8 @@ let id_list :=
 
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { Arrow (xs, t1, t2) }
-  | t1 = term; ARROW; t2 = term; { SimpleArrow (t1, t2) }
-  | x = applicable; { x }
+  | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
+  | x = atom_list; { x }
 
 // let term_list := 
 //   | t1 = term; t2 = term; { t1 :: t2 :: [] }
@@ -71,13 +77,14 @@ let demo_atom :=
 //   | t = atom; l = tm_or_demo_list; { Tm(t) :: l }
 //   | d = demo_atom; l = tm_or_demo_list; { Demo(d) :: l }
 
-let demo_list := 
-  | d = demo_atom; { d :: [] }
-  | d = demo_atom; ds = demo_list; { d :: ds }
+// let demo_list := 
+//   | d = demo_atom; { d :: [] }
+//   | d = demo_atom; ds = demo_list; { d :: ds }
 
 let demo :=
   | d = demo_atom; { d }
-  | x = ID; ds = demo_list; { Use(x, ds) }
+  | t = atom; { Term(t) }
+  // | x = ID; ds = demo_list; { Use(x, ds) }
   | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }

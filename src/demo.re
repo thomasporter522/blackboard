@@ -22,6 +22,7 @@ type demo =
     | Ap(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | Use(name, list(demo))
+    | Term(surface_tm)
     | Obvious
 
 // and tm_or_demo = 
@@ -228,6 +229,9 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             // print_endline("found head! " ++ string_of_int(n));
             use_with_reversed_args(s, x, lookup_index(c, n), List.rev(ds))
         })
+    }
+    | Term(a) => {
+        failwith("todo")
     }
     | Obvious => {
         attempt_option(typ_formation(s), s' => (s', report([], [])), 

@@ -21,6 +21,7 @@ rule read =
   | "->" { ARROW }
   | "prove" { PROVE }
   | "by" { BY }
+  | "assume" { ASSUME }
   | "?" { HOLE }
   | "given" { GIVEN }
   | "valid" { VALID }
