@@ -66,7 +66,7 @@ let term :=
 
 let demo_atom := 
   | _ = HOLE; { Hole }
-  | x = ID; { Hyp x }
+  // | x = ID; { Hyp x }
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
