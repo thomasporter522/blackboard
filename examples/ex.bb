@@ -1,3 +1,6 @@
+assume 
+asdf : type 
+by ?
 prove
 (A B C : type) -> (A -> B) -> (B -> C) -> (A -> C)
 by

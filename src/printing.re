@@ -1,5 +1,6 @@
 open Core
 open Demo
+open Program
 
 let show_indices = false;
 
@@ -17,13 +18,14 @@ let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
 }
 
-let rec string_of_term(c : ctx, a : tm) : string = {
+let rec string_of_term(~right_of_arrow = false, c : ctx, a : tm) : string = {
     switch(a) {
     | Typ => "type"
-    | In(a, ty) => string_of_term(c, a) ++ " : " ++ string_of_term(c, ty)
+    | In(a, ty) => "(" ++ string_of_term(c, a) ++ " : " ++ string_of_term(c, ty) ++ ")"
     | Arrow(x, ty1, ty2) => 
-        ((x == "_") ? string_of_term(c, ty1) : "(" ++ x ++ " : " ++ string_of_term(c, ty1) ++ ")")
-        ++ " -> " ++ string_of_term(Cons(c, x, ty1), ty2)
+        let inner = ((x == "_") ? string_of_term(c, ty1) : "(" ++ x ++ " : " ++ string_of_term(c, ty1) ++ ")")
+        ++ " -> " ++ string_of_term(~right_of_arrow = true, Cons(c, x, ty1), ty2);
+        right_of_arrow ? inner : "(" ++ inner ++ ")"
     | Var(x) => string_of_var(c, x)
     | Ap(a1, a2) => string_of_term(c, a1) ++ " " ++ string_of_term(c, a2)
     }
@@ -41,8 +43,13 @@ let string_of_judgment_short(j : judgment) : string = {
     }
 }
 
-let string_of_report(r : demo_check_report) : string = {
+let string_of_demo_report(r : demo_check_report) : string = {
     if (r.open_goals == [] && r.errors == []) "Proven!" else
     "Goals:\n\n" ++ String.concat("\n", List.map(string_of_judgment_short, r.open_goals))
     ++ "\n\nErrors:\n\n" ++ String.concat("\n", r.errors)
+}
+
+
+let string_of_report(rs : program_check_report) : string = {
+    String.concat("\n----\n", List.map(string_of_demo_report, rs))
 }
