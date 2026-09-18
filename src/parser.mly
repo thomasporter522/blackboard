@@ -17,6 +17,7 @@ open Program
 %token PROVE "prove"
 %token BY "by"
 %token ASSUME "assume"
+%token CONSTRUCT "construct"
 
 
 %token GIVEN "given"
@@ -36,9 +37,11 @@ open Program
 let prog :=
   | EOF; { Empty }
   | ASSUME; s = signature; BY; d = demo; p = prog; { Assume (s, d, p) }
+  | CONSTRUCT; s = signature; BY; d = demo; p = prog; { Construct (s, d, p) }
   | PROVE; t = term; BY; d = demo; p = prog; { Prove (t, d, p) }
 
 let signature := 
+  | { [] }
   | x = ID; COLON; t = term; { (x, t) :: [] }
   | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
 

@@ -46,6 +46,18 @@ let rec varmap (a : tm, x : int, f : int => int) : tm = {
     }
 }
 
+// smartapplies f to each variable in [a] greater than or equal to [n]
+let rec smartvarmap (a : tm, x : int, f : int => int) : tm = {
+    switch(a) {
+    | Typ => Typ
+    | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
+    | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, y => f(y-1)+1))
+    | Var(y) when y >= x => Var(f(y))
+    | Var(y) => Var(y)
+    | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
+    }
+}
+
 // increments each variable in [a] greater than or equal to [n]
 let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
 

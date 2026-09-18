@@ -22,6 +22,7 @@ rule read =
   | "prove" { PROVE }
   | "by" { BY }
   | "assume" { ASSUME }
+  | "construct" { CONSTRUCT }
   | "?" { HOLE }
   | "given" { GIVEN }
   | "valid" { VALID }
