@@ -66,7 +66,7 @@ let term :=
 
 let demo_atom := 
   | _ = HOLE; { Hole }
-  // | x = ID; { Hyp x }
+  | x = ID; { Hyp x }
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
@@ -77,14 +77,14 @@ let demo_atom :=
 //   | t = atom; l = tm_or_demo_list; { Tm(t) :: l }
 //   | d = demo_atom; l = tm_or_demo_list; { Demo(d) :: l }
 
-// let demo_list := 
-//   | d = demo_atom; { d :: [] }
-//   | d = demo_atom; ds = demo_list; { d :: ds }
+let demo_list := 
+  | d = demo_atom; { d :: [] }
+  | d = demo_atom; ds = demo_list; { d :: ds }
 
 let demo :=
   | d = demo_atom; { d }
-  | t = atom; { Term(t) }
-  // | x = ID; ds = demo_list; { Use(x, ds) }
+  // | t = atom; { Term(t) }
+  | x = ID; ds = demo_list; { Use(x, ds) }
   | GIVEN; x = ID; COLON; t = term; LSQAREN; VALID; BY; d1 = demo; RSQAREN; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }
