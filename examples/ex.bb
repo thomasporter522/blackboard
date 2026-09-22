@@ -5,7 +5,7 @@ valid by
 
 arrow-type M type-type (arrow-type h (arrow-type eq check (arrow-type refl (arrow-type A type-type (arrow-type a (type-of A) (
 
-    (ap thing1 A type ? obvious)
+    (ap thing1 A type (ap thing2 A (A -> type) check check) obvious)
 
 ))) obvious)) obvious)
 

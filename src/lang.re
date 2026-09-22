@@ -64,13 +64,14 @@ let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
 // decrements each variable in [a] greater than or equal to [n]
 let downshift (a : tm, x : int) : tm = varmap(a, x, n => n-1)
 
-// replaces all occurrences of [x] with [a]
+// replaces all occurrences of [x] with [a], downshifting all vars > x.
 let rec subst (a1 : tm, a : tm, x : int) : tm = {
     switch(a1) {
     | Typ => Typ
     | In(a1, ty) => In(subst(a1, a, x), subst(ty, a, x))
     | Arrow(y, ty1, ty2) => Arrow(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
-    | Var(y) when x == y => a 
+    | Var(y) when y == x => a 
+    | Var(y) when y > x => Var(y-1)
     | Var(y) => Var(y)
     | Ap(a1, a2) => Ap(subst(a1, a, x), subst(a2, a, x))
     }
