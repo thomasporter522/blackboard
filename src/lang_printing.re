@@ -46,14 +46,29 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     prec_string_of_term(0, 0, c, a)
 }
 
-let rec string_of_ctx(c : ctx) : string = switch(c) {
+let rec string_of_ctx_short(c : ctx) : string = switch(c) {
     | Empty => ""
     | Cons(Empty, x, ty) => x ++ " : " ++ string_of_term(c, ty)
-    | Cons(c, x, ty) => string_of_ctx(c) ++ ", " ++ x ++ " : " ++ string_of_term(c, ty)
+    | Cons(c, x, ty) => string_of_ctx_short(c) ++ ", " ++ x ++ " : " ++ string_of_term(c, ty)
 }
 
 let string_of_judgment_short(j : judgment) : string = {
     switch(j) {
-    | J(c, a) =>  string_of_ctx(c) ++ " |- " ++ string_of_term(c, a)
+    | J(c, a) =>  string_of_ctx_short(c) ++ " |- " ++ string_of_term(c, a)
+    }
+}
+
+let rec string_of_ctx(c : ctx) : string = switch(c) {
+    | Empty => ""
+    | Cons(Empty, x, ty) => x ++ " : " ++ string_of_term(c, ty)
+    | Cons(c, x, ty) => x ++ " : " ++ string_of_term(c, ty) ++ ",\n" ++ string_of_ctx(c)
+}
+
+let string_of_judgment(j : judgment) : string = {
+    switch(j) {
+    | J(c, a) => 
+        let s = string_of_term(c, a);
+        let bar = String.make(String.length(s), '-');
+        s ++ "\n" ++ bar ++ "\n" ++ string_of_ctx(c)
     }
 }
