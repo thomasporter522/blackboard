@@ -14,8 +14,8 @@ rule read =
   | white { read lexbuf }
   | "(" { LPAREN }
   | ")" { RPAREN }
-  | "[" { LSQAREN }
-  | "]" { RSQAREN }
+  (* | "[" { LSQAREN }
+  | "]" { RSQAREN } *)
   | "type" { TYPE }
   | ":" { COLON }
   | "->" { ARROW }
@@ -33,5 +33,6 @@ rule read =
   | "obvious" { OBVIOUS }
   | "claim" { CLAIM }
   | "suffices" { SUFFICES }
+  | "check" { CHECK }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }

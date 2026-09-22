@@ -1,4 +1,4 @@
-open Core
+open Lang
 open Demo
 
 type surface_signature = list((name, surface_tm))

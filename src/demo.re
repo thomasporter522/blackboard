@@ -1,4 +1,4 @@
-open Core
+open Lang
 open Core.PartialDerivation
 
 type surface_tm = 
@@ -8,6 +8,9 @@ type surface_tm =
     | SimpleArrow(surface_tm, surface_tm)
     | Var(name)
     | Ap(surface_tm, surface_tm);
+
+type tactic = 
+    | Check
 
 type demo = 
     | Hole
@@ -23,6 +26,7 @@ type demo =
     | Given(name, surface_tm, demo, demo)
     | Use(name, list(demo))
     | Obvious
+    | Tactic(tactic, list(demo))
 
 // and tm_or_demo = 
 //     | Tm(surface_tm)
@@ -131,6 +135,19 @@ let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
     }
 }
 
+let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
+    | Typ => Typ
+    | In(_) => Typ
+    | Arrow(_) => Typ
+    | Var(x) => lookup_index(c, x)
+    | Ap(a1, a2) => {
+        switch(infer_typ(c, a1)) {
+        | Arrow(_, _, ty2) => subst(ty2, a2, 0)
+        | _ => Typ
+        }
+    }
+}
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
@@ -234,6 +251,26 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         attempt_option(assumed(s), s' => (s', report([], [])), 
         attempt_option(hyp(s), s' => (s', report([], [])), 
         skip_and_error(s,"not obvious"))))
+    }
+    | Tactic(Check, ds) => {
+        if(ds != []) {
+            skip_and_error(s,"side conditions not supported yet")
+        } else {
+            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            switch(ty_goal) {
+                | In(Typ, _) => check_demo(s, TypForm)
+                | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
+                | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
+                | In(Ap(a1, _), _) => {
+                    switch(infer_typ(c, a1)) {
+                    | Arrow(x, ty1, ty2) => check_demo(s, Ap(x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+                    | _ => skip_and_error(s, "applying a non-arrow")
+                    }
+                }
+                | In(In(_, _), _) => failwith("unimplemented: In")
+                | _ => skip_and_error(s, "not a type obligation")
+            }
+        }
     }
 }
 

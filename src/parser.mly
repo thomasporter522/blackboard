@@ -6,8 +6,8 @@ open Program
 %token <string> ID
 %token LPAREN "("
 %token RPAREN ")"
-%token LSQAREN "["
-%token RSQAREN "]"
+// %token LSQAREN "["
+// %token RSQAREN "]"
 %token EOF
 
 %token TYPE "type"
@@ -30,6 +30,8 @@ open Program
 %token OBVIOUS "obvious"
 %token CLAIM "claim"
 %token SUFFICES "suffices"
+
+%token CHECK "check"
 
 %start <Program.surface_program> prog
 %%
@@ -96,3 +98,5 @@ let demo :=
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
+  | CHECK; { Tactic (Check, []) }
+  | CHECK; ds = demo_list; { Tactic (Check, ds) }

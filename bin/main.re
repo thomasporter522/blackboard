@@ -11,4 +11,6 @@ open Blackboard.Program
 // // let my_demo = ArrowIntro(ArrowIntro(Obvious))
 // print_endline(string_of_report(check_demo_root(my_root, my_demo)))
 
-print_endline(string_of_report(check_program(program_of_file("examples/ex.bb"))))
+let filename = Array.length(Sys.argv) > 1 ? Sys.argv[1] : "examples/ex.bb"
+
+print_endline(string_of_report(check_program(program_of_file(filename))))
