@@ -33,6 +33,7 @@ open Program
 %token SUFFICES "suffices"
 
 %token CHECK "check"
+%token DEFINITION "definition"
 
 %start <Program.surface_program> prog
 %%
@@ -77,6 +78,7 @@ let demo_atom :=
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
   | CHECK; { Tactic (Check, []) }
+  | DEFINITION; { Tactic (Schema(Definition), []) }
 
 // let tm_or_demo_list := 
 //   | t = atom; { Tm(t) :: [] }

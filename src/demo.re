@@ -9,8 +9,12 @@ type surface_tm =
     | Var(name)
     | Ap(surface_tm, surface_tm);
 
+type schema = 
+    | Definition
+
 type tactic = 
     | Check
+    | Schema(schema)
 
 type demo = 
     | Hole
@@ -25,6 +29,7 @@ type demo =
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
+    | ElabGiven(name, tm, demo, demo)
     | Use(name, list(demo))
     | Obvious
     | Tactic(tactic, list(demo))
@@ -231,10 +236,15 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
     | Given(x, ty, d1, d2) => {
         // first check that the types line up
-        let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let ty_elab = tm_of_surface(c, ty);
+        check_demo(s, ElabGiven(x, ty_elab, d1, d2));
+    }
+    | ElabGiven(x, ty_elab, d1, d2) => {
+        // first check that the types line up
+        let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
         switch(ty_goal) {
             | Arrow(_, ty1, _) => 
-                let ty_elab = tm_of_surface(c, ty);
                 if (!equiv(ty_elab, ty1)) {
                     skip_and_error(s, "wrong given type")
                 } else {
@@ -261,7 +271,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
     | Tactic(Check, ds) => {
         if(ds != []) {
-            skip_and_error(s,"side conditions not supported yet")
+            skip_and_error(s, "side conditions not supported yet")
         } else {
             let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
@@ -276,6 +286,22 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 }
                 | In(In(_, _), _) => failwith("unimplemented: In")
                 | _ => skip_and_error(s, "not a type obligation")
+            }
+        }
+    }
+    | Tactic(Schema(Definition), ds) => {
+        if (ds != []) {
+            skip_and_error(s, "side conditions not supported yet")
+        } else {
+            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            switch(ty_goal) {
+            | Arrow(m, Typ, Arrow(h, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Var(1))) 
+                when equiv(ty, ty') && equiv(ty, ty'') => 
+                check_demo(s, ElabGiven("M", Typ, TypForm, 
+                    ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Tactic(Check, []), 
+                    Hole //ElabAp("thing", )
+                    )))
+            | _ => skip_and_error(s, "not a definition obligation")
             }
         }
     }

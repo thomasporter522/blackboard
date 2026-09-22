@@ -35,5 +35,6 @@ rule read =
   | "claim" { CLAIM }
   | "suffices" { SUFFICES }
   | "check" { CHECK }
+  | "definition" { DEFINITION }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }
