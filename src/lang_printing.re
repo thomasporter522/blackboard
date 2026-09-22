@@ -10,7 +10,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
 }
 
 
-let show_indices = false;
+let show_indices = true;
 
 let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")

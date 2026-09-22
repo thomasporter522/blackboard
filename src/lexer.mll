@@ -30,6 +30,7 @@ rule read =
   | "type-type" { TYPETYPE }
   | "arrow-type" { ARROWTYPE }
   | "type-of" { TYPEOF }
+  | "ap" { AP }
   | "obvious" { OBVIOUS }
   | "claim" { CLAIM }
   | "suffices" { SUFFICES }

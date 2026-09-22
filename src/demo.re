@@ -1,5 +1,5 @@
 open Lang
-open Core.PartialDerivation
+open Deriv.PartialDerivation
 
 type surface_tm = 
     | Typ 
@@ -22,7 +22,8 @@ type demo =
     | Suffices(name, surface_tm, demo, demo)
     | TypForm
     | ArrowForm(name, demo, demo)
-    | Ap(name, tm, tm, demo, demo)
+    | Ap(name, surface_tm, surface_tm, demo, demo)
+    | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | Use(name, list(demo))
     | Obvious
@@ -76,7 +77,7 @@ let attempt(s : t, v : result('a, error), f : 'a => (t, demo_check_report)) : (t
 let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
     | Cons(_, y, _) when x == y => 0 
     | Cons(c, _, _) => 1+var_of_surface(c, x)
-    | Empty => failwith("unbound variable")
+    | Empty => failwith("unbound variable: " ++ x)
 }
 
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
@@ -216,6 +217,12 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         });
     | Ap(x, ty1, ty2, d1, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let ty1_elab = tm_of_surface(c, ty1);
+        let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
+        check_demo(s, ElabAp(x, ty1_elab, ty2_elab, d1, d2))
+    }
+    | ElabAp(x, ty1, ty2, d1, d2) => {
         attempt(s, ap(s, x, ty1, ty2), s' => {
             let (s'', r1) = check_demo(s', d1);
             let (s''', r2) = check_demo(s'', d2);
@@ -263,7 +270,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
                 | In(Ap(a1, _), _) => {
                     switch(infer_typ(c, a1)) {
-                    | Arrow(x, ty1, ty2) => check_demo(s, Ap(x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+                    | Arrow(x, ty1, ty2) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
                     | _ => skip_and_error(s, "applying a non-arrow")
                     }
                 }

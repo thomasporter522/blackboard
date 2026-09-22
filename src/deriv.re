@@ -89,7 +89,14 @@ module PartialDerivation : {
         switch(j) {
         | J(c, In(Var(x), ty)) => 
             let found = lookup_index(c, x);
-            if (equiv(found, ty)) Ok([]) else Error("hyp failure: " ++ text_of_var(c, x, x) ++ " found to have type ")
+            if (equiv(found, ty)) Ok([]) else Error(
+                "hyp failure: " 
+                ++ text_of_var(c, x, x) 
+                ++ " : "
+                ++ string_of_term(c, found)
+                ++ " ≠ "
+                ++ string_of_term(c, ty)
+            )
         | _ => Error("hyp failure: goal not of the form `x : _`")
         }
     })
@@ -131,9 +138,22 @@ module PartialDerivation : {
 
     let ap (s : t, x : name, ty1 : tm, ty2 : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Ap(a1, a2), ty2_sub)) when subst(ty2, a2, 0) == shift(ty2_sub,0) => 
-            Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
-        | _ => Error("ap failure")
+        | J(c, In(Ap(a1, a2), ty_expected)) => {
+            let ty_found = subst(ty2, a2, 0);
+            if (equiv(ty_found, ty_expected))
+                Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
+            else Error(
+                "ap failure: found = " 
+                ++ string_of_term(c, ty_found)
+                ++ " ≠ "
+                ++ string_of_term(c, ty_expected)
+            )
+        } 
+        | J(c, ty) => Error(
+            "ap failure: goal = " 
+            ++ string_of_term(c, ty)
+            ++ " ≠ `_ _ : _`"
+        )
         }
     })
 

@@ -27,6 +27,7 @@ open Program
 %token TYPETYPE "type-type"
 %token ARROWTYPE "arrow-type"
 %token TYPEOF "type-of"
+%token AP "ap"
 %token OBVIOUS "obvious"
 %token CLAIM "claim"
 %token SUFFICES "suffices"
@@ -75,6 +76,7 @@ let demo_atom :=
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
+  | CHECK; { Tactic (Check, []) }
 
 // let tm_or_demo_list := 
 //   | t = atom; { Tm(t) :: [] }
@@ -96,7 +98,7 @@ let demo :=
   | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim (x, t, Obvious, d2) }
   | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
+  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
-  | CHECK; { Tactic (Check, []) }
   | CHECK; ds = demo_list; { Tactic (Check, ds) }
