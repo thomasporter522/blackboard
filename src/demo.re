@@ -29,12 +29,12 @@ type demo =
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | FE(name, surface_tm, demo)
-    | At(demo, list((surface_tm, demo)))
     | BinaryAt(demo, surface_tm, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
     | Use(demo, list(demo))
+    | BinaryUse(demo, demo)
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -184,15 +184,6 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
 let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
     | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
     | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
-    | At(d, []) => infer_proven_ty(c, d)
-    | At(d, [(a, _), ...args]) => {
-        Result.bind(infer_proven_ty(c, At(d, args)), inferred_ty => switch(inferred_ty) {
-        | Arrow(_, _, ty_b) =>
-            let elab_a = tm_of_surface(c, a);
-            Ok(subst(ty_b, elab_a, 0))
-        | _ => Error("ap of non-arrow")
-        })
-    }
     | BinaryAt(d, a, _) => {
         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
         | Arrow(_, _, ty_b) =>
@@ -320,12 +311,6 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             }
         })
     }
-    | At(hd, tds) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        attempt(s, infer_proven_ty(c, hd), hd_ty => 
-            at_with_reversed_args(s, c, hd, hd_ty, tds)
-        )
-    }
     | BinaryAt(d1, a, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
@@ -366,6 +351,21 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, hd), hd_ty => 
             use_with_reversed_args(s, hd, hd_ty, ds)
+        )
+    }
+    | BinaryUse(d1, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        attempt(s, infer_proven_ty(c, d1), d1_ty => 
+            switch(d1_ty) {
+            | Arrow(_, ty_1, ty_2) when no_x(ty_2, 0) => {
+                attempt(s, modus_ponens(s, ty_1), s' => {
+                    let (s2, r1) = check_demo(s', d1);
+                    let (s3, r2) = check_demo(s2, d2);
+                    (s3, merge_report_list([r1, r2]))
+                })
+            }
+            | _ => skip_and_error(s, "not a simple arrow") 
+            }
         )
     }
     | Obvious => {
@@ -421,24 +421,6 @@ and use_with_reversed_args(s : t, hd : demo, hd_ty : tm, ds : list(demo)) : (t, 
             attempt(s, modus_ponens(s, premise), s' => {
                 let (s2, r1) = use_with_reversed_args(s', hd, hd_ty, other_ds);
                 let (s3, r2) = check_demo(s2, d);
-                (s3, merge_report_list([r1, r2]))
-            })
-        }
-        | Error(e) => skip_and_error(s, e)
-        };
-    }
-}
-
-and at_with_reversed_args(s : t, c : ctx, hd : demo, hd_ty : tm, tds : list((surface_tm, demo))) : (t, demo_check_report) = {
-    switch(tds){
-    | [] => check_demo(s, hd);
-    | [(a, d),... other_tds] =>
-        switch(infer_arrow_typ_of_ap(c, hd_ty, other_tds)) {
-        | Ok((x, ty_a, ty_b)) => {
-            let a_elab = tm_of_surface(c, a);
-            attempt(s, forall_elim(s, x, ty_a, ty_b, a_elab), s' => {
-                let (s2, r1) = check_demo(s', d);
-                let (s3, r2) = at_with_reversed_args(s2, c, hd, hd_ty, other_tds);
                 (s3, merge_report_list([r1, r2]))
             })
         }
