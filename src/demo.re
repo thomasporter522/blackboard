@@ -19,6 +19,7 @@ type tactic =
 type demo = 
     | Hole
     | Hyp(name)
+    | ElabHyp(int)
     | HypTyp(name)
     | InForm(tm, demo, demo)
     | InElim(tm, demo)
@@ -27,10 +28,11 @@ type demo =
     | TypForm
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
+    | FE(name, surface_tm, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | Use(name, list(tm_or_demo))
+    | Use(name, list(demo))
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -119,7 +121,7 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     Result.bind(cut(s2, "#f", Arrow("_", shift(ty_a, 0), shift(ty_b, 0))), s3 => {
     Result.bind(swap(s3), s4 => {
     Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
-    Result.bind(ap(s5, "_", shift(shift(ty_a, 0), 0), shift(shift(ty_b, 0), 0)), s6 => { 
+    Result.bind(ap(s5, "_", shift(shift(ty_a, 0), 0), shift(shift(ty_b, 1), 1)), s6 => { 
     Result.bind(hyp(s6), s7 => { 
     Result.bind(hyp(s7), s8 => { 
     weaken(s8)
@@ -133,18 +135,17 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     })
 }
 
-// if the focus of [s] is c |- B[a], refines to goals (x : A) -> B[x] and a : A
+// if the focus of [s] is c |- B[a], refines to goals a : A and (x : A) -> B[x]
 // assumes (x : A) -> B[x] is well-typed in c
 let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
     // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
     Result.bind(cut(s, "#f", Arrow(x, ty_a, ty_b)), s3 => {
     Result.bind(swap(s3), s4 => {
     Result.bind(in_elimination(s4, Ap(Var(0), shift(a, 0))), s5 => {
-    Result.bind(ap(s5, x, shift(ty_a, 0), shift(ty_b, 0)), s6 => { 
-        hyp(s6)
-    // Result.bind(hyp(s6), s7 => { 
-    // weaken(s7)
-    // })
+    Result.bind(ap(s5, x, shift(ty_a, 0), shift(ty_b, 1)), s6 => { 
+    Result.bind(hyp(s6), s7 => { 
+    weaken(s7)
+    })
     })
     })
     })
@@ -184,9 +185,11 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     | Hyp(x) =>
         let f = Result.get_ok(focused(s));
         attempt(s, index_of_name(ctx_of_judgment(f), x), n => 
-            attempt(s, in_elimination(s, Var(n)), s' => 
-                attempt(s', hyp(s'), s'' => 
-                    (s'', report([], [])))))
+            check_demo(s, ElabHyp(n)))
+    | ElabHyp(n) =>
+        attempt(s, in_elimination(s, Var(n)), s' => 
+            attempt(s', hyp(s'), s'' => 
+                (s'', report([], []))))
     | HypTyp(x) =>
         let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, index_of_name(c, x), n => {
@@ -251,6 +254,21 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
         });
+    }
+    | FE(x_hd, a, d) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let a_elab = tm_of_surface(c, a);
+        attempt(s, index_of_name(c, x_hd), n => {
+            switch(lookup_index(c, n)) {
+            | Arrow(x, ty_a, ty_b) => 
+                attempt(s, forall_elim(s, x, ty_a, ty_b, a_elab), s' => {
+                    let (s'', r1) = check_demo(s', d);
+                    let (s3, r2) = check_demo(s'', ElabHyp(n));
+                    (s3, merge_reports(r1, r2))
+                })
+            | _ => skip_and_error(s, "cannot apply non-head")
+            }
+        })
     }
     | Given(x, ty, d1, d2) => {
         // first check that the types line up
@@ -325,10 +343,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
 }
 
-and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(tm_or_demo)) : (t, demo_check_report) = {
+and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
     switch(ds){
         | [] => check_demo(s, Hyp(x));
-        | [Demo(d),... other_ds] => {
+        | [d,... other_ds] => {
             switch(nth_premise(x_ty, List.length(ds), 0)) {
                 | Ok(premise) => {
                     attempt(s, modus_ponens(s, premise), s' => {
@@ -339,9 +357,6 @@ and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(tm_or_demo)) : 
                 }
                 | Error(e) => skip_and_error(s, e)
             };
-        }
-        | [Tm(_d),... _other_ds] => {
-            failwith("todo")
         }
     }
 }
