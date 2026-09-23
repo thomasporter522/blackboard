@@ -107,7 +107,8 @@ let at_list :=
 let demo :=
   | d = demo_atom; { d }
   | d = demo_atom; ds = use_list; { Use(d, ds) }
-  | d = demo_atom; ts = at_list; { At(d, ts) }
+  | d1 = demo_atom; AT; t = term; VALID; BY; d2 = demo; { BinaryAt(d1, t, d2) }
+  | d1 = demo_atom; AT; t = term; { BinaryAt(d1, t, Obvious) }
   | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }

@@ -30,6 +30,7 @@ type demo =
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | FE(name, surface_tm, demo)
     | At(demo, list((surface_tm, demo)))
+    | BinaryAt(demo, surface_tm, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
@@ -192,6 +193,14 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
         | _ => Error("ap of non-arrow")
         })
     }
+    | BinaryAt(d, a, _) => {
+        Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
+        | Arrow(_, _, ty_b) =>
+            let elab_a = tm_of_surface(c, a);
+            Ok(subst(ty_b, elab_a, 0))
+        | _ => Error("ap of non-arrow")
+        })
+    }
     | Use(d, []) => infer_proven_ty(c, d)
     | Use(d, [_, ... args]) => {
         Result.bind(infer_proven_ty(c, Use(d, args)), inferred_ty => switch(inferred_ty) {
@@ -243,7 +252,6 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             | _ => skip_and_error(s, "typ-of failure")
             }
         })
-
     | InForm(ty, d1, d2) => 
         attempt(s, in_formation(s, ty), s' => {
             let (s'', r1) = check_demo(s', d1);
@@ -316,6 +324,22 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, hd), hd_ty => 
             at_with_reversed_args(s, c, hd, hd_ty, tds)
+        )
+    }
+    | BinaryAt(d1, a, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        attempt(s, infer_proven_ty(c, d1), d1_ty => 
+            switch(d1_ty) {
+            | Arrow(x, ty_1, ty_2) => {
+                let a_elab = tm_of_surface(c, a);
+                attempt(s, forall_elim(s, x, ty_1, ty_2, a_elab), s' => {
+                let (s2, r1) = check_demo(s', d2);
+                let (s3, r2) = check_demo(s2, d1);
+                (s3, merge_report_list([r1, r2]))
+            })
+            }
+            | _ => skip_and_error(s, "applying non arrow")
+            }
         )
     }
     | Given(x, ty, d1, d2) => {

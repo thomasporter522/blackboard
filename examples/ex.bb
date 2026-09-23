@@ -9,4 +9,4 @@ my-type-eq : eq type type my-type (type -> type)
 by 
 given M : type,
 given portal : ((my-type : type) -> (my-type-eq : eq type type my-type (type -> type)) -> M) valid by check,
-((portal @ (type -> type)) (refl @ type @ (type -> type)))
+((portal @ (type -> type)) ((refl @ type) @ (type -> type)))
