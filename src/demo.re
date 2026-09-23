@@ -303,7 +303,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         attempt_option(typ_formation(s), s' => (s', report([], [])), 
         attempt_option(assumed(s), s' => (s', report([], [])), 
         attempt_option(hyp(s), s' => (s', report([], [])), 
-        skip_and_error(s,"not obvious"))))
+        check_demo(s, Tactic(Check, [])))))
     }
     | Tactic(Check, ds) => {
         if(ds != []) {
