@@ -28,6 +28,7 @@ open Program
 %token ARROWTYPE "arrow-type"
 %token TYPEOF "type-of"
 %token AP "ap"
+%token AT "@"
 %token OBVIOUS "obvious"
 %token CLAIM "claim"
 %token SUFFICES "suffices"
@@ -80,11 +81,11 @@ let demo_atom :=
   | CHECK; { Tactic (Check, []) }
   | DEFINITION; { Tactic (Schema(Definition), []) }
 
-// let tm_or_demo_list := 
-//   | t = atom; { Tm(t) :: [] }
-//   | d = demo_atom; { Demo(d) :: [] }
-//   | t = atom; l = tm_or_demo_list; { Tm(t) :: l }
-//   | d = demo_atom; l = tm_or_demo_list; { Demo(d) :: l }
+let tm_or_demo_list := 
+  | AT; t = atom; { Tm(t) :: [] }
+  | d = demo_atom; { Demo(d) :: [] }
+  | AT; t = atom; l = tm_or_demo_list; { Tm(t) :: l }
+  | d = demo_atom; l = tm_or_demo_list; { Demo(d) :: l }
 
 let demo_list := 
   | d = demo_atom; { d :: [] }
@@ -93,7 +94,7 @@ let demo_list :=
 let demo :=
   | d = demo_atom; { d }
   // | t = atom; { Term(t) }
-  | x = ID; ds = demo_list; { Use(x, ds) }
+  | x = ID; ds = tm_or_demo_list; { Use(x, ds) }
   | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }

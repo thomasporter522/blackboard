@@ -31,6 +31,7 @@ rule read =
   | "arrow-type" { ARROWTYPE }
   | "type-of" { TYPEOF }
   | "ap" { AP }
+  | "@" { AT }
   | "obvious" { OBVIOUS }
   | "claim" { CLAIM }
   | "suffices" { SUFFICES }

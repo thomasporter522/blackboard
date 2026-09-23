@@ -30,13 +30,13 @@ type demo =
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | Use(name, list(demo))
+    | Use(name, list(tm_or_demo))
     | Obvious
     | Tactic(tactic, list(demo))
 
-// and tm_or_demo = 
-//     | Tm(surface_tm)
-//     | Demo(demo)
+and tm_or_demo = 
+    | Tm(surface_tm)
+    | Demo(demo)
 
 type demo_check_report = {
     open_goals : list(judgment),
@@ -119,7 +119,7 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     Result.bind(cut(s2, "#f", Arrow("_", shift(ty_a, 0), shift(ty_b, 0))), s3 => {
     Result.bind(swap(s3), s4 => {
     Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
-    Result.bind(ap(s5, "_", shift(shift(ty_a, 0), 0), shift(shift(ty_b, 0), 0)), s6 => { // todo: shift these?
+    Result.bind(ap(s5, "_", shift(shift(ty_a, 0), 0), shift(shift(ty_b, 0), 0)), s6 => { 
     Result.bind(hyp(s6), s7 => { 
     Result.bind(hyp(s7), s8 => { 
     weaken(s8)
@@ -127,6 +127,24 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     })
     })
     })
+    })
+    })
+    })
+    })
+}
+
+// if the focus of [s] is c |- B[a], refines to goals (x : A) -> B[x] and a : A
+// assumes (x : A) -> B[x] is well-typed in c
+let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
+    // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
+    Result.bind(cut(s, "#f", Arrow(x, ty_a, ty_b)), s3 => {
+    Result.bind(swap(s3), s4 => {
+    Result.bind(in_elimination(s4, Ap(Var(0), shift(a, 0))), s5 => {
+    Result.bind(ap(s5, x, shift(ty_a, 0), shift(ty_b, 0)), s6 => { 
+        hyp(s6)
+    // Result.bind(hyp(s6), s7 => { 
+    // weaken(s7)
+    // })
     })
     })
     })
@@ -293,9 +311,9 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         if (ds != []) {
             skip_and_error(s, "side conditions not supported yet")
         } else {
-            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            let (_, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
-            | Arrow(m, Typ, Arrow(h, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Var(1))) 
+            | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Var(1))) 
                 when equiv(ty, ty') && equiv(ty, ty'') => 
                 check_demo(s, ElabGiven("M", Typ, TypForm, 
                     ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Tactic(Check, []), 
@@ -307,10 +325,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
 }
 
-and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
+and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(tm_or_demo)) : (t, demo_check_report) = {
     switch(ds){
         | [] => check_demo(s, Hyp(x));
-        | [d,... other_ds] => {
+        | [Demo(d),... other_ds] => {
             switch(nth_premise(x_ty, List.length(ds), 0)) {
                 | Ok(premise) => {
                     attempt(s, modus_ponens(s, premise), s' => {
@@ -321,6 +339,9 @@ and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(demo)) : (t, de
                 }
                 | Error(e) => skip_and_error(s, e)
             };
+        }
+        | [Tm(_d),... _other_ds] => {
+            failwith("todo")
         }
     }
 }
