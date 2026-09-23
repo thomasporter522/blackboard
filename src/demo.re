@@ -33,7 +33,6 @@ type demo =
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | Use(demo, list(demo))
     | BinaryUse(demo, demo)
     | Obvious
     | Tactic(tactic, list(demo))
@@ -192,9 +191,8 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
         | _ => Error("ap of non-arrow")
         })
     }
-    | Use(d, []) => infer_proven_ty(c, d)
-    | Use(d, [_, ... args]) => {
-        Result.bind(infer_proven_ty(c, Use(d, args)), inferred_ty => switch(inferred_ty) {
+    | BinaryUse(d1, _) => {
+        Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
         | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
         | _ => Error("use of non-arrow or non-simple arrow")
         })
@@ -347,12 +345,6 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 }
             | _ => skip_and_error(s, "not an arrow")
         }}
-    | Use(hd, ds) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        attempt(s, infer_proven_ty(c, hd), hd_ty => 
-            use_with_reversed_args(s, hd, hd_ty, ds)
-        )
-    }
     | BinaryUse(d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
@@ -409,23 +401,6 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             | _ => skip_and_error(s, "not a definition obligation")
             }
         }
-    }
-}
-
-and use_with_reversed_args(s : t, hd : demo, hd_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
-    switch(ds){
-    | [] => check_demo(s, hd);
-    | [d,... other_ds] =>
-        switch(nth_premise(hd_ty, List.length(ds), 0)) {
-        | Ok(premise) => {
-            attempt(s, modus_ponens(s, premise), s' => {
-                let (s2, r1) = use_with_reversed_args(s', hd, hd_ty, other_ds);
-                let (s3, r2) = check_demo(s2, d);
-                (s3, merge_report_list([r1, r2]))
-            })
-        }
-        | Error(e) => skip_and_error(s, e)
-        };
     }
 }
 

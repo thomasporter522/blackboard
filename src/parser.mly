@@ -91,7 +91,6 @@ let demo_list :=
   | d = demo_atom; { d :: [] }
   | d = demo_atom; ds = demo_list; { d :: ds }
 
-
 let use_list := 
   | d = demo_atom; { d :: [] }
   | ds = demo_list; d = demo_atom; { d :: ds }
@@ -106,7 +105,7 @@ let at_list :=
 
 let demo :=
   | d = demo_atom; { d }
-  | d = demo_atom; ds = use_list; { Use(d, ds) }
+  | d1 = demo_atom; d2 = demo; { BinaryUse(d1, d2) }
   | d1 = demo_atom; AT; t = term; VALID; BY; d2 = demo; { BinaryAt(d1, t, d2) }
   | d1 = demo_atom; AT; t = term; { BinaryAt(d1, t, Obvious) }
   | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
