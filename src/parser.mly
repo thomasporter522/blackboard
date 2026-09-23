@@ -68,10 +68,6 @@ let term :=
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
   | x = atom_list; { x }
 
-// let term_list := 
-//   | t1 = term; t2 = term; { t1 :: t2 :: [] }
-//   | t = term; ts = term_list; { t :: ts }
-
 let demo_atom := 
   | _ = HOLE; { Hole }
   | x = ID; { Hyp x }
@@ -81,33 +77,18 @@ let demo_atom :=
   | CHECK; { Tactic (Check, []) }
   | DEFINITION; { Tactic (Schema(Definition), []) }
 
-// let tm_or_demo_list := 
-//   | AT; t = atom; { Tm(t) :: [] }
-//   | d = demo_atom; { Demo(d) :: [] }
-//   | AT; t = atom; l = tm_or_demo_list; { Tm(t) :: l }
-//   | d = demo_atom; l = tm_or_demo_list; { Demo(d) :: l }
-
 let demo_list := 
   | d = demo_atom; { d :: [] }
   | d = demo_atom; ds = demo_list; { d :: ds }
 
-let use_list := 
-  | d = demo_atom; { d :: [] }
-  | ds = demo_list; d = demo_atom; { d :: ds }
-
-let at_list_entry := 
-  | AT; t = term; VALID; BY; d = demo; { (t, d) }
-  | AT; t = term; { (t, Obvious) }
-
-let at_list := 
-  | t = at_list_entry; { t :: [] }
-  | ts = at_list; t = at_list_entry; { t :: ts }
+let chain_demo := 
+  | d = demo_atom; { d }
+  | d1 = chain_demo; d2 = demo_atom; { Use(d1, d2) }
+  | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
+  | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
 
 let demo :=
-  | d = demo_atom; { d }
-  | d1 = demo_atom; d2 = demo; { BinaryUse(d1, d2) }
-  | d1 = demo_atom; AT; t = term; VALID; BY; d2 = demo; { BinaryAt(d1, t, d2) }
-  | d1 = demo_atom; AT; t = term; { BinaryAt(d1, t, Obvious) }
+  | d = chain_demo; { d }
   | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }
@@ -117,4 +98,3 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
-  | CHECK; ds = demo_list; { Tactic (Check, ds) }

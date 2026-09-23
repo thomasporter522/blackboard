@@ -28,12 +28,11 @@ type demo =
     | TypForm
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
-    | FE(name, surface_tm, demo)
-    | BinaryAt(demo, surface_tm, demo)
+    | At(demo, surface_tm, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | BinaryUse(demo, demo)
+    | Use(demo, demo)
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -183,7 +182,7 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
 let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
     | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
     | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
-    | BinaryAt(d, a, _) => {
+    | At(d, a, _) => {
         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
         | Arrow(_, _, ty_b) =>
             let elab_a = tm_of_surface(c, a);
@@ -191,7 +190,7 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
         | _ => Error("ap of non-arrow")
         })
     }
-    | BinaryUse(d1, _) => {
+    | Use(d1, _) => {
         Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
         | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
         | _ => Error("use of non-arrow or non-simple arrow")
@@ -294,22 +293,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         });
     }
-    | FE(hd, a, d) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        let a_elab = tm_of_surface(c, a);
-        attempt(s, index_of_name(c, hd), n => {
-            switch(lookup_index(c, n)) {
-            | Arrow(x, ty_a, ty_b) => 
-                attempt(s, forall_elim(s, x, ty_a, ty_b, a_elab), s' => {
-                    let (s'', r1) = check_demo(s', d);
-                    let (s3, r2) = check_demo(s'', ElabHyp(n));
-                    (s3, merge_reports(r1, r2))
-                })
-            | _ => skip_and_error(s, "cannot apply non-head")
-            }
-        })
-    }
-    | BinaryAt(d1, a, d2) => {
+    | At(d1, a, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
             switch(d1_ty) {
@@ -345,7 +329,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 }
             | _ => skip_and_error(s, "not an arrow")
         }}
-    | BinaryUse(d1, d2) => {
+    | Use(d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
             switch(d1_ty) {
