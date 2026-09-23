@@ -91,11 +91,23 @@ let demo_list :=
   | d = demo_atom; { d :: [] }
   | d = demo_atom; ds = demo_list; { d :: ds }
 
+
+let use_list := 
+  | d = demo_atom; { d :: [] }
+  | ds = demo_list; d = demo_atom; { d :: ds }
+
+let at_list_entry := 
+  | AT; t = term; VALID; BY; d = demo; { (t, d) }
+  | AT; t = term; { (t, Obvious) }
+
+let at_list := 
+  | t = at_list_entry; { t :: [] }
+  | ts = at_list; t = at_list_entry; { t :: ts }
+
 let demo :=
   | d = demo_atom; { d }
-  | x = ID; ds = demo_list; { Use(x, ds) }
-  | x = ID; AT; t = term; VALID; BY; d = demo; { FE(x, t, d) }
-  | x = ID; AT; t = term; { FE(x, t, Obvious) }
+  | d = demo_atom; ds = use_list; { Use(d, ds) }
+  | d = demo_atom; ts = at_list; { At(d, ts) }
   | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
   | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
   | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }

@@ -29,10 +29,11 @@ type demo =
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | FE(name, surface_tm, demo)
+    | At(demo, list((surface_tm, demo)))
     | ElabAp(name, tm, tm, demo, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | Use(name, list(demo))
+    | Use(demo, list(demo))
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -160,6 +161,47 @@ let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
     }
 }
 
+let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
+    switch(tds) {
+    | [] => switch(hd_ty) {
+        | Arrow(x, a, b) => Ok((x, a, b))
+        | _ => Error("head is not of arrow type")
+        }
+    | [(a, _), ...other_tds] => {
+        Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
+            let (_, _, ty_b) = f;
+            let elab_a = tm_of_surface(c, a);
+            switch(subst(ty_b, elab_a, 0)) {
+            | Arrow(x, a, b) => Ok((x, a, b))
+            | _ => Error("constituent is not of arrow type")
+            }
+        })
+    }
+    }
+}
+
+let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
+    | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
+    | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
+    | At(d, []) => infer_proven_ty(c, d)
+    | At(d, [(a, _), ...args]) => {
+        Result.bind(infer_proven_ty(c, At(d, args)), inferred_ty => switch(inferred_ty) {
+        | Arrow(_, _, ty_b) =>
+            let elab_a = tm_of_surface(c, a);
+            Ok(subst(ty_b, elab_a, 0))
+        | _ => Error("ap of non-arrow")
+        })
+    }
+    | Use(d, []) => infer_proven_ty(c, d)
+    | Use(d, [_, ... args]) => {
+        Result.bind(infer_proven_ty(c, Use(d, args)), inferred_ty => switch(inferred_ty) {
+        | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
+        | _ => Error("use of non-arrow or non-simple arrow")
+        })
+    }
+    | _ => Error("cannot infer what it proves") // todo: make this message better
+}
+
 let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
     | Typ => Typ
     | In(_) => Typ
@@ -255,10 +297,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         });
     }
-    | FE(x_hd, a, d) => {
+    | FE(hd, a, d) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let a_elab = tm_of_surface(c, a);
-        attempt(s, index_of_name(c, x_hd), n => {
+        attempt(s, index_of_name(c, hd), n => {
             switch(lookup_index(c, n)) {
             | Arrow(x, ty_a, ty_b) => 
                 attempt(s, forall_elim(s, x, ty_a, ty_b, a_elab), s' => {
@@ -270,14 +312,18 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             }
         })
     }
+    | At(hd, tds) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        attempt(s, infer_proven_ty(c, hd), hd_ty => 
+            at_with_reversed_args(s, c, hd, hd_ty, tds)
+        )
+    }
     | Given(x, ty, d1, d2) => {
-        // first check that the types line up
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let ty_elab = tm_of_surface(c, ty);
         check_demo(s, ElabGiven(x, ty_elab, d1, d2));
     }
     | ElabGiven(x, ty_elab, d1, d2) => {
-        // first check that the types line up
         let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
         switch(ty_goal) {
             | Arrow(_, ty1, _) => 
@@ -292,12 +338,11 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 }
             | _ => skip_and_error(s, "not an arrow")
         }}
-    | Use(x, ds) => {
+    | Use(hd, ds) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        attempt(s, index_of_name(c, x), n => {
-            // print_endline("found head! " ++ string_of_int(n));
-            use_with_reversed_args(s, x, lookup_index(c, n), List.rev(ds))
-        })
+        attempt(s, infer_proven_ty(c, hd), hd_ty => 
+            use_with_reversed_args(s, hd, hd_ty, ds)
+        )
     }
     | Obvious => {
         attempt_option(typ_formation(s), s' => (s', report([], [])), 
@@ -343,23 +388,41 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
 }
 
-and use_with_reversed_args(s : t, x : name, x_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
+and use_with_reversed_args(s : t, hd : demo, hd_ty : tm, ds : list(demo)) : (t, demo_check_report) = {
     switch(ds){
-        | [] => check_demo(s, Hyp(x));
-        | [d,... other_ds] => {
-            switch(nth_premise(x_ty, List.length(ds), 0)) {
-                | Ok(premise) => {
-                    attempt(s, modus_ponens(s, premise), s' => {
-                        let (s2, r1) = use_with_reversed_args(s', x, x_ty, other_ds);
-                        let (s3, r2) = check_demo(s2, d);
-                        (s3, merge_report_list([r1, r2]))
-                    })
-                }
-                | Error(e) => skip_and_error(s, e)
-            };
+    | [] => check_demo(s, hd);
+    | [d,... other_ds] =>
+        switch(nth_premise(hd_ty, List.length(ds), 0)) {
+        | Ok(premise) => {
+            attempt(s, modus_ponens(s, premise), s' => {
+                let (s2, r1) = use_with_reversed_args(s', hd, hd_ty, other_ds);
+                let (s3, r2) = check_demo(s2, d);
+                (s3, merge_report_list([r1, r2]))
+            })
         }
+        | Error(e) => skip_and_error(s, e)
+        };
     }
 }
+
+and at_with_reversed_args(s : t, c : ctx, hd : demo, hd_ty : tm, tds : list((surface_tm, demo))) : (t, demo_check_report) = {
+    switch(tds){
+    | [] => check_demo(s, hd);
+    | [(a, d),... other_tds] =>
+        switch(infer_arrow_typ_of_ap(c, hd_ty, other_tds)) {
+        | Ok((x, ty_a, ty_b)) => {
+            let a_elab = tm_of_surface(c, a);
+            attempt(s, forall_elim(s, x, ty_a, ty_b, a_elab), s' => {
+                let (s2, r1) = check_demo(s', d);
+                let (s3, r2) = at_with_reversed_args(s2, c, hd, hd_ty, other_tds);
+                (s3, merge_report_list([r1, r2]))
+            })
+        }
+        | Error(e) => skip_and_error(s, e)
+        };
+    }
+}
+
 
 let check_demo_root(root : judgment, d : demo) : demo_check_report = {
     let (s, r) = check_demo(init(root), d);
