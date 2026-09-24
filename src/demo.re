@@ -1,4 +1,5 @@
 open Lang
+open Lang_printing
 open Deriv.PartialDerivation
 
 type surface_tm = 
@@ -28,8 +29,9 @@ type demo =
     | TypForm
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
-    | At(demo, surface_tm, demo)
     | ElabAp(name, tm, tm, demo, demo)
+    | At(demo, surface_tm, demo)
+    | ElabAt(demo, tm, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
     | Use(demo, demo)
@@ -182,11 +184,14 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
 let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
     | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
     | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
-    | At(d, a, _) => {
+    | At(d1, a, d2) => {
+        let elab_a = tm_of_surface(c, a);
+        infer_proven_ty(c, ElabAt(d1, elab_a, d2))
+    }
+    | ElabAt(d, a, _) => {
         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
         | Arrow(_, _, ty_b) =>
-            let elab_a = tm_of_surface(c, a);
-            Ok(subst(ty_b, elab_a, 0))
+            Ok(subst(ty_b, a, 0))
         | _ => Error("ap of non-arrow")
         })
     }
@@ -210,6 +215,17 @@ let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
         | _ => Typ
         }
     }
+}
+
+let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
+    try { 
+        switch(lookup_index(c, current)) {
+        | Arrow(_, Typ, Arrow(_, Var(0), 
+            Ap(Ap(Ap(Ap(Var(eq'), Var(1)), Var(1)), Var(0)), Var(0))
+            )) when eq == eq'-2  => Ok(current)
+        | _ => find_refl(c, eq, current-1)
+        } 
+    } { | _ => Error("couldn't find refl") }
 }
 
 // precondition: the [s.focused] is nonempty
@@ -295,11 +311,15 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
     | At(d1, a, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let a_elab = tm_of_surface(c, a);
+        check_demo(s, ElabAt(d1, a_elab, d2))
+    }
+    | ElabAt(d1, a, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
             switch(d1_ty) {
             | Arrow(x, ty_1, ty_2) => {
-                let a_elab = tm_of_surface(c, a);
-                attempt(s, forall_elim(s, x, ty_1, ty_2, a_elab), s' => {
+                attempt(s, forall_elim(s, x, ty_1, ty_2, a), s' => {
                 let (s2, r1) = check_demo(s', d2);
                 let (s3, r2) = check_demo(s2, d1);
                 (s3, merge_report_list([r1, r2]))
@@ -374,14 +394,16 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         if (ds != []) {
             skip_and_error(s, "side conditions not supported yet")
         } else {
-            let (_, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
             | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Var(1))) 
                 when equiv(ty, ty') && equiv(ty, ty'') => 
+                attempt(s, find_refl(c, eq-2, eq-2), refl => {
                 check_demo(s, ElabGiven("M", Typ, TypForm, 
                     ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Tactic(Check, []), 
-                    Hole //ElabAp("thing", )
+                    ElabAt(ElabAt(ElabHyp(0), xthing, Obvious), Ap(Ap(Var(refl+2), ty), xthing), Obvious)
                     )))
+                })
             | _ => skip_and_error(s, "not a definition obligation")
             }
         }
