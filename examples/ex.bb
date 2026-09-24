@@ -37,8 +37,37 @@ plus : nat -> nat -> nat
 valid by check
 
 construct 
+double : nat -> nat,
+double-eq : (n : nat) -> eq nat (double n) (plus n n)
+by
+given M : type,
+given portal : (double : nat -> nat) -> (double-eq : (n : nat) -> eq nat (double n) (plus n n)) -> M,
+claim equation : (n : nat) -> eq nat (abs-ap nat nat nat plus (abs-id nat) n) (plus n n) by 
+    given n : nat, 
+    trans @ nat @ (abs-ap nat nat nat plus (abs-id nat) n) @ (plus n (abs-id nat n)) @ (plus n n) 
+    (abs-ap-eq @ nat @ nat @ nat @ plus @ (abs-id nat) @ n)
+    (?)
+,
+portal @ (abs-ap nat nat nat plus (abs-id nat)) equation
+
+construct 
+cast : (A B : type) -> (eq type A B) -> A -> B
+by 
+direct
+givenall
+given e : eq type A B,
+given a : A,
+?
+
+construct 
 cong-ap-arg : (A B : type) -> (f : A -> B) -> (a b : A) -> (h : eq A a b) -> eq B (f a) (f b)
 by
 direct 
 givenall
-?
+claim h1 : abs-ap A B type (abs-const A (B -> type) (eq B (f b))) f a by (
+    (subst @ A @ (abs-ap A B type (abs-const A (B -> type) (eq B (f b))) f) @ a @ b) h (
+        ?
+    )
+),
+claim h2 : eq B (f b) (f a) by ?,
+sym @ B @ (f b) @ (f a) h2
