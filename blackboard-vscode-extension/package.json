@@ -1,0 +1,25 @@
+{
+  "name": "blackboard",
+  "displayName": "blackboard",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.138.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "blackboard",
+      "aliases": ["blackboard", "blackboard"],
+      "extensions": [".bb"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "blackboard",
+      "scopeName": "source.bb",
+      "path": "./syntaxes/blackboard.tmLanguage.json"
+    }]
+  }
+}

@@ -52,7 +52,7 @@ portal @ (abs-ap nat nat nat plus (abs-id nat)) equation
 
 construct
 comp : (A B C : type) -> (g : B -> C) -> (f : A -> B) -> A -> C,
-comp-eq : (A B C : type) -> (g : B -> C) -> (f : A -> B) -> (a : A) -> eq C (comp g f a) (g (f a)),
+comp-eq : (A B C : type) -> (g : B -> C) -> (f : A -> B) -> (a : A) -> eq C (comp A B C g f a) (g (f a)),
 by 
 given M : type,
 given portal : ((comp : (A B C : type) -> (g : B -> C) -> (f : A -> B) -> A -> C) -> (comp-eq : (A : type) -> (B : type) -> (C : type) -> (g : B -> C) -> (f : A -> B) -> (a : A) -> eq C (comp A B C g f a) (g (f a))) -> M),

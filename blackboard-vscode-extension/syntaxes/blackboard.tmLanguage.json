@@ -1,0 +1,46 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "blackboard",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#constants"
+		},
+		{ "match": ":", "name": "keyword.other.unit" },
+		{ "match": "->", "name": "keyword.other.unit" }
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.blackboard",
+				"match": "\\b(assume|construct|prove|valid|by)\\b"
+			},{
+				"name": "keyword.other.blackboard.direct",
+				"match": "\\b(given|claim|suffices|obvious)\\b"
+			},{
+				"name": "keyword.other.blackboard.tactic",
+				"match": "\\b(direct|check|givenall|obvious)\\b"
+			},{
+				"name": "keyword.other.blackboard.schema",
+				"match": "\\b(definition)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.blackboard",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.blackboard",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.bb"
+}
