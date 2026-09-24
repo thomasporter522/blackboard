@@ -1,7 +1,7 @@
 assume 
 eq : (A B : type) -> (a : A) -> (b : B) -> type,
 refl : (A : type) -> (a : A) -> eq A A a a,
-subst : (A : type) -> (p : A -> type) -> (a b : A) -> (h1 : eq A A a b) -> (h2 : p a) -> p b
+subst : (A : type) -> (p : A -> type) -> (a b : A) -> (h1 : eq A A a b) -> (h2 : p b) -> p a
 valid by check
 
 construct
@@ -9,12 +9,16 @@ my-type : type,
 my-type-eq : eq type type my-type (type -> type)
 by definition
 
+construct 
+sym : (A : type) -> (a b : A) -> (h : eq A A a b) -> eq A A b a,
+by direct givenall
+subst @ A @ (eq A A b) @ a @ b h (refl @ A @ b)
+
 construct
 trans : (A : type) -> (a b c : A) -> (h1 : eq A A a b) -> (h2 : eq A A b c) -> eq A A a c,
 by 
-given M : type,
-given portal : ((A : type) -> (a : A) -> (b : A) -> (c : A) -> (h1 : eq A A a b) -> (h2 : eq A A b c) -> eq A A a c) -> M,
-portal ?
+direct givenall 
+subst @ A @ (eq A A a) @ c @ b (sym @ A @ b @ c h2) h1
 
 assume
 abs-const : (X A : type) -> (a : A) -> (X -> A),

@@ -223,7 +223,7 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
         switch(lookup_index(c, current)) {
         | Arrow(_, Typ, Arrow(_, Var(0), 
-            Ap(Ap(Ap(Ap(Var(eq'), Var(1)), Var(1)), Var(0)), Var(0))
+            Ap(Ap(Ap(Var(eq'), Var(1)), Var(0)), Var(0))
             )) when eq == eq'-2  => Ok(current)
         | _ => find_refl(c, eq, current-1)
         } 
@@ -398,11 +398,11 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         } else {
             let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
-            | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Var(1))) 
-                when equiv(ty, ty') && equiv(ty, ty'') => 
+            | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) 
+                when equiv(ty, ty') => 
                 attempt(s, find_refl(c, eq-2, eq-2), refl => {
                 check_demo(s, ElabGiven("M", Typ, TypForm, 
-                    ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Ap(Var(eq), ty'), ty''), Var(0)), xthing), Var(2))), Tactic(Check, []), 
+                    ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
                     ElabAt(ElabAt(ElabHyp(0), xthing, Obvious), Ap(Ap(Var(refl+2), ty), xthing), Obvious)
                     )))
                 })
