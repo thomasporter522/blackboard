@@ -35,6 +35,7 @@ open Program
 
 %token CHECK "check"
 %token DEFINITION "definition"
+%token DIRECT "direct"
 
 %start <Program.surface_program> prog
 %%
@@ -98,3 +99,4 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
+  | DIRECT; d = demo; { Tactic (Direct, d :: []) }

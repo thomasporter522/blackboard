@@ -1,5 +1,5 @@
 open Lang
-open Lang_printing
+// open Lang_printing
 open Deriv.PartialDerivation
 
 type surface_tm = 
@@ -15,6 +15,7 @@ type schema =
 
 type tactic = 
     | Check
+    | Direct
     | Schema(schema)
 
 type demo = 
@@ -407,6 +408,31 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             | _ => skip_and_error(s, "not a definition obligation")
             }
         }
+    }
+    | Tactic(Direct, ds) => switch(ds) {
+        | [d] => 
+            attempt(s, arrow_introduction("M", s), s1 => {
+                let (s2, r1) = check_demo(s1, Obvious);
+                attempt(s2, arrow_introduction("h", s2), s3 => {
+                    let (s4, r2) = check_demo(s3, Obvious);
+                    let (c, _) = pair_of_judgment(Result.get_ok(focused(s4)));
+                    let target = switch(lookup_index(c, 0)) {
+                        | Arrow(_, ty_a, _) => ty_a 
+                        | _ => failwith("impossible")
+                    };
+                    attempt(s4, modus_ponens(s4, target), s5 => {
+                        attempt(s5, assumed(s5), s6 => {
+                            attempt(s6, weaken(s6), s7 => {
+                                attempt(s7, weaken(s7), s8 => {
+                                    let (s9, r3) = check_demo(s8, d);
+                                    (s9, merge_report_list([r1, r2, r3]))
+                                })
+                            })
+                        })
+                    })
+                })
+            })
+        | _ => skip_and_error(s, "wrong number of args to direct")
     }
 }
 

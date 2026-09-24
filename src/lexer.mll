@@ -37,5 +37,6 @@ rule read =
   | "suffices" { SUFFICES }
   | "check" { CHECK }
   | "definition" { DEFINITION }
+  | "direct" { DIRECT }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }
