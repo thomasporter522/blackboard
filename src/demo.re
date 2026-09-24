@@ -16,6 +16,7 @@ type schema =
 type tactic = 
     | Check
     | Direct
+    | GivenAll
     | Schema(schema)
 
 type demo = 
@@ -433,6 +434,21 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 })
             })
         | _ => skip_and_error(s, "wrong number of args to direct")
+    }
+    | Tactic(GivenAll, ds) => switch(ds) {
+        | [d] => 
+            let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            switch(ty_goal) {
+            | Arrow(x, _, _) when x != "_" => {
+                attempt(s, arrow_introduction(x, s), s1 => {
+                    let (s2, r1) = check_demo(s1, Obvious);
+                    let (s3, r2) = check_demo(s2, Tactic(GivenAll, [d]));
+                    (s3, merge_reports(r1, r2))
+                })
+            }
+            | _ => check_demo(s, d)
+            }
+        | _ => skip_and_error(s, "wrong number of args to givenall")
     }
 }
 

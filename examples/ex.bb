@@ -12,7 +12,9 @@ by definition
 construct
 trans : (A : type) -> (a b c : A) -> (h1 : eq A A a b) -> (h2 : eq A A b c) -> eq A A a c,
 by 
-direct ?
+direct
+givenall 
+?
 
 assume
 abs-const : (X A : type) -> (a : A) -> (X -> A),

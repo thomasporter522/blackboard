@@ -38,5 +38,6 @@ rule read =
   | "check" { CHECK }
   | "definition" { DEFINITION }
   | "direct" { DIRECT }
+  | "givenall" { GIVENALL }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }
