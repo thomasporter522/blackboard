@@ -17,7 +17,7 @@ assume
 abs-const : (X A : type) -> (a : A) -> (X -> A),
 abs-const-eq : (X A : type) -> (a : A) -> (x : X) -> eq A A (abs-const X A a x) a,
 abs-id : (X : type) -> X -> X, 
-abs-id-eq : (X : type) -> (x : X) -> eq X X (abs-id x) x,
+abs-id-eq : (X : type) -> (x : X) -> eq X X (abs-id X x) x,
 abs-ap : (X A B : type) -> (f : X -> A -> B) -> (a : X -> A) -> (X -> B),
 abs-ap-eq : (X A B : type) -> (f : X -> A -> B) -> (a : X -> A) -> (x : X) -> eq B B (abs-ap X A B f a x) (f x (a x)),
 valid by check
