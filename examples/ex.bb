@@ -12,7 +12,7 @@ by definition
 construct 
 sym : (A : type) -> (a b : A) -> (h : eq A a b) -> eq A b a,
 by direct givenall
-?
+subst @ A @ (eq A b) @ a @ b h (refl @ A @ b)
 
 construct
 trans : (A : type) -> (a b c : A) -> (h1 : eq A a b) -> (h2 : eq A b c) -> eq A a c,
@@ -39,4 +39,20 @@ valid by check
 construct 
 double : nat -> nat,
 double-eq : (n : nat) -> eq nat (double n) (plus n n)
-by ?
+by
+given M : type,
+given portal : (double : nat -> nat) -> (double-eq : (n : nat) -> eq nat (double n) (plus n n)) -> M,
+claim equation : (n : nat) -> eq nat (abs-ap nat nat nat plus (abs-id nat) n) (plus n n) by 
+    given n : nat, 
+    trans @ nat @ (abs-ap nat nat nat plus (abs-id nat) n) @ (plus n (abs-id nat n)) @ (plus n n) 
+    (abs-ap-eq @ nat @ nat @ nat @ plus @ (abs-id nat) @ n)
+    (?)
+,
+portal @ (abs-ap nat nat nat plus (abs-id nat)) equation
+
+construct 
+cong-ap-arg : (A B : type) -> (f : A -> B) -> (a b : A) -> (h : eq A a b) -> eq B (f a) (f b)
+by
+direct 
+givenall
+?
