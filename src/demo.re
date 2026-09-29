@@ -7,6 +7,8 @@ type surface_tm =
     | In(surface_tm, surface_tm)
     | Arrow(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
+    | Open(list(name), surface_tm, surface_tm)
+    | SimpleOpen(surface_tm, surface_tm)
     | Var(name)
     | Ap(surface_tm, surface_tm);
 
@@ -96,7 +98,10 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | In(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
     | Arrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), Arrow(xs, t1, t2)))
     | Arrow([], _, t2) => tm_of_surface(c, t2)
+    | Open([x,...xs], t1, t2) => Open(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), Open(xs, t1, t2)))
+    | Open([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
+    | SimpleOpen(t1, t2) => Open("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | Var(x) => Var(var_of_surface(c, x))
     | Ap(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
 }
