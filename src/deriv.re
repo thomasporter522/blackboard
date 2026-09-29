@@ -17,6 +17,9 @@ module PartialDerivation : {
     let arrow_formation : (t, name) => result(t, error);
     let ap : (t, name, tm, tm) => result(t, error);
     let arrow_introduction : (name, t) => result(t, error);
+    let open_formation : (t, name) => result(t, error);
+    let open_introduction : (name, t) => result(t, error);
+    let open_elimination : (error, t) => result (t, error)
 
 } = {
     type t = {
@@ -161,6 +164,27 @@ module PartialDerivation : {
         switch(j) {
         | J(c, Arrow(_, ty1, ty2)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), ty2)])
         | _ => Error("arrow_introduction failure")
+        }
+    })
+
+    let open_formation (s : t, x : name)  : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(c, In(Open(_x, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))])
+        | _ => Error("open_formation failure")
+        }
+    })
+
+    let open_introduction (x : name, s : t) : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(c, In(a, Open(_, ty1, ty2))) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(a, ty2))])
+        | _ => Error("open_introduction failure")
+        }
+    })
+
+    let open_elimination (x : name, s : t) : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(Cons(c, _x, ty1), In(a, ty2)) => Ok([J(c, In(a, Open(x, ty1, ty2)))])
+        | _ => Error("open_elimination failure")
         }
     })
 }

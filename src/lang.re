@@ -5,6 +5,7 @@ type tm =
     | Typ 
     | In(tm, tm)
     | Arrow(name, tm, tm)
+    | Open(name, tm, tm)
     | Var(int)
     | Ap(tm, tm);
 
@@ -40,6 +41,7 @@ let rec varmap (a : tm, x : int, f : int => int) : tm = {
     | Typ => Typ
     | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
     | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
+    | Open(y, ty1, ty2) => Open(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
     | Var(y) when y >= x => Var(f(y))
     | Var(y) => Var(y)
     | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
@@ -47,14 +49,15 @@ let rec varmap (a : tm, x : int, f : int => int) : tm = {
 }
 
 // smartapplies f to each variable in [a] greater than or equal to [n]
-let smartvarmap (a : tm, x : int, f : int => int) : tm = {
+let rec smartvarmap (a : tm, x : int, f : int => int) : tm = {
     switch(a) {
     | Typ => Typ
-    | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
-    | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, y => f(y-1)+1))
+    | In(a, ty) => In(smartvarmap(a, x, f), smartvarmap(ty, x, f))
+    | Arrow(y, ty1, ty2) => Arrow(y, smartvarmap(ty1, x, f), smartvarmap(ty2, x+1, y => f(y-1)+1))
+    | Open(y, ty1, ty2) => Open(y, smartvarmap(ty1, x, f), smartvarmap(ty2, x+1, y => f(y-1)+1))
     | Var(y) when y >= x => Var(f(y))
     | Var(y) => Var(y)
-    | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
+    | Ap(a1, a2) => Ap(smartvarmap(a1, x, f), smartvarmap(a2, x, f))
     }
 }
 
@@ -70,6 +73,7 @@ let rec subst (a1 : tm, a : tm, x : int) : tm = {
     | Typ => Typ
     | In(a1, ty) => In(subst(a1, a, x), subst(ty, a, x))
     | Arrow(y, ty1, ty2) => Arrow(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
+    | Open(y, ty1, ty2) => Open(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
     | Var(y) when y == x => a 
     | Var(y) when y > x => Var(y-1)
     | Var(y) => Var(y)
@@ -90,6 +94,7 @@ let rec no_x (a : tm, x : int) : bool = {
     | Typ => true
     | In(a, ty) => no_x(a, x) && no_x(ty, x)
     | Arrow(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
+    | Open(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
     | Var(y) => y != x
     | Ap(a1, a2) => no_x(a1, x) && no_x(a2, x)
     }

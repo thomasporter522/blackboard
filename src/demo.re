@@ -210,6 +210,7 @@ let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
     | Typ => Typ
     | In(_) => Typ
     | Arrow(_) => Typ
+    | Open(_) => Typ
     | Var(x) => lookup_index(c, x)
     | Ap(a1, a2) => {
         switch(infer_typ(c, a1)) {
