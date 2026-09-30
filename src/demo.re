@@ -32,6 +32,9 @@ type demo =
     | Suffices(name, surface_tm, demo, demo)
     | TypForm
     | ArrowForm(name, demo, demo)
+    | OpenForm(name, demo, demo)
+    | OpenIntro(name, demo, demo)
+    | OpenElim(name, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | ElabAp(name, tm, tm, demo, demo)
     | At(demo, surface_tm, demo)
@@ -236,6 +239,23 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     } { | _ => Error("couldn't find refl") }
 }
 
+let rec check_var(s : t) : result (t, error) =
+    switch(hyp(s)) {
+    | Ok(s') => Ok(s')
+    | Error(_) => {
+        let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+        switch(ty_goal) {
+        | In(Var(x), _) => {
+            switch(lookup_index(c, x)) {
+            | Open(y, _, _) => Result.bind(open_elimination(y, s), s' => check_var(s'))
+            | bad => Error("check_var failed: var " ++ Lang_printing.text_of_var(c, x, 0) ++ " has type "++Lang_printing.string_of_term(c, bad))
+            }
+        }
+        | _ => Error("check_var not checking a var")
+        }
+    }
+    }
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
@@ -303,6 +323,22 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (s'', r1) = check_demo(s', d1);
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
+        });
+    | OpenForm(x, d1, d2) => 
+        attempt(s, open_formation(s, x), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
+        });
+    | OpenIntro(x, d1, d2) => 
+        attempt(s, open_introduction(x, s), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
+        });
+    | OpenElim(x, d) => 
+        attempt(s, open_elimination(x, s), s' => {
+            check_demo(s', d)
         });
     | Ap(x, ty1, ty2, d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
@@ -386,7 +422,8 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             switch(ty_goal) {
                 | In(Typ, _) => check_demo(s, TypForm)
                 | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
-                | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
+                | In(Open(x, _, _), _) => check_demo(s, OpenForm(x, Tactic(Check, []), Tactic(Check, [])))
+                | In(Var(_), _) => attempt(s, check_var(s), s' => (s', report([], [])))
                 | In(Ap(a1, _), _) => {
                     switch(infer_typ(c, a1)) {
                     | Arrow(x, ty1, ty2) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))

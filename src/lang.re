@@ -29,6 +29,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Open(_, a1, a2), Open(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | _ => false

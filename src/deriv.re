@@ -93,9 +93,9 @@ module PartialDerivation : {
         | J(c, In(Var(x), ty)) => 
             let found = lookup_index(c, x);
             if (equiv(found, ty)) Ok([]) else Error(
-                "hyp failure: " 
+                "hyp failure for (" 
                 ++ text_of_var(c, x, x) 
-                ++ " : "
+                ++ ") : "
                 ++ string_of_term(c, found)
                 ++ " ≠ "
                 ++ string_of_term(c, ty)

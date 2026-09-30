@@ -26,6 +26,9 @@ open Program
 %token HOLE "?"
 %token TYPETYPE "type-type"
 %token ARROWTYPE "arrow-type"
+%token OPENTYPE "open-type"
+%token OPENUP "open-up"
+%token OPENDOWN "open-down"
 %token TYPEOF "type-of"
 %token AP "ap"
 %token AT "@"
@@ -81,9 +84,9 @@ let demo_atom :=
   | CHECK; { Tactic (Check, []) }
   | DEFINITION; { Tactic (Schema(Definition), []) }
 
-let demo_list := 
-  | d = demo_atom; { d :: [] }
-  | d = demo_atom; ds = demo_list; { d :: ds }
+// let demo_list := 
+//   | d = demo_atom; { d :: [] }
+//   | d = demo_atom; ds = demo_list; { d :: ds }
 
 let chain_demo := 
   | d = demo_atom; { d }
@@ -102,5 +105,8 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
+  | OPENTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { OpenForm (x, d1, d2) }
+  | OPENUP; x = ID; d1 = demo_atom; d2 = demo_atom; { OpenIntro (x, d1, d2) }
+  | OPENDOWN; x = ID; d = demo_atom; { OpenElim (x, d) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

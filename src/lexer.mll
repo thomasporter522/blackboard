@@ -29,6 +29,9 @@ rule read =
   | "," { COMMA }
   | "type-type" { TYPETYPE }
   | "arrow-type" { ARROWTYPE }
+  | "open-type" { OPENTYPE }
+  | "open-up" { OPENUP }
+  | "open-down" { OPENDOWN }
   | "type-of" { TYPEOF }
   | "ap" { AP }
   | "@" { AT }
