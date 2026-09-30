@@ -30,9 +30,17 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | _ => false
+    | (Typ, _) => false
+    | (In(_), _) => false
+    | (Arrow(_), _) => false
+    | (Lam(_), _) => false
+    | (Unlam(_), _) => false
+    | (Var(_), _) => false
+    | (Ap(_), _) => false
     }
 }
 
@@ -56,30 +64,37 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
 
 let getwk(a : tm) : tm = wkn(0, a)
 
-let wk(a : tm) : option(tm) = {
-    try { Some(getwk(a)) } {
-    | _ => None
+let wk(a : tm) : result(tm, error) = {
+    try { Ok(getwk(a)) } {
+    | _ => Error("unweakenable")
     }
 }
 
-let rec substvar(n : int, s : tm, m : int) : tm = {
+let rec substnvar(n : int, s : tm, m : int) : tm = {
     if (n == 0 && m == 0) { s } else
     if (n == 0 && m > 0) { Var(m-1) } else 
     if (n > 0 && m == 0) { Var(0) } else 
-    { wkn(0, substvar(n-1, s, m-1))}
+    { wkn(0, substnvar(n-1, s, m-1))}
 }
 
-let rec subst(n : int, s : tm, t : tm) : tm = switch(t) {
+let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | Typ => Typ
-    | In(a, ty) => In(subst(n, s, a), subst(n, s, ty))
-    | Arrow(y, ty1, ty2) => Arrow(y, subst(n, s, ty1), subst(n+1, s, ty2))
-    | Lam(y, ty, a) => Lam(y, subst(n, s, ty), subst(n+1, s, a))
+    | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
+    | Arrow(y, ty1, ty2) => Arrow(y, substn(n, s, ty1), substn(n+1, s, ty2))
+    | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
     | Unlam(y, a) =>
-        if (n > 0) { Unlam(y, subst(n-1, s, a)) } 
-        else { failwith("unsubstable") }
-    | Var(y) => substvar(n, s, y)
-    | Ap(a1, a2) => Ap(subst(n, s, a1), subst(n, s, a2))
+        if (n > 0) { Unlam(y, substn(n-1, s, a)) } 
+        else { failwith("unsubstnable") }
+    | Var(y) => substnvar(n, s, y)
+    | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
 }
+
+let getsubst(s : tm, t : tm) : tm = substn(0, s, t)
+
+let subst(s : tm, t : tm) : result(tm, error) = 
+    try { Ok(getsubst(s, t)) } {
+    | _ => Error("unsubstable")
+    }
 
 // // applies f to each variable in [a] greater than or equal to [n]
 // let rec varmap (a : tm, x : int, f : int => int) : tm = {

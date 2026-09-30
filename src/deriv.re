@@ -8,7 +8,7 @@ module PartialDerivation : {
     let focused : t => result(judgment, error);
     let skip : t => result(t, error);
     let swap : t => result(t, error);
-    let weaken : t => result(t, error);
+    let weaken : (t, tm) => result(t, error);
     let hyp : t => result(t, error);
     let in_formation : (t, tm) => result(t, error);
     let in_elimination : (t, tm) => result(t, error);
@@ -77,10 +77,11 @@ module PartialDerivation : {
         }
     }
 
-    let weaken (s : t) : result(t, error) = refine(s, j => {
-        switch(j) {
-        | J(Cons(c, _, _), ty) when no_x(ty, 0) => 
-            Ok([J(c, downshift(ty, 0))])
+    let weaken (s : t, ty : tm) : result(t, error) = refine(s, j => {
+        switch(j, wk(ty)) {
+        | (J(Cons(c, _, _), ty_goal), Ok(ty_wk)) when equiv(ty_goal, ty_wk) => 
+            Ok([J(c, ty)])
+        | (J(Cons(_, _, _), _), Error(e)) => Error(e)
         | _ => Error("weaken failure")
         }
     })
@@ -117,9 +118,9 @@ module PartialDerivation : {
     })
 
     let cut (s : t, x : name, ty1 : tm)  : result(t, error) = refine(s, j => {
-        switch(j) {
-        | J(c, ty2) => Ok([J(c, ty1), J(Cons(c, x, ty1), shift(ty2, 0))])
-        }
+        let (c, ty2) = pair_of_judgment(j);
+        Result.bind(wk(ty2), ty2wk => 
+            Ok([J(c, ty1), J(Cons(c, x, ty1), ty2wk)]))
     })
 
     let typ_formation (s : t)  : result(t, error) = refine(s, j => {
@@ -139,14 +140,15 @@ module PartialDerivation : {
     let ap (s : t, x : name, ty1 : tm, ty2 : tm)  : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Ap(a1, a2), ty_expected)) => {
-            let ty_found = subst(ty2, a2, 0);
-            if (equiv(ty_found, ty_expected))
-                Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
-            else Error(
-                "ap failure: found = " 
-                ++ string_of_term(c, ty_found)
-                ++ " ≠ "
-                ++ string_of_term(c, ty_expected)
+            Result.bind(subst(a2, ty2), ty_found => 
+                if (equiv(ty_found, ty_expected))
+                    Ok([J(c, In(a1, Arrow(x, ty1, ty2))), J(c, In(a2, ty1))])
+                else Error(
+                    "ap failure: found = " 
+                    ++ string_of_term(c, ty_found)
+                    ++ " ≠ "
+                    ++ string_of_term(c, ty_expected)
+                )
             )
         } 
         | J(c, ty) => Error(

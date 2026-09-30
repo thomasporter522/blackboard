@@ -19,6 +19,8 @@ let string_of_var(c : ctx, x : int) : string = {
 // precedences:
 let colon_prec = (5, 5)
 let arrow_prec = (11, 10)
+let lam_prec = (-1, 15)
+let unlam_prec = (20, -1)
 let ap_prec = (20, 21)
 
 let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string = {
@@ -33,6 +35,15 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
             ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty1) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty1) ++ ")")
             ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
+        }
+    | Lam(x, ty, a) => 
+        if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
+            ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, a) ++ ")")
+            ++ " => " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty), a) 
+        }
+    | Unlam(x, a) => 
+        if (lp >= fst(unlam_prec)) { wrap(c, outer_a) } else {
+            prec_string_of_term(lp, fst(unlam_prec), c, a) ++ "[" ++ x ++ "]"
         }
     | Var(x) => string_of_var(c, x)
     | Ap(a1, a2) => 

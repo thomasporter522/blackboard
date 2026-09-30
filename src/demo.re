@@ -14,10 +14,10 @@ type schema =
     | Definition
 
 type tactic = 
-    | Check
-    | Direct
+    // | Check
+    // | Direct
     | GivenAll
-    | Schema(schema)
+    // | Schema(schema)
 
 type demo = 
     | Hole
@@ -32,11 +32,11 @@ type demo =
     | ArrowForm(name, demo, demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | ElabAp(name, tm, tm, demo, demo)
-    | At(demo, surface_tm, demo)
-    | ElabAt(demo, tm, demo)
+    // | At(demo, surface_tm, demo)
+    // | ElabAt(demo, tm, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    | Use(demo, demo)
+    // | Use(demo, demo)
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -116,53 +116,54 @@ let assumed(s : t) : result (t, error) = {
                 hyp(s')))
 }
 
-// if the focus of [s] is c |- B, refines to goals A -> B and A
-// assumes [ty_A] (A) is well-typed in c
-let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
-    Result.bind(cut(s, "#a", ty_a), s' => {
-    Result.bind(swap(s'), s2 => {
-    let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
-    Result.bind(cut(s2, "#f", Arrow("_", shift(ty_a, 0), shift(ty_b, 0))), s3 => {
-    Result.bind(swap(s3), s4 => {
-    Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
-    Result.bind(ap(s5, "_", shift(shift(ty_a, 0), 0), shift(shift(ty_b, 1), 1)), s6 => { 
-    Result.bind(hyp(s6), s7 => { 
-    Result.bind(hyp(s7), s8 => { 
-    weaken(s8)
-    })
-    })
-    })
-    })
-    })
-    })
-    })
-    })
-}
+// // if the focus of [s] is c |- B[a], refines to goals a : A and (x : A) -> B[x]
+// // assumes (x : A) -> B[x] is well-typed in c
+// let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
+//     // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
+//     Result.bind(cut(s, "#f", Arrow(x, ty_a, ty_b)), s3 => {
+//     Result.bind(swap(s3), s4 => {
+//     Result.bind(in_elimination(s4, Ap(Var(0), getwk(a))), s5 => {
+//     Result.bind(ap(s5, x, getwk(ty_a), wkn(1, ty_b)), s6 => { 
+//     Result.bind(hyp(s6), s7 => { 
+//     weaken(s7, failwith("todo"))
+//     })
+//     })
+//     })
+//     })
+//     })
+// }
 
-// if the focus of [s] is c |- B[a], refines to goals a : A and (x : A) -> B[x]
-// assumes (x : A) -> B[x] is well-typed in c
-let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
-    // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
-    Result.bind(cut(s, "#f", Arrow(x, ty_a, ty_b)), s3 => {
-    Result.bind(swap(s3), s4 => {
-    Result.bind(in_elimination(s4, Ap(Var(0), shift(a, 0))), s5 => {
-    Result.bind(ap(s5, x, shift(ty_a, 0), shift(ty_b, 1)), s6 => { 
-    Result.bind(hyp(s6), s7 => { 
-    weaken(s7)
-    })
-    })
-    })
-    })
-    })
-}
+// // if the focus of [s] is c |- B, refines to goals A -> B and A
+// // assumes [ty_A] (A) is well-typed in c
+// let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
+//     Result.bind(cut(s, "#a", ty_a), s' => {
+//     Result.bind(swap(s'), s2 => {
+//     let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
+//     Result.bind(cut(s2, "#f", Arrow("_", getwk(ty_a), getwk(ty_b))), s3 => {
+//     Result.bind(swap(s3), s4 => {
+//     Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
+//     Result.bind(ap(s5, "_", getwk(getwk(ty_a)), getwk(getwk(ty_b))), s6 => { 
+//     Result.bind(hyp(s6), s7 => { 
+//     Result.bind(hyp(s7), s8 => { 
+//     weaken(s8, failwith("todo"))
+//     })
+//     })
+//     })
+//     })
+//     })
+//     })
+//     })
+//     })
+// }
 
-let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
-    switch(ty) {
-    | Arrow(_, ty1, ty2) when n == 1 && no_x(ty2, 0) => Ok(varmap(ty1, 0, x => x-downshift))
-    | Arrow(_, _, ty2) when n > 1 => nth_premise(ty2, n-1, downshift+1)
-    | _ => Error("head cannot be applied")
-    }
-}
+
+// let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
+//     switch(ty) {
+//     | Arrow(_, ty1, ty2) when n == 1 && no_x(ty2, 0) => Ok(varmap(ty1, 0, x => x-downshift))
+//     | Arrow(_, _, ty2) when n > 1 => nth_premise(ty2, n-1, downshift+1)
+//     | _ => Error("head cannot be applied")
+//     }
+// }
 
 let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
     switch(tds) {
@@ -174,7 +175,7 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
         Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
             let (_, _, ty_b) = f;
             let elab_a = tm_of_surface(c, a);
-            switch(subst(ty_b, elab_a, 0)) {
+            switch(getsubst(elab_a, ty_b)) {
             | Arrow(x, a, b) => Ok((x, a, b))
             | _ => Error("constituent is not of arrow type")
             }
@@ -183,41 +184,41 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
     }
 }
 
-let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
-    | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
-    | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
-    | At(d1, a, d2) => {
-        let elab_a = tm_of_surface(c, a);
-        infer_proven_ty(c, ElabAt(d1, elab_a, d2))
-    }
-    | ElabAt(d, a, _) => {
-        Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
-        | Arrow(_, _, ty_b) =>
-            Ok(subst(ty_b, a, 0))
-        | _ => Error("ap of non-arrow")
-        })
-    }
-    | Use(d1, _) => {
-        Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
-        | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
-        | _ => Error("use of non-arrow or non-simple arrow")
-        })
-    }
-    | _ => Error("cannot infer what it proves") // todo: make this message better
-}
+// let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
+//     | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
+//     | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
+//     | At(d1, a, d2) => {
+//         let elab_a = tm_of_surface(c, a);
+//         infer_proven_ty(c, ElabAt(d1, elab_a, d2))
+//     }
+//     | ElabAt(d, a, _) => {
+//         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
+//         | Arrow(_, _, ty_b) =>
+//             Ok(getsubst(a, ty_b))
+//         | _ => Error("ap of non-arrow")
+//         })
+//     }
+//     | Use(d1, _) => {
+//         Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
+//         | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
+//         | _ => Error("use of non-arrow or non-simple arrow")
+//         })
+//     }
+//     | _ => Error("cannot infer what it proves") // todo: make this message better
+// }
 
-let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
-    | Typ => Typ
-    | In(_) => Typ
-    | Arrow(_) => Typ
-    | Var(x) => lookup_index(c, x)
-    | Ap(a1, a2) => {
-        switch(infer_typ(c, a1)) {
-        | Arrow(_, _, ty2) => subst(ty2, a2, 0)
-        | _ => Typ
-        }
-    }
-}
+// let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
+//     | Typ => Typ
+//     | In(_) => Typ
+//     | Arrow(_) => Typ
+//     | Var(x) => lookup_index(c, x)
+//     | Ap(a1, a2) => {
+//         switch(infer_typ(c, a1)) {
+//         | Arrow(_, _, ty2) => subst(ty2, a2, 0)
+//         | _ => Typ
+//         }
+//     }
+// }
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
@@ -311,26 +312,26 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         });
     }
-    | At(d1, a, d2) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        let a_elab = tm_of_surface(c, a);
-        check_demo(s, ElabAt(d1, a_elab, d2))
-    }
-    | ElabAt(d1, a, d2) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        attempt(s, infer_proven_ty(c, d1), d1_ty => 
-            switch(d1_ty) {
-            | Arrow(x, ty_1, ty_2) => {
-                attempt(s, forall_elim(s, x, ty_1, ty_2, a), s' => {
-                let (s2, r1) = check_demo(s', d2);
-                let (s3, r2) = check_demo(s2, d1);
-                (s3, merge_report_list([r1, r2]))
-            })
-            }
-            | _ => skip_and_error(s, "applying non arrow")
-            }
-        )
-    }
+    // | At(d1, a, d2) => {
+    //     let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+    //     let a_elab = tm_of_surface(c, a);
+    //     check_demo(s, ElabAt(d1, a_elab, d2))
+    // }
+    // | ElabAt(d1, a, d2) => {
+    //     let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+    //     attempt(s, infer_proven_ty(c, d1), d1_ty => 
+    //         switch(d1_ty) {
+    //         | Arrow(x, ty_1, ty_2) => {
+    //             attempt(s, forall_elim(s, x, ty_1, ty_2, a), s' => {
+    //             let (s2, r1) = check_demo(s', d2);
+    //             let (s3, r2) = check_demo(s2, d1);
+    //             (s3, merge_report_list([r1, r2]))
+    //         })
+    //         }
+    //         | _ => skip_and_error(s, "applying non arrow")
+    //         }
+    //     )
+    // }
     | Given(x, ty, d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let ty_elab = tm_of_surface(c, ty);
@@ -351,90 +352,91 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 }
             | _ => skip_and_error(s, "not an arrow")
         }}
-    | Use(d1, d2) => {
-        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-        attempt(s, infer_proven_ty(c, d1), d1_ty => 
-            switch(d1_ty) {
-            | Arrow(_, ty_1, ty_2) when no_x(ty_2, 0) => {
-                attempt(s, modus_ponens(s, ty_1), s' => {
-                    let (s2, r1) = check_demo(s', d1);
-                    let (s3, r2) = check_demo(s2, d2);
-                    (s3, merge_report_list([r1, r2]))
-                })
-            }
-            | _ => skip_and_error(s, "not a simple arrow") 
-            }
-        )
-    }
+    // | Use(d1, d2) => {
+    //     let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+    //     attempt(s, infer_proven_ty(c, d1), d1_ty => 
+    //         switch(d1_ty) {
+    //         | Arrow(_, ty_1, ty_2) when no_x(ty_2, 0) => {
+    //             attempt(s, modus_ponens(s, ty_1), s' => {
+    //                 let (s2, r1) = check_demo(s', d1);
+    //                 let (s3, r2) = check_demo(s2, d2);
+    //                 (s3, merge_report_list([r1, r2]))
+    //             })
+    //         }
+    //         | _ => skip_and_error(s, "not a simple arrow") 
+    //         }
+    //     )
+    // }
     | Obvious => {
         attempt_option(typ_formation(s), s' => (s', report([], [])), 
         attempt_option(assumed(s), s' => (s', report([], [])), 
         attempt_option(hyp(s), s' => (s', report([], [])), 
-        check_demo(s, Tactic(Check, [])))))
+        skip_and_error(s, "not obvious"))))
+        // check_demo(s, Tactic(Check, [])))))
     }
-    | Tactic(Check, ds) => {
-        if(ds != []) {
-            skip_and_error(s, "side conditions not supported yet")
-        } else {
-            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-            switch(ty_goal) {
-                | In(Typ, _) => check_demo(s, TypForm)
-                | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
-                | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
-                | In(Ap(a1, _), _) => {
-                    switch(infer_typ(c, a1)) {
-                    | Arrow(x, ty1, ty2) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
-                    | _ => skip_and_error(s, "applying a non-arrow")
-                    }
-                }
-                | In(In(_, _), _) => failwith("unimplemented: In")
-                | _ => skip_and_error(s, "not a type obligation")
-            }
-        }
-    }
-    | Tactic(Schema(Definition), ds) => {
-        if (ds != []) {
-            skip_and_error(s, "side conditions not supported yet")
-        } else {
-            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-            switch(ty_goal) {
-            | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) 
-                when equiv(ty, ty') => 
-                attempt(s, find_refl(c, eq-2, eq-2), refl => {
-                check_demo(s, ElabGiven("M", Typ, TypForm, 
-                    ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
-                    ElabAt(ElabAt(ElabHyp(0), xthing, Obvious), Ap(Ap(Var(refl+2), ty), xthing), Obvious)
-                    )))
-                })
-            | _ => skip_and_error(s, "not a definition obligation")
-            }
-        }
-    }
-    | Tactic(Direct, ds) => switch(ds) {
-        | [d] => 
-            attempt(s, arrow_introduction("M", s), s1 => {
-                let (s2, r1) = check_demo(s1, Obvious);
-                attempt(s2, arrow_introduction("h", s2), s3 => {
-                    let (s4, r2) = check_demo(s3, Obvious);
-                    let (c, _) = pair_of_judgment(Result.get_ok(focused(s4)));
-                    let target = switch(lookup_index(c, 0)) {
-                        | Arrow(_, ty_a, _) => ty_a 
-                        | _ => failwith("impossible")
-                    };
-                    attempt(s4, modus_ponens(s4, target), s5 => {
-                        attempt(s5, assumed(s5), s6 => {
-                            attempt(s6, weaken(s6), s7 => {
-                                attempt(s7, weaken(s7), s8 => {
-                                    let (s9, r3) = check_demo(s8, d);
-                                    (s9, merge_report_list([r1, r2, r3]))
-                                })
-                            })
-                        })
-                    })
-                })
-            })
-        | _ => skip_and_error(s, "wrong number of args to direct")
-    }
+    // | Tactic(Check, ds) => {
+    //     if(ds != []) {
+    //         skip_and_error(s, "side conditions not supported yet")
+    //     } else {
+    //         let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+    //         switch(ty_goal) {
+    //             | In(Typ, _) => check_demo(s, TypForm)
+    //             | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
+    //             | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
+    //             | In(Ap(a1, _), _) => {
+    //                 switch(infer_typ(c, a1)) {
+    //                 | Arrow(x, ty1, ty2) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+    //                 | _ => skip_and_error(s, "applying a non-arrow")
+    //                 }
+    //             }
+    //             | In(In(_, _), _) => failwith("unimplemented: In")
+    //             | _ => skip_and_error(s, "not a type obligation")
+    //         }
+    //     }
+    // }
+    // | Tactic(Schema(Definition), ds) => {
+    //     if (ds != []) {
+    //         skip_and_error(s, "side conditions not supported yet")
+    //     } else {
+    //         let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+    //         switch(ty_goal) {
+    //         | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) 
+    //             when equiv(ty, ty') => 
+    //             attempt(s, find_refl(c, eq-2, eq-2), refl => {
+    //             check_demo(s, ElabGiven("M", Typ, TypForm, 
+    //                 ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
+    //                 ElabAt(ElabAt(ElabHyp(0), xthing, Obvious), Ap(Ap(Var(refl+2), ty), xthing), Obvious)
+    //                 )))
+    //             })
+    //         | _ => skip_and_error(s, "not a definition obligation")
+    //         }
+    //     }
+    // }
+    // | Tactic(Direct, ds) => switch(ds) {
+    //     | [d] => 
+    //         attempt(s, arrow_introduction("M", s), s1 => {
+    //             let (s2, r1) = check_demo(s1, Obvious);
+    //             attempt(s2, arrow_introduction("h", s2), s3 => {
+    //                 let (s4, r2) = check_demo(s3, Obvious);
+    //                 let (c, _) = pair_of_judgment(Result.get_ok(focused(s4)));
+    //                 let target = switch(lookup_index(c, 0)) {
+    //                     | Arrow(_, ty_a, _) => ty_a 
+    //                     | _ => failwith("impossible")
+    //                 };
+    //                 attempt(s4, modus_ponens(s4, target), s5 => {
+    //                     attempt(s5, assumed(s5), s6 => {
+    //                         attempt(s6, weaken(s6), s7 => {
+    //                             attempt(s7, weaken(s7), s8 => {
+    //                                 let (s9, r3) = check_demo(s8, d);
+    //                                 (s9, merge_report_list([r1, r2, r3]))
+    //                             })
+    //                         })
+    //                     })
+    //                 })
+    //             })
+    //         })
+    //     | _ => skip_and_error(s, "wrong number of args to direct")
+    // }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
             let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
