@@ -5,6 +5,8 @@ type tm =
     | Typ 
     | In(tm, tm)
     | Arrow(name, tm, tm)
+    | Lam(name, tm, tm)
+    | Unlam(name, tm)
     | Var(int)
     | Ap(tm, tm);
 
@@ -34,66 +36,111 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     }
 }
 
-// applies f to each variable in [a] greater than or equal to [n]
-let rec varmap (a : tm, x : int, f : int => int) : tm = {
-    switch(a) {
+let rec wknvar(n : int, m : int) : int = {
+    if (n == 0) { m+1 } else
+    if (n > 0 && m == 0) { 0 } else 
+    { wknvar(0, wknvar(n-1, m-1))}
+}
+
+let rec wkn(n : int, a : tm) : tm = switch(a) {
     | Typ => Typ
-    | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
-    | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
-    | Var(y) when y >= x => Var(f(y))
-    | Var(y) => Var(y)
-    | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
+    | In(a, ty) => In(wkn(n, a), wkn(n, ty))
+    | Arrow(y, ty1, ty2) => Arrow(y, wkn(n, ty1), wkn(n+1, ty2))
+    | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
+    | Unlam(y, a) =>
+        if (n > 0) { Unlam(y, wkn(n-1, a)) } 
+        else { failwith("unweakenable") }
+    | Var(y) => Var(wknvar(n, y))
+    | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
+}
+
+let getwk(a : tm) : tm = wkn(0, a)
+
+let wk(a : tm) : option(tm) = {
+    try { Some(getwk(a)) } {
+    | _ => None
     }
 }
 
-// smartapplies f to each variable in [a] greater than or equal to [n]
-let smartvarmap (a : tm, x : int, f : int => int) : tm = {
-    switch(a) {
-    | Typ => Typ
-    | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
-    | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, y => f(y-1)+1))
-    | Var(y) when y >= x => Var(f(y))
-    | Var(y) => Var(y)
-    | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
-    }
+let rec substvar(n : int, s : tm, m : int) : tm = {
+    if (n == 0 && m == 0) { s } else
+    if (n == 0 && m > 0) { Var(m-1) } else 
+    if (n > 0 && m == 0) { Var(0) } else 
+    { wkn(0, substvar(n-1, s, m-1))}
 }
 
-// increments each variable in [a] greater than or equal to [n]
-let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
-
-// decrements each variable in [a] greater than or equal to [n]
-let downshift (a : tm, x : int) : tm = varmap(a, x, n => n-1)
-
-// replaces all occurrences of [x] with [a], downshifting all vars > x.
-let rec subst (a1 : tm, a : tm, x : int) : tm = {
-    switch(a1) {
+let rec subst(n : int, s : tm, t : tm) : tm = switch(t) {
     | Typ => Typ
-    | In(a1, ty) => In(subst(a1, a, x), subst(ty, a, x))
-    | Arrow(y, ty1, ty2) => Arrow(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
-    | Var(y) when y == x => a 
-    | Var(y) when y > x => Var(y-1)
-    | Var(y) => Var(y)
-    | Ap(a1, a2) => Ap(subst(a1, a, x), subst(a2, a, x))
-    }
+    | In(a, ty) => In(subst(n, s, a), subst(n, s, ty))
+    | Arrow(y, ty1, ty2) => Arrow(y, subst(n, s, ty1), subst(n+1, s, ty2))
+    | Lam(y, ty, a) => Lam(y, subst(n, s, ty), subst(n+1, s, a))
+    | Unlam(y, a) =>
+        if (n > 0) { Unlam(y, subst(n-1, s, a)) } 
+        else { failwith("unsubstable") }
+    | Var(y) => substvar(n, s, y)
+    | Ap(a1, a2) => Ap(subst(n, s, a1), subst(n, s, a2))
 }
+
+// // applies f to each variable in [a] greater than or equal to [n]
+// let rec varmap (a : tm, x : int, f : int => int) : tm = {
+//     switch(a) {
+//     | Typ => Typ
+//     | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
+//     | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
+//     | Var(y) when y >= x => Var(f(y))
+//     | Var(y) => Var(y)
+//     | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
+//     }
+// }
+
+// // smartapplies f to each variable in [a] greater than or equal to [n]
+// let smartvarmap (a : tm, x : int, f : int => int) : tm = {
+//     switch(a) {
+//     | Typ => Typ
+//     | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
+//     | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, y => f(y-1)+1))
+//     | Var(y) when y >= x => Var(f(y))
+//     | Var(y) => Var(y)
+//     | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
+//     }
+// }
+
+// // increments each variable in [a] greater than or equal to [n]
+// let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
+
+// // decrements each variable in [a] greater than or equal to [n]
+// let downshift (a : tm, x : int) : tm = varmap(a, x, n => n-1)
+
+// // replaces all occurrences of [x] with [a], downshifting all vars > x.
+// let rec subst (a1 : tm, a : tm, x : int) : tm = {
+//     switch(a1) {
+//     | Typ => Typ
+//     | In(a1, ty) => In(subst(a1, a, x), subst(ty, a, x))
+//     | Arrow(y, ty1, ty2) => Arrow(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
+//     | Var(y) when y == x => a 
+//     | Var(y) when y > x => Var(y-1)
+//     | Var(y) => Var(y)
+//     | Ap(a1, a2) => Ap(subst(a1, a, x), subst(a2, a, x))
+//     }
+// }
 
 let rec lookup_index (c : ctx, x : int) : tm = {
     switch(c, x) {
-    | (Cons(_, _, t), 0) => shift(t, 0)
-    | (Cons(c, _, _), x) when x > 0 => shift(lookup_index(c, x-1), 0)
+    | (Cons(_, _, t), 0) => getwk(t)
+    | (Cons(c, _, _), x) when x > 0 => getwk(lookup_index(c, x-1))
     | _ => failwith("Context lookup out of bounds")
     }
 }
 
-let rec no_x (a : tm, x : int) : bool = {
-    switch(a) {
-    | Typ => true
-    | In(a, ty) => no_x(a, x) && no_x(ty, x)
-    | Arrow(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
-    | Var(y) => y != x
-    | Ap(a1, a2) => no_x(a1, x) && no_x(a2, x)
-    }
-}
+// let rec no_x (a : tm, x : int) : bool = {
+//     switch(a) {
+//     | Typ => true
+//     | In(a, ty) => no_x(a, x) && no_x(ty, x)
+//     | Arrow(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
+//     | Var(y) => y != x
+//     | Ap(a1, a2) => no_x(a1, x) && no_x(a2, x)
+//     }
+// }
 
 type judgment = J(ctx, tm);
 
