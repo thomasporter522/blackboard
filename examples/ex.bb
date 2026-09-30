@@ -14,7 +14,7 @@ arrow-type M obvious (arrow-type portal (arrow-type thing (arrow-type A obvious 
     
     (arrow-type h1 (arrow-type x obvious 
     
-    (ap h2 type type (ap h3 type (type -> type) check (open-down hii ?)) check)
+    (ap h2 type type (ap h3 type (type -> type) check ?) check)
     
     ) ?)
     
