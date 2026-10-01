@@ -407,7 +407,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                     }
                 }
                 | In(Lam(_), _) => failwith("unimplemented: Lam")
-                | In(Unlam(_), _) => failwith("unimplemented: Unlam")
+                | In(Unlam(_), _) => check_demo(s, ArrowElim(Tactic(Check, [])))
                 | In(In(_, _), _) => failwith("unimplemented: In")
                 | _ => skip_and_error(s, "not a type obligation")
             }
