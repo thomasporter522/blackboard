@@ -11,4 +11,4 @@ mythm : eq type type type
 by 
 given M : type valid by check,
 given portal : (mythm : eq type type type) -> M valid by check,
-portal @ (refl type type) valid by (ap a type (eq type a a) (ap A type ((a : A) -> eq A a a) check check) check)
+portal @ (refl type type)
