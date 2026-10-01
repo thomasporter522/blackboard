@@ -15,7 +15,7 @@ type program =
     | Assume(ctx, tm, demo, program)
     | Construct(ctx, tm, demo, program)
     | Prove(ctx, tm, demo, program)
-    
+
 let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) = switch(s) {
     | [] => (c, [])
     | [(x, ty),...s'] => {
@@ -35,17 +35,17 @@ let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx =
     }
 }
 
-let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature) : tm = switch(s){
-    | [] => Var(0)
+let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature, depth : int) : tm = switch(s){
+    | [] => Var(depth)
     | [(x, ty),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
         let c' = Cons(c, x, ty_elab);
-        Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s'))
+        Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
     }
 }
 
 let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
-    Arrow("M", Typ, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Typ), s), Var(1)))
+    Arrow("M", Typ, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Typ), s, 0), Var(1)))
 }
 
 let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) {
