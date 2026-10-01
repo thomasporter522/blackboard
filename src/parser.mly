@@ -6,8 +6,8 @@ open Program
 %token <string> ID
 %token LPAREN "("
 %token RPAREN ")"
-// %token LSQAREN "["
-// %token RSQAREN "]"
+%token LSQAREN "["
+%token RSQAREN "]"
 %token EOF
 
 %token TYPE "type"
@@ -68,6 +68,7 @@ let id_list :=
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
+  | t1 = atom; LSQAREN; x = ID; RSQAREN; { Unlam(t1, x) }
   | x = atom_list; { x }
 
 let demo_atom := 
