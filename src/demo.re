@@ -5,7 +5,7 @@ open Deriv.PartialDerivation
 type surface_tm = 
     | Typ 
     | In(surface_tm, surface_tm)
-    | Arrow(list(name), surface_tm, surface_tm)
+    | SurfaceArrow(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
     | Var(name)
     | Ap(surface_tm, surface_tm);
@@ -14,7 +14,7 @@ type schema =
     | Definition
 
 type tactic = 
-    // | Check
+    | Check
     // | Direct
     | GivenAll
     // | Schema(schema)
@@ -94,8 +94,8 @@ let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | Typ => Typ
     | In(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
-    | Arrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), Arrow(xs, t1, t2)))
-    | Arrow([], _, t2) => tm_of_surface(c, t2)
+    | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(xs, t1, t2)))
+    | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | Var(x) => Var(var_of_surface(c, x))
     | Ap(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
@@ -103,7 +103,7 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
     try {
-        if (equiv(ty, lookup_index(c, n))) { Ok(n) } else { find_assumption(c, ty, n+1) }
+        if (equiv(ty, get_lookup_index(c, n))) { Ok(n) } else { find_assumption(c, ty, n+1) }
     } {
        | _ => Error("can't find assumption")
     }
@@ -207,22 +207,31 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
 //     | _ => Error("cannot infer what it proves") // todo: make this message better
 // }
 
-// let rec infer_typ(c : ctx, a : tm) : tm = switch(a) {
-//     | Typ => Typ
-//     | In(_) => Typ
-//     | Arrow(_) => Typ
-//     | Var(x) => lookup_index(c, x)
-//     | Ap(a1, a2) => {
-//         switch(infer_typ(c, a1)) {
-//         | Arrow(_, _, ty2) => subst(ty2, a2, 0)
-//         | _ => Typ
-//         }
-//     }
-// }
+// infers the type of a term in a context
+let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
+    | Typ => Ok(Typ)
+    | In(_) => Ok(Typ)
+    | Arrow(_) => Ok(Typ)
+    | Lam(x, ty, b) => Result.bind(infer_typ(Cons(c, x, ty), b), ty_body => Ok(Arrow(x, ty, ty_body)))
+    | Unlam(_, f) => switch(c) {
+        | Empty => Error("Unlambda has no type in the empty context")
+        | Cons(c', _, _) => switch(infer_typ(c', f)) {
+            | Ok(Arrow(_, _, ty_b)) => Ok(ty_b)
+            | Ok(_) => Error("Unlambda body does not have arrow type")
+            | Error(e) => Error(e)
+            }   
+        }
+    | Var(x) => lookup_index(c, x)
+    | Ap(a1, a2) => switch(infer_typ(c, a1)) {
+        | Ok(Arrow(_, _, ty2)) => subst(a2, ty2)
+        | Ok(_) => Error("Applied term does not have arrow type")
+        | Error(e) => Error(e)
+    }
+}
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
-        switch(lookup_index(c, current)) {
+        switch(get_lookup_index(c, current)) {
         | Arrow(_, Typ, Arrow(_, Var(0), 
             Ap(Ap(Ap(Var(eq'), Var(1)), Var(0)), Var(0))
             )) when eq == eq'-2  => Ok(current)
@@ -374,26 +383,28 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         skip_and_error(s, "not obvious"))))
         // check_demo(s, Tactic(Check, [])))))
     }
-    // | Tactic(Check, ds) => {
-    //     if(ds != []) {
-    //         skip_and_error(s, "side conditions not supported yet")
-    //     } else {
-    //         let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-    //         switch(ty_goal) {
-    //             | In(Typ, _) => check_demo(s, TypForm)
-    //             | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
-    //             | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
-    //             | In(Ap(a1, _), _) => {
-    //                 switch(infer_typ(c, a1)) {
-    //                 | Arrow(x, ty1, ty2) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
-    //                 | _ => skip_and_error(s, "applying a non-arrow")
-    //                 }
-    //             }
-    //             | In(In(_, _), _) => failwith("unimplemented: In")
-    //             | _ => skip_and_error(s, "not a type obligation")
-    //         }
-    //     }
-    // }
+    | Tactic(Check, ds) => {
+        if(ds != []) {
+            skip_and_error(s, "side conditions not supported yet")
+        } else {
+            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+            switch(ty_goal) {
+                | In(Typ, _) => check_demo(s, TypForm)
+                | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
+                | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
+                | In(Ap(a1, _), _) => {
+                    switch(infer_typ(c, a1)) {
+                    | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+                    | _ => skip_and_error(s, "applying a non-arrow")
+                    }
+                }
+                | In(Lam(_), _) => failwith("unimplemented: Lam")
+                | In(Unlam(_), _) => failwith("unimplemented: Unlam")
+                | In(In(_, _), _) => failwith("unimplemented: In")
+                | _ => skip_and_error(s, "not a type obligation")
+            }
+        }
+    }
     // | Tactic(Schema(Definition), ds) => {
     //     if (ds != []) {
     //         skip_and_error(s, "side conditions not supported yet")

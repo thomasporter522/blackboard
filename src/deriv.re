@@ -89,7 +89,7 @@ module PartialDerivation : {
     let hyp (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Var(x), ty)) => 
-            let found = lookup_index(c, x);
+            let found = get_lookup_index(c, x);
             if (equiv(found, ty)) Ok([]) else Error(
                 "hyp failure: " 
                 ++ text_of_var(c, x, x) 

@@ -139,13 +139,18 @@ let subst(s : tm, t : tm) : result(tm, error) =
 //     }
 // }
 
-let rec lookup_index (c : ctx, x : int) : tm = {
+let rec get_lookup_index(c : ctx, x : int) : tm = {
     switch(c, x) {
     | (Cons(_, _, t), 0) => getwk(t)
-    | (Cons(c, _, _), x) when x > 0 => getwk(lookup_index(c, x-1))
+    | (Cons(c, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
     | _ => failwith("Context lookup out of bounds")
     }
 }
+
+let lookup_index(c : ctx, x : int) : result(tm, error) = 
+    try { Ok(get_lookup_index(c, x)) } {
+    | _ => Error("lookup index failed")
+    }
 
 // let rec no_x (a : tm, x : int) : bool = {
 //     switch(a) {

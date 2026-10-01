@@ -66,7 +66,7 @@ let id_list :=
   | x = ID; xs = id_list; { x :: xs }
 
 let term :=
-  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { Arrow (xs, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
   | x = atom_list; { x }
 
@@ -76,7 +76,7 @@ let demo_atom :=
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
-  // | CHECK; { Tactic (Check, []) }
+  | CHECK; { Tactic (Check, []) }
   // | DEFINITION; { Tactic (Schema(Definition), []) }
 
 let demo_list := 
