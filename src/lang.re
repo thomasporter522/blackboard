@@ -24,6 +24,11 @@ let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     }
 }
 
+let tail_of_ctx(c : ctx) : ctx = switch(c) {
+    | Empty => failwith("tail of empty context")
+    | Cons(c', _, _) => c'
+}
+
 // alpha equivalence
 let rec equiv(a1 : tm, a2 : tm) : bool = {
     switch(a1, a2) {

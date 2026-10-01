@@ -31,6 +31,7 @@ type demo =
     | Suffices(name, surface_tm, demo, demo)
     | TypForm
     | ArrowForm(name, demo, demo)
+    | ArrowElim(demo)
     | Ap(name, surface_tm, surface_tm, demo, demo)
     | ElabAp(name, tm, tm, demo, demo)
     // | At(demo, surface_tm, demo)
@@ -314,6 +315,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
         });
+    | ArrowElim(d) => attempt(s, arrow_elimination(s), s' => check_demo(s', d));
     | Ap(x, ty1, ty2, d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let ty1_elab = tm_of_surface(c, ty1);

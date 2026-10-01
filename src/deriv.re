@@ -15,6 +15,7 @@ module PartialDerivation : {
     let cut : (t, name, tm) => result(t, error);
     let typ_formation : t => result(t, error);
     let arrow_formation : (t, name) => result(t, error);
+    let arrow_elimination : t => result(t, error);
     let ap : (t, name, tm, tm) => result(t, error);
     let arrow_introduction : (name, t) => result(t, error);
 
@@ -134,6 +135,13 @@ module PartialDerivation : {
         switch(j) {
         | J(c, In(Arrow(_x, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1), In(ty2, Typ))])
         | _ => Error("arrow_formation failure")
+        }
+    })
+
+    let arrow_elimination (s : t)  : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(Cons(c, x, ty_a), In(Unlam(x', t), ty_b)) when x == x' => Ok([J(c, In(t, Arrow(x, ty_a, ty_b)))])
+        | _ => Error("arrow_elimination failure")
         }
     })
 

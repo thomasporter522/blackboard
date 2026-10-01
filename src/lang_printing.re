@@ -44,7 +44,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         }
     | Unlam(x, a) => 
         if (lp >= fst(unlam_prec)) { wrap(c, outer_a) } else {
-            prec_string_of_term(lp, fst(unlam_prec), c, a) ++ "[" ++ x ++ "]"
+            prec_string_of_term(lp, fst(unlam_prec), tail_of_ctx(c), a) ++ "[" ++ x ++ "]"
         }
     | Var(x) => string_of_var(c, x)
     | Ap(a1, a2) => 

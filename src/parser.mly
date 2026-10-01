@@ -26,6 +26,7 @@ open Program
 %token HOLE "?"
 %token TYPETYPE "type-type"
 %token ARROWTYPE "arrow-type"
+%token UNLAMBDATYPE "unlambda-type"
 %token TYPEOF "type-of"
 %token AP "ap"
 %token AT "@"
@@ -101,5 +102,6 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
+  | UNLAMBDATYPE; d = demo_atom; { ArrowElim (d) }
   // | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }
