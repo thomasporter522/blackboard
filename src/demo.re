@@ -4,12 +4,12 @@ open Deriv.PartialDerivation
 
 type surface_tm = 
     | Typ 
-    | In(surface_tm, surface_tm)
+    | SurfaceIn(surface_tm, surface_tm)
     | SurfaceArrow(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
-    | Unlam(surface_tm, name)
-    | Var(name)
-    | Ap(surface_tm, surface_tm);
+    | SurfaceUnlam(surface_tm, name)
+    | SurfaceVar(name)
+    | SurfaceAp(surface_tm, surface_tm);
 
 type schema = 
     | Definition
@@ -32,10 +32,10 @@ type demo =
     | TypForm
     | ArrowForm(name, demo, demo)
     | ArrowElim(demo)
-    | Ap(name, surface_tm, surface_tm, demo, demo)
-    | ElabAp(name, tm, tm, demo, demo)
-    // | At(demo, surface_tm, demo)
-    // | ElabAt(demo, tm, demo)
+    | ApTyp(name, surface_tm, surface_tm, demo, demo)
+    | ElabApTyp(name, tm, tm, demo, demo)
+    | At(demo, surface_tm, demo)
+    | ElabAt(demo, tm, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
     // | Use(demo, demo)
@@ -95,17 +95,17 @@ let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
 
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | Typ => Typ
-    | In(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
+    | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
     | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(xs, t1, t2)))
     | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
-    | Unlam(t, x) => switch(c) {
+    | SurfaceUnlam(t, x) => switch(c) {
         | Cons(c', y, _) when x == y => Unlam(x, tm_of_surface(c', t))
         | Cons(_) => failwith("Can only unlambda with the most proximate variable")
         | Empty => failwith("Unable to elaborate unlamda in empty context")
     }
-    | Var(x) => Var(var_of_surface(c, x))
-    | Ap(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
+    | SurfaceVar(x) => Var(var_of_surface(c, x))
+    | SurfaceAp(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
 }
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
@@ -123,22 +123,69 @@ let assumed(s : t) : result (t, error) = {
                 hyp(s')))
 }
 
-// // if the focus of [s] is c |- B[a], refines to goals a : A and (x : A) -> B[x]
-// // assumes (x : A) -> B[x] is well-typed in c
-// let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
-//     // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
-//     Result.bind(cut(s, "#f", Arrow(x, ty_a, ty_b)), s3 => {
-//     Result.bind(swap(s3), s4 => {
-//     Result.bind(in_elimination(s4, Ap(Var(0), getwk(a))), s5 => {
-//     Result.bind(ap(s5, x, getwk(ty_a), wkn(1, ty_b)), s6 => { 
-//     Result.bind(hyp(s6), s7 => { 
-//     weaken(s7, failwith("todo"))
-//     })
-//     })
-//     })
-//     })
-//     })
-// }
+// inverse of wknvar(n, _)
+let invert_wknvar(n : int, m : int) : result(int, error) = {
+    if (n == m) { Error("unstrengthenable var") } else 
+    if (n > m) { Ok(m) } else { Ok(m-1) }
+}
+
+// inverse of wkn(n, _)
+let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
+    | Typ => Ok(Typ)
+    | In(a, ty) => {
+        let* a' = invert_wkn(n, a);
+        let* ty' = invert_wkn(n, ty);
+        Ok(In(a', ty'))
+    }
+    | Arrow(y, ty1, ty2) => {
+        let* ty1' = invert_wkn(n, ty1);
+        let* ty2' = invert_wkn(n+1, ty2);
+        Ok(Arrow(y, ty1', ty2'))
+    }
+    | Lam(y, ty, a) => {
+        let* ty' = invert_wkn(n, ty);
+        let* a' = invert_wkn(n+1, a);
+        Ok(Lam(y, ty', a'))
+    }
+    | Unlam(y, a) =>
+        if (n <= 0) { Error("unstrengthenable") } 
+        else { 
+            let* a' = invert_wkn(n-1, a);
+            Ok(Unlam(y, a')) 
+        } 
+    | Var(y) => {
+        let* y' = invert_wknvar(n, y);
+        Ok(Var(y'))
+    }
+    | Ap(a1, a2) => {
+        let* a1' = invert_wkn(n, a1);
+        let* a2' = invert_wkn(n, a2);
+        Ok(Ap(a1', a2'))
+    } 
+}
+
+// inverse of wk(_)
+let invert_wk(a : tm) : result(tm, error) = invert_wkn(0, a)
+
+// if the focus of [s] is c, x : A |- T, refines to goal c |- T' where wk(T') = T
+let weaken_goal(s : t) : result(t, error) = {
+    let (_, ty) = pair_of_judgment(Result.get_ok(focused(s)));
+    let* ty_inv_wk = invert_wk(ty);
+    weaken(s, ty_inv_wk)
+}
+
+// if the focus of [s] is c |- B[a/x], refines to goals a : A and (x : A) -> B
+// assumes (x : A) -> B is well-typed in c
+let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
+    let* s = cut(s, "#f", Arrow(x, ty_a, ty_b));
+    let* s = swap(s);
+    let* a_wk = wk(a);
+    let* s = in_elimination(s, Ap(Var(0), a_wk));
+    let* ty_a_wk = wk(ty_a);
+    let* s = ap(s, x, ty_a_wk, wkn(1, ty_b));
+    let* s = hyp(s)
+    weaken_goal(s)
+}
 
 // // if the focus of [s] is c |- B, refines to goals A -> B and A
 // // assumes [ty_A] (A) is well-typed in c
@@ -191,28 +238,29 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
     }
 }
 
-// let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
-//     | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
-//     | ElabHyp(n) => try { Ok(lookup_index(c, n)) } { | _ => Error("Cannot find index")}
-//     | At(d1, a, d2) => {
-//         let elab_a = tm_of_surface(c, a);
-//         infer_proven_ty(c, ElabAt(d1, elab_a, d2))
-//     }
-//     | ElabAt(d, a, _) => {
-//         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
-//         | Arrow(_, _, ty_b) =>
-//             Ok(getsubst(a, ty_b))
-//         | _ => Error("ap of non-arrow")
-//         })
-//     }
-//     | Use(d1, _) => {
-//         Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
-//         | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
-//         | _ => Error("use of non-arrow or non-simple arrow")
-//         })
-//     }
-//     | _ => Error("cannot infer what it proves") // todo: make this message better
-// }
+// infers the type proven by a demo in a context
+let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
+    | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
+    | ElabHyp(n) => lookup_index(c, n)
+    | At(d1, a, d2) => {
+        let elab_a = tm_of_surface(c, a);
+        infer_proven_ty(c, ElabAt(d1, elab_a, d2))
+    }
+    | ElabAt(d, a, _) => {
+        Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
+        | Arrow(_, _, ty_b) =>
+            Ok(getsubst(a, ty_b))
+        | _ => Error("ap of non-arrow")
+        })
+    }
+    // | Use(d1, _) => {
+    //     Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
+    //     | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
+    //     | _ => Error("use of non-arrow or non-simple arrow")
+    //     })
+    // }
+    | _ => Error("cannot infer what it proves") // todo: make this message better
+}
 
 // infers the type of a term in a context
 let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
@@ -316,39 +364,39 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         });
     | ArrowElim(d) => attempt(s, arrow_elimination(s), s' => check_demo(s', d));
-    | Ap(x, ty1, ty2, d1, d2) => {
+    | ApTyp(x, ty1, ty2, d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let ty1_elab = tm_of_surface(c, ty1);
         let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
-        check_demo(s, ElabAp(x, ty1_elab, ty2_elab, d1, d2))
+        check_demo(s, ElabApTyp(x, ty1_elab, ty2_elab, d1, d2))
     }
-    | ElabAp(x, ty1, ty2, d1, d2) => {
+    | ElabApTyp(x, ty1, ty2, d1, d2) => {
         attempt(s, ap(s, x, ty1, ty2), s' => {
             let (s'', r1) = check_demo(s', d1);
             let (s''', r2) = check_demo(s'', d2);
             (s''', merge_reports(r1, r2))
         });
     }
-    // | At(d1, a, d2) => {
-    //     let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-    //     let a_elab = tm_of_surface(c, a);
-    //     check_demo(s, ElabAt(d1, a_elab, d2))
-    // }
-    // | ElabAt(d1, a, d2) => {
-    //     let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
-    //     attempt(s, infer_proven_ty(c, d1), d1_ty => 
-    //         switch(d1_ty) {
-    //         | Arrow(x, ty_1, ty_2) => {
-    //             attempt(s, forall_elim(s, x, ty_1, ty_2, a), s' => {
-    //             let (s2, r1) = check_demo(s', d2);
-    //             let (s3, r2) = check_demo(s2, d1);
-    //             (s3, merge_report_list([r1, r2]))
-    //         })
-    //         }
-    //         | _ => skip_and_error(s, "applying non arrow")
-    //         }
-    //     )
-    // }
+    | At(d1, a, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        let a_elab = tm_of_surface(c, a);
+        check_demo(s, ElabAt(d1, a_elab, d2))
+    }
+    | ElabAt(d1, a, d2) => {
+        let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
+        attempt(s, infer_proven_ty(c, d1), d1_ty => 
+            switch(d1_ty) {
+            | Arrow(x, ty_1, ty_2) => {
+                attempt(s, forall_elim(s, x, ty_1, ty_2, a), s' => {
+                let (s2, r1) = check_demo(s', d2);
+                let (s3, r2) = check_demo(s2, d1);
+                (s3, merge_report_list([r1, r2]))
+            })
+            }
+            | _ => skip_and_error(s, "applying non arrow")
+            }
+        )
+    }
     | Given(x, ty, d1, d2) => {
         let (c, _) = pair_of_judgment(Result.get_ok(focused(s)));
         let ty_elab = tm_of_surface(c, ty);
@@ -402,7 +450,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
                 | In(Ap(a1, _), _) => {
                     switch(infer_typ(c, a1)) {
-                    | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabAp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+                    | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabApTyp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
                     | _ => skip_and_error(s, "applying a non-arrow")
                     }
                 }

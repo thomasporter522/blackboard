@@ -54,13 +54,13 @@ let signature :=
   | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
 
 let atom := 
-  | x = ID; { Var x }
+  | x = ID; { SurfaceVar x }
   | TYPE; { Typ }
   | LPAREN; t = term; RPAREN; { t }
 
 let atom_list := 
   | x = atom; { x }
-  | t1 = atom_list; t2 = atom; { Ap (t1, t2) }
+  | t1 = atom_list; t2 = atom; { SurfaceAp (t1, t2) }
 
 let id_list := 
   | x = ID; { [x] }
@@ -69,7 +69,7 @@ let id_list :=
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
-  | t1 = atom; LSQAREN; x = ID; RSQAREN; { Unlam(t1, x) }
+  | t1 = atom; LSQAREN; x = ID; RSQAREN; { SurfaceUnlam(t1, x) }
   | x = atom_list; { x }
 
 let demo_atom := 
@@ -99,7 +99,7 @@ let demo :=
   | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim (x, t, Obvious, d2) }
   | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
-  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
+  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
   | UNLAMBDATYPE; d = demo_atom; { ArrowElim (d) }
