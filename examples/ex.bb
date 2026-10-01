@@ -6,7 +6,7 @@ fav-cong : (A : type) -> (B1 B2 : A -> type) ->
 valid by
 arrow-type M check (arrow-type portal (arrow-type eq check (arrow-type fav-cong (arrow-type A check (arrow-type B1 check (arrow-type B2 check (arrow-type h 
 (
-arrow-type a check (ap ty2 type type ? (unlambda-type ?))
+arrow-type a check (ap ty2 type type ? (unlambda-type check))
 ) 
 
 ?)))) check)) check)

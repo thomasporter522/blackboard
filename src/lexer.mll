@@ -29,7 +29,7 @@ rule read =
   | "," { COMMA }
   | "type-type" { TYPETYPE }
   | "arrow-type" { ARROWTYPE }
-  | "unlamda-type" { UNLAMBDATYPE }
+  | "unlambda-type" { UNLAMBDATYPE }
   | "type-of" { TYPEOF }
   | "ap" { AP }
   | "@" { AT }
