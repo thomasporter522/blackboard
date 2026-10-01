@@ -88,8 +88,8 @@ let demo_list :=
 let chain_demo := 
   | d = demo_atom; { d }
   // | d1 = chain_demo; d2 = demo_atom; { Use(d1, d2) }
-  // | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
-  // | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
+  | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
+  | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
 
 let demo :=
   | d = chain_demo; { d }
