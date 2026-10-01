@@ -76,8 +76,8 @@ let demo_atom :=
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
-  | CHECK; { Tactic (Check, []) }
-  | DEFINITION; { Tactic (Schema(Definition), []) }
+  // | CHECK; { Tactic (Check, []) }
+  // | DEFINITION; { Tactic (Schema(Definition), []) }
 
 let demo_list := 
   | d = demo_atom; { d :: [] }
@@ -85,9 +85,9 @@ let demo_list :=
 
 let chain_demo := 
   | d = demo_atom; { d }
-  | d1 = chain_demo; d2 = demo_atom; { Use(d1, d2) }
-  | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
-  | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
+  // | d1 = chain_demo; d2 = demo_atom; { Use(d1, d2) }
+  // | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
+  // | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
 
 let demo :=
   | d = chain_demo; { d }
@@ -100,5 +100,5 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
-  | DIRECT; d = demo; { Tactic (Direct, d :: []) }
+  // | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

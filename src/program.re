@@ -12,9 +12,21 @@ type surface_program =
 
 type program = 
     | Empty 
-    | Assume(ctx, signature, demo, program)
-    | Construct(ctx, signature, demo, program)
+    | Assume(ctx, tm, demo, program)
+    | Construct(ctx, tm, demo, program)
     | Prove(ctx, tm, demo, program)
+
+
+let rec ty_arrow_of_sig (s : signature, depth : int) : tm = switch(s) {
+    | [] => Var(depth)
+    | [(x, ty), ...s] => Arrow(x, ty, ty_arrow_of_sig(s, depth+1))
+}
+
+// let ty_arrow_of_sig (_s : signature, _m : int) : tm = Typ
+
+let ty_of_sig (s : signature) : tm = Arrow("M", Typ, Arrow("_", ty_arrow_of_sig(s, 0), Var(1)))
+
+// let ty_of_sig (_s : signature) : tm = Typ
 
 let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) = switch(s) {
     | [] => (c, [])
@@ -26,24 +38,48 @@ let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) 
     }
 }
 
+let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx = switch(s) {
+    | [] => c
+    | [(x, ty),...s'] => {
+        let ty_elab = tm_of_surface(c, ty);
+        let c' = Cons(c, x, ty_elab);
+        extend_context_surface_signature(c', s');
+    }
+}
+
+let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature) : tm = switch(s){
+    | [] => Var(0)
+    | [(x, ty),...s'] => {
+        let ty_elab = tm_of_surface(c, ty);
+        let c' = Cons(c, x, ty_elab);
+        Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s'))
+    }
+}
+
+let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
+    Arrow("M", Typ, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Typ), s), Var(1)))
+}
+
 let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) {
     | Empty => Empty 
     | Assume(s, d, p) => 
-        let (c', s') = signature_of_surface(c, s);
-        Assume(c, s', d, program_of_surface(c', p))
+        let c' = extend_context_surface_signature(c, s);
+        let ty = ty_of_surface_signature(c, s);
+        Assume(c, ty, d, program_of_surface(c', p))
     | Construct(s, d, p) => 
-        let (c', s') = signature_of_surface(c, s);
-        Construct(c, s', d, program_of_surface(c', p))
+        let c' = extend_context_surface_signature(c, s);
+        let ty = ty_of_surface_signature(c, s);
+        Construct(c, ty, d, program_of_surface(c', p))
     | Prove(a, d, p) => Prove(c, tm_of_surface(Empty, a), d, program_of_surface(c, p))
 }
 
 type program_check_report = list(demo_check_report);
 
-let swap01 (x : int) : int = switch(x) {
-    | 0 => 1 
-    | 1 => 0 
-    | x => x
-}
+// let swap01 (x : int) : int = switch(x) {
+//     | 0 => 1 
+//     | 1 => 0 
+//     | x => x
+// }
 // d : type
 // c : d0
 // b : c0 d1,
@@ -66,22 +102,11 @@ let swap01 (x : int) : int = switch(x) {
 // M, b |- (a : b0) -> M2 (smartswap)
 
 
-// let rec ty_arrow_of_sig (s : signature, depth : int) : tm = switch(s) {
-//     | [] => Var(depth)
-//     | [(x, ty), ...s] => Arrow(x, varmap(ty, depth, x => x+1), ty_arrow_of_sig(s, depth+1))
-// }
-
-// let ty_arrow_of_sig (_s : signature, _m : int) : tm = Typ
-
-let ty_of_sig (s : signature) : tm = Arrow("M", Typ, Arrow("_", ty_arrow_of_sig(s, 0), Var(1)))
-
-// let ty_of_sig (_s : signature) : tm = Typ
-
 let rec check_program (p : program) : program_check_report = {
     switch(p) {
     | Empty => []
-    | Assume(c, s, d, p) => [check_demo_root(J(c, In(ty_of_sig(s), Typ)), d),... check_program(p)]
-    | Construct(c, s, d, p) => [check_demo_root(J(c, ty_of_sig(s)), d),... check_program(p)]
+    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Typ)), d),... check_program(p)]
+    | Construct(c, ty, d, p) => [check_demo_root(J(c, ty), d),... check_program(p)]
     | Prove(c, ty, d, p) => [check_demo_root(J(c, ty), d),... check_program(p)]
     }
 }
