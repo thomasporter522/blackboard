@@ -244,23 +244,12 @@ let weaken_goal(s : t) : result(t, error) = {
 // if the focus of [s] is c |- B[a/x], refines to goals a : A and (x : A) -> B
 // assumes (x : A) -> B is well-typed in c
 let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, error) = {
-    print_endline("fe " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
-    print_endline("fe ty_a " ++ Lang_printing.string_of_term(fst(goal(s)), ty_a));
     let* s = cut(s, "#f", Arrow(x, ty_a, ty_b));
-    print_endline("fe cut " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
     let* s = swap(s);
-    print_endline("fe swap " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
     let* a_wk = wk(a);
-    print_endline("fe wk " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
     let* s = in_elimination(s, Ap(Var(0), a_wk));
     let* ty_a' = wk(ty_a);
-    let (c, ty_goal) = goal(s);
-    print_endline("fe inelim " ++ Lang_printing.string_of_ctx(fst(goal(s))));
-    print_endline("fe inelim " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
-    print_endline("fe inelim a " ++ Lang_printing.string_of_term(fst(goal(s)), ty_a'));
-    print_endline("fe inelim a " ++ Lang_printing.string_of_term(fst(goal(s)), ty_a'));
     let* s = ap(s, x, ty_a', wkn(1, ty_b));
-    print_endline("Asdfasdf");
     let* s = hyp(s);
     let* s = weaken_goal(s);
     Ok(s)
@@ -269,65 +258,16 @@ let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, erro
 // if the focus of [s] is c |- B, refines to goals A -> B and A
 // assumes [ty_A] (A) is well-typed in c
 let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
-    print_endline("mp " ++ Lang_printing.string_of_ctx(fst(goal(s))));
-    print_endline("mp " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
     let* s = cut(s, "#a", ty_a);
     let* s = swap(s);
-    print_endline("mp cut " ++ Lang_printing.string_of_ctx(fst(goal(s))));
-    print_endline("mp cut " ++ Lang_printing.string_of_term(fst(goal(s)), snd(goal(s))));
     let* ty_a' = wk(ty_a);
-    // let ty_a' = ty_a;
     let (_, ty_b) = goal(s);
     let* ty_b' = wk(ty_b);
     let* s = forall_elim(s, "_", ty_a', ty_b', Var(0));
-    // let* s = in_elimination(s, Var(0));
-    // let* ty_a'' = wk(ty_a');
-    // let* ty_b' = wk(ty_b);
-    // let* s = ap(s, "_", ty_a'', ty_b');
-    // let* s = hyp(s);
     let* s = hyp(s);
     let* s = weaken_goal(s);
     Ok(s)
-    // Result.bind(cut(s, "#a", ty_a), s' => {
-    // Result.bind(swap(s'), s2 => {
-    // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
-    // Result.bind(cut(s2, "#f", Arrow("_", getwk(ty_a), getwk(ty_b))), s3 => {
-    // Result.bind(swap(s3), s4 => {
-    // Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
-    // Result.bind(ap(s5, "_", getwk(getwk(ty_a)), getwk(getwk(ty_b))), s6 => { 
-    // Result.bind(hyp(s6), s7 => { 
-    // Result.bind(hyp(s7), s8 => { 
-    // weaken(s8, failwith("todo"))
-    // })
-    // })
-    // })
-    // })
-    // })
-    // })
-    // })
-    // })
 }
-
-// if(ds != []) {
-//     skip_and_error(s, "side conditions not supported yet")
-// } else {
-//     let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-//     switch(ty_goal) {
-//         | In(Typ, _) => check_demo(s, TypForm)
-//         | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
-//         | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
-//         | In(Ap(a1, _), _) => {
-//             switch(infer_typ(c, a1)) {
-//             | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabApTyp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
-//             | _ => skip_and_error(s, "applying a non-arrow")
-//             }
-//         }
-//         | In(Lam(_), _) => failwith("unimplemented: Lam")
-//         | In(Unlam(_), _) => check_demo(s, ArrowElim(Tactic(Check, [])))
-//         | In(In(_, _), _) => failwith("unimplemented: In")
-//         | _ => skip_and_error(s, "not a type obligation")
-//     }
-
 
 let rec check(s : t) : result(t, error) = {
     let (c, ty_goal) = goal(s);
@@ -565,13 +505,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     //         }
     //     )
     // }
-    | Obvious => {
-        attempt_option(typ_formation(s), s' => (s', report([], [])), 
-        attempt_option(assumed(s), s' => (s', report([], [])), 
-        attempt_option(hyp(s), s' => (s', report([], [])), 
-        // skip_and_error(s, "not obvious"))))
-        check_demo(s, Tactic(Check, [])))))
-    }
+    | Obvious =>  attempt(s, obvious(s), s' => (s', report([], [])))
     | Tactic(Check, ds) => {
         if(ds != []) {
             skip_and_error(s, "side conditions not supported yet")

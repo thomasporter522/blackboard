@@ -10,4 +10,4 @@ construct
 mythm : eq type type type
 by 
 direct
-?
+refl @ type @ type
