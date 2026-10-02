@@ -39,7 +39,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         }
     | Lam(x, ty, a) => 
         if (rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
-            ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, a) ++ ")")
+            ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty) ++ ")")
             ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty), a) 
         }
     | Unlam(x, a) => 
