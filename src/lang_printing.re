@@ -11,7 +11,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
 
 
 let show_indices = false;
-// let show_indices = true;
+let show_indices = true;
 
 let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
@@ -72,7 +72,7 @@ let string_of_judgment_short(j : judgment) : string = {
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
-    | Cons(Empty, x, ty) => x ++ " : " ++ string_of_term(c, ty)
+    | Cons(Empty, x, ty) => x ++ " : " ++ string_of_term(Empty, ty)
     | Cons(c, x, ty) => x ++ " : " ++ string_of_term(c, ty) ++ ",\n" ++ string_of_ctx(c)
 }
 
