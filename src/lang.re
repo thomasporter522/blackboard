@@ -22,6 +22,12 @@ let ( let* ) = (x: result('a, 'b), f: 'a => result('c, 'b)): result('c, 'b) =>
   | Error(e) => Error(e)
   };
 
+let ( let! ) = (x: result('a, 'b), f: 'b => result('a, 'b)): result('a, 'b) =>
+  switch (x) {
+  | Ok(x) => Ok(x)
+  | Error(e) => f(e)
+  };
+
 let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     switch(c, x) {
     | (Cons(_, y, _), x) when y == x => Ok(0)

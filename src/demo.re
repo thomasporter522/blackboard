@@ -117,6 +117,72 @@ let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
     }
 }
 
+
+let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
+    switch(tds) {
+    | [] => switch(hd_ty) {
+        | Arrow(x, a, b) => Ok((x, a, b))
+        | _ => Error("head is not of arrow type")
+        }
+    | [(a, _), ...other_tds] => {
+        Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
+            let (_, _, ty_b) = f;
+            let elab_a = tm_of_surface(c, a);
+            switch(getsubst(elab_a, ty_b)) {
+            | Arrow(x, a, b) => Ok((x, a, b))
+            | _ => Error("constituent is not of arrow type")
+            }
+        })
+    }
+    }
+}
+
+// infers the type proven by a demo in a context
+let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
+    | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
+    | ElabHyp(n) => lookup_index(c, n)
+    | At(d1, a, d2) => {
+        let elab_a = tm_of_surface(c, a);
+        infer_proven_ty(c, ElabAt(d1, elab_a, d2))
+    }
+    | ElabAt(d, a, _) => {
+        Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
+        | Arrow(_, _, ty_b) =>
+            Ok(getsubst(a, ty_b))
+        | _ => Error("ap of non-arrow")
+        })
+    }
+    // | Use(d1, _) => {
+    //     Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
+    //     | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
+    //     | _ => Error("use of non-arrow or non-simple arrow")
+    //     })
+    // }
+    | _ => Error("cannot infer what it proves") // todo: make this message better
+}
+
+// infers the type of a term in a context
+let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
+    | Typ => Ok(Typ)
+    | In(_) => Ok(Typ)
+    | Arrow(_) => Ok(Typ)
+    | Lam(x, ty, b) => Result.bind(infer_typ(Cons(c, x, ty), b), ty_body => Ok(Arrow(x, ty, ty_body)))
+    | Unlam(_, f) => switch(c) {
+        | Empty => Error("Unlambda has no type in the empty context")
+        | Cons(c', _, _) => switch(infer_typ(c', f)) {
+            | Ok(Arrow(_, _, ty_b)) => Ok(ty_b)
+            | Ok(_) => Error("Unlambda body does not have arrow type")
+            | Error(e) => Error(e)
+            }   
+        }
+    | Var(x) => lookup_index(c, x)
+    | Ap(a1, a2) => switch(infer_typ(c, a1)) {
+        | Ok(Arrow(_, _, ty2)) => subst(a2, ty2)
+        | Ok(_) => Error("Applied term does not have arrow type")
+        | Error(e) => Error(e)
+    }
+}
+
 let assumed(s : t) : result (t, error) = {
     let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
     Result.bind(find_assumption(c, ty_goal, 0), n => 
@@ -194,13 +260,14 @@ let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, erro
 let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     let* s = cut(s, "#a", ty_a);
     let* ty_a' = wk(ty_a);
+    // let ty_a' = ty_a;
     let (_, ty_b) = goal(s);
     let* s = forall_elim(s, "_", ty_a', ty_b, Var(0));
-    let* s = in_elimination(s, Ap(Var(0), Var(1)));
-    let* ty_a'' = wk(ty_a');
-    let* ty_b' = wk(ty_b);
-    let* s = ap(s, "_", ty_a'', ty_b');
-    let* s = hyp(s);
+    // let* s = in_elimination(s, Var(0));
+    // let* ty_a'' = wk(ty_a');
+    // let* ty_b' = wk(ty_b);
+    // let* s = ap(s, "_", ty_a'', ty_b');
+    // let* s = hyp(s);
     let* s = hyp(s);
     let* s = weaken_goal(s);
     Ok(s)
@@ -224,19 +291,78 @@ let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
     // })
 }
 
+// if(ds != []) {
+//     skip_and_error(s, "side conditions not supported yet")
+// } else {
+//     let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+//     switch(ty_goal) {
+//         | In(Typ, _) => check_demo(s, TypForm)
+//         | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
+//         | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
+//         | In(Ap(a1, _), _) => {
+//             switch(infer_typ(c, a1)) {
+//             | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabApTyp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
+//             | _ => skip_and_error(s, "applying a non-arrow")
+//             }
+//         }
+//         | In(Lam(_), _) => failwith("unimplemented: Lam")
+//         | In(Unlam(_), _) => check_demo(s, ArrowElim(Tactic(Check, [])))
+//         | In(In(_, _), _) => failwith("unimplemented: In")
+//         | _ => skip_and_error(s, "not a type obligation")
+//     }
 
-let obvious(s : t) : result(t, error) = failwith("todo")
+
+let rec check(s : t) : result(t, error) = {
+    let (c, ty_goal) = goal(s);
+    switch(ty_goal) {
+        | In(Typ, _) => typ_formation(s)
+        | In(Arrow(x, _, _), _) => {
+            let* s = arrow_formation(s, x);
+            let* s = check(s);
+            let* s = check(s);
+            Ok(s)
+        }
+        | In(Var(_), _) => hyp(s)
+        | In(Ap(a1, _), _) => {
+            switch(infer_typ(c, a1)) {
+            | Ok(Arrow(x, ty1, ty2)) => {
+                let* s = ap(s, x, ty1, ty2);
+                let* s = check(s);
+                let* s = check(s);
+                Ok(s)
+            }
+            | _ => Error("applying a non-arrow")
+            }
+        }
+        | In(Lam(_), _) => failwith("unimplemented: Lam")
+        | In(Unlam(_), _) => {
+            let* s = arrow_elimination(s);
+            let* s = check(s);
+            Ok(s)
+        }
+        | In(In(_, _), _) => failwith("unimplemented: In")
+        | _ => Error("not a type obligation")
+    }
+}
+
+let obvious(s : t) : result(t, error) = {
+    let! _ = assumed(s);
+    let! e = check(s);
+    Error(e)
+}
 
 // if the goal is (M : type) -> (A -> M) -> M, refines to goal A.
 let direct(s : t) : result(t, error) = {
-    let* s = arrow_introduction("M", s);
-    let* s = arrow_introduction("h", s);
+    let* s = arrow_introduction(s, "M");
+    let* s = obvious(s);
+    let* s = arrow_introduction(s, "h");
     let* s = obvious(s);
     let (c, _) = goal(s);
     let* target = switch(lookup_index(c, 0)) {
         | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
         | _ => Error("cannot prove directly")
     };
+    print_endline(Lang_printing.string_of_term(c, target));
     let* s = modus_ponens(s, target);
     let* s = assumed(s);
     let* s = weaken_goal(s);
@@ -273,71 +399,6 @@ let direct(s : t) : result(t, error) = {
 //     | _ => Error("head cannot be applied")
 //     }
 // }
-
-let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
-    switch(tds) {
-    | [] => switch(hd_ty) {
-        | Arrow(x, a, b) => Ok((x, a, b))
-        | _ => Error("head is not of arrow type")
-        }
-    | [(a, _), ...other_tds] => {
-        Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
-            let (_, _, ty_b) = f;
-            let elab_a = tm_of_surface(c, a);
-            switch(getsubst(elab_a, ty_b)) {
-            | Arrow(x, a, b) => Ok((x, a, b))
-            | _ => Error("constituent is not of arrow type")
-            }
-        })
-    }
-    }
-}
-
-// infers the type proven by a demo in a context
-let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
-    | Hyp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHyp(n)))
-    | ElabHyp(n) => lookup_index(c, n)
-    | At(d1, a, d2) => {
-        let elab_a = tm_of_surface(c, a);
-        infer_proven_ty(c, ElabAt(d1, elab_a, d2))
-    }
-    | ElabAt(d, a, _) => {
-        Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
-        | Arrow(_, _, ty_b) =>
-            Ok(getsubst(a, ty_b))
-        | _ => Error("ap of non-arrow")
-        })
-    }
-    // | Use(d1, _) => {
-    //     Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
-    //     | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
-    //     | _ => Error("use of non-arrow or non-simple arrow")
-    //     })
-    // }
-    | _ => Error("cannot infer what it proves") // todo: make this message better
-}
-
-// infers the type of a term in a context
-let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
-    | Typ => Ok(Typ)
-    | In(_) => Ok(Typ)
-    | Arrow(_) => Ok(Typ)
-    | Lam(x, ty, b) => Result.bind(infer_typ(Cons(c, x, ty), b), ty_body => Ok(Arrow(x, ty, ty_body)))
-    | Unlam(_, f) => switch(c) {
-        | Empty => Error("Unlambda has no type in the empty context")
-        | Cons(c', _, _) => switch(infer_typ(c', f)) {
-            | Ok(Arrow(_, _, ty_b)) => Ok(ty_b)
-            | Ok(_) => Error("Unlambda body does not have arrow type")
-            | Error(e) => Error(e)
-            }   
-        }
-    | Var(x) => lookup_index(c, x)
-    | Ap(a1, a2) => switch(infer_typ(c, a1)) {
-        | Ok(Arrow(_, _, ty2)) => subst(a2, ty2)
-        | Ok(_) => Error("Applied term does not have arrow type")
-        | Error(e) => Error(e)
-    }
-}
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
@@ -464,7 +525,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 if (!equiv(ty_elab, ty1)) {
                     skip_and_error(s, "wrong given type")
                 } else {
-                    attempt(s, arrow_introduction(x, s), s' => {
+                    attempt(s, arrow_introduction(s, x), s' => {
                     let (s'', r1) = check_demo(s', d1);
                     let (s''', r2) = check_demo(s'', d2);
                     (s''', merge_reports(r1, r2))
@@ -498,22 +559,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         if(ds != []) {
             skip_and_error(s, "side conditions not supported yet")
         } else {
-            let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
-            switch(ty_goal) {
-                | In(Typ, _) => check_demo(s, TypForm)
-                | In(Arrow(x, _, _), _) => check_demo(s, ArrowForm(x, Tactic(Check, []), Tactic(Check, [])))
-                | In(Var(_), _) => attempt(s, hyp(s), s' => (s', report([], [])))
-                | In(Ap(a1, _), _) => {
-                    switch(infer_typ(c, a1)) {
-                    | Ok(Arrow(x, ty1, ty2)) => check_demo(s, ElabApTyp("_" ++ x, ty1, ty2, Tactic(Check, []), Tactic(Check, [])))
-                    | _ => skip_and_error(s, "applying a non-arrow")
-                    }
-                }
-                | In(Lam(_), _) => failwith("unimplemented: Lam")
-                | In(Unlam(_), _) => check_demo(s, ArrowElim(Tactic(Check, [])))
-                | In(In(_, _), _) => failwith("unimplemented: In")
-                | _ => skip_and_error(s, "not a type obligation")
-            }
+            attempt(s, check(s), s' => (s', report([], [])))
         }
     }
     // | Tactic(Schema(Definition), ds) => {
@@ -543,7 +589,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
             | Arrow(x, _, _) when x != "_" => {
-                attempt(s, arrow_introduction(x, s), s1 => {
+                attempt(s, arrow_introduction(s, x), s1 => {
                     let (s2, r1) = check_demo(s1, Obvious);
                     let (s3, r2) = check_demo(s2, Tactic(GivenAll, [d]));
                     (s3, merge_reports(r1, r2))
