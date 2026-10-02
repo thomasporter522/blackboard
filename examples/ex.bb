@@ -21,5 +21,5 @@ by fav-cong @ type,
 claim h3 :
     ((a : type) -> eq type (((A : type) => eq type A A1) [a]) (((A : type) => eq type A A2) [a])) -> 
     eq type ((a : type) -> ((A : type) => eq type A A1) [a]) ((a : type) -> ((A : type) => eq type A A2) [a])
-by ?,
+by h2 @ ((A : type) => eq type A A1) @ ((A : type) => eq type A A2),
 ?

@@ -294,7 +294,12 @@ let rec check(s : t) : result(t, error) = {
             | _ => Error("applying a non-arrow")
             }
         }
-        | In(Lam(_), _) => failwith("unimplemented: Lam")
+        | In(Lam(x, _, _), _) => {
+            let* s = arrow_formation(s, x);
+            let* s = check(s);
+            let* s = check(s);
+            Ok(s)
+        }
         | In(Unlam(_), _) => {
             let* s = arrow_elimination(s);
             let* s = check(s);
