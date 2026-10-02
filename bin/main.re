@@ -14,10 +14,6 @@ open Blackboard.Program
 let filename = Array.length(Sys.argv) > 1 ? Sys.argv[1] : "examples/ex.bb"
 
 let report = check_program(program_of_file(filename));
-
-print_endline("report gen")
-
 let report_string = string_of_report(report)
-print_endline("string gen")
 
 print_endline(report_string)

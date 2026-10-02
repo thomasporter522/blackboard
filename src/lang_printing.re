@@ -6,7 +6,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
         let y' = text_of_var(c, x-1, original);
         if (y' == y) { y ++ " (shadowed)"} else y'
     }
-    | _ => failwith("(impossible) variable out of range: " ++ string_of_int(original))
+    | _ => "!!" ++ string_of_int(original)
 }
 
 
