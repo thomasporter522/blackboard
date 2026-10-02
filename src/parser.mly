@@ -13,6 +13,7 @@ open Program
 %token TYPE "type"
 %token COLON ":"
 %token ARROW "->"
+%token LAMBDA "=>"
 
 %token PROVE "prove"
 %token BY "by"
@@ -68,6 +69,7 @@ let id_list :=
 
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; LAMBDA; t2 = term; { SurfaceLambda (xs, t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
   | t1 = atom; LSQAREN; x = ID; RSQAREN; { SurfaceUnlam(t1, x) }
   | x = atom_list; { x }

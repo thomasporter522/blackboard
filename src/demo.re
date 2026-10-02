@@ -7,6 +7,7 @@ type surface_tm =
     | Typ 
     | SurfaceIn(surface_tm, surface_tm)
     | SurfaceArrow(list(name), surface_tm, surface_tm)
+    | SurfaceLambda(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
     | SurfaceUnlam(surface_tm, name)
     | SurfaceVar(name)
@@ -99,6 +100,8 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
     | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(xs, t1, t2)))
     | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
+    | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceLambda(xs, t1, t2)))
+    | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | SurfaceUnlam(t, x) => switch(c) {
         | Cons(c', y, _) when x == y => Unlam(x, tm_of_surface(c', t))
@@ -319,7 +322,6 @@ let direct(s : t) : result(t, error) = {
         | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
         | _ => Error("cannot prove directly")
     };
-    print_endline(Lang_printing.string_of_term(c, target));
     let* s = modus_ponens(s, target);
     let* s = assumed(s);
     let* s = weaken_goal(s);

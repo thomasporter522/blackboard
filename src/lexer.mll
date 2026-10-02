@@ -19,6 +19,7 @@ rule read =
   | "type" { TYPE }
   | ":" { COLON }
   | "->" { ARROW }
+  | "=>" { LAMBDA }
   | "prove" { PROVE }
   | "by" { BY }
   | "assume" { ASSUME }

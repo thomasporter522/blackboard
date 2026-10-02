@@ -11,7 +11,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
 
 
 let show_indices = false;
-let show_indices = true;
+// let show_indices = true;
 
 let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
@@ -38,9 +38,9 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
             ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
         }
     | Lam(x, ty, a) => 
-        if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
-            ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, a) ++ ")")
-            ++ " => " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty), a) 
+        if (lp >= fst(lam_prec) || rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
+            ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, a) ++ ")")
+            ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty), a) 
         }
     | Unlam(x, a) => 
         if (lp >= fst(unlam_prec)) { wrap(c, outer_a) } else {
