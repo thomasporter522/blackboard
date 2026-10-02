@@ -1,6 +1,7 @@
 open Lang
 // open Lang_printing
 open Deriv.PartialDerivation
+open Deriv
 
 type surface_tm = 
     | Typ 
@@ -16,7 +17,7 @@ type schema =
 
 type tactic = 
     | Check
-    // | Direct
+    | Direct
     | GivenAll
     // | Schema(schema)
 
@@ -183,33 +184,87 @@ let forall_elim(s : t, x : name, ty_a : tm, ty_b : tm, a : tm) : result (t, erro
     let* s = in_elimination(s, Ap(Var(0), a_wk));
     let* ty_a_wk = wk(ty_a);
     let* s = ap(s, x, ty_a_wk, wkn(1, ty_b));
-    let* s = hyp(s)
-    weaken_goal(s)
+    let* s = hyp(s);
+    let* s = weaken_goal(s);
+    Ok(s)
 }
 
-// // if the focus of [s] is c |- B, refines to goals A -> B and A
-// // assumes [ty_A] (A) is well-typed in c
-// let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
-//     Result.bind(cut(s, "#a", ty_a), s' => {
-//     Result.bind(swap(s'), s2 => {
-//     let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
-//     Result.bind(cut(s2, "#f", Arrow("_", getwk(ty_a), getwk(ty_b))), s3 => {
-//     Result.bind(swap(s3), s4 => {
-//     Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
-//     Result.bind(ap(s5, "_", getwk(getwk(ty_a)), getwk(getwk(ty_b))), s6 => { 
-//     Result.bind(hyp(s6), s7 => { 
-//     Result.bind(hyp(s7), s8 => { 
-//     weaken(s8, failwith("todo"))
-//     })
-//     })
-//     })
-//     })
-//     })
-//     })
-//     })
-//     })
-// }
+// if the focus of [s] is c |- B, refines to goals A -> B and A
+// assumes [ty_A] (A) is well-typed in c
+let modus_ponens(s : t, ty_a : tm) : result (t, error) = {
+    let* s = cut(s, "#a", ty_a);
+    let* ty_a' = wk(ty_a);
+    let (_, ty_b) = goal(s);
+    let* s = forall_elim(s, "_", ty_a', ty_b, Var(0));
+    let* s = in_elimination(s, Ap(Var(0), Var(1)));
+    let* ty_a'' = wk(ty_a');
+    let* ty_b' = wk(ty_b);
+    let* s = ap(s, "_", ty_a'', ty_b');
+    let* s = hyp(s);
+    let* s = hyp(s);
+    let* s = weaken_goal(s);
+    Ok(s)
+    // Result.bind(cut(s, "#a", ty_a), s' => {
+    // Result.bind(swap(s'), s2 => {
+    // let (_, ty_b) = pair_of_judgment(Result.get_ok(focused(s2)));
+    // Result.bind(cut(s2, "#f", Arrow("_", getwk(ty_a), getwk(ty_b))), s3 => {
+    // Result.bind(swap(s3), s4 => {
+    // Result.bind(in_elimination(s4, Ap(Var(0), Var(1))), s5 => {
+    // Result.bind(ap(s5, "_", getwk(getwk(ty_a)), getwk(getwk(ty_b))), s6 => { 
+    // Result.bind(hyp(s6), s7 => { 
+    // Result.bind(hyp(s7), s8 => { 
+    // weaken(s8, failwith("todo"))
+    // })
+    // })
+    // })
+    // })
+    // })
+    // })
+    // })
+    // })
+}
 
+
+let obvious(s : t) : result(t, error) = failwith("todo")
+
+// if the goal is (M : type) -> (A -> M) -> M, refines to goal A.
+let direct(s : t) : result(t, error) = {
+    let* s = arrow_introduction("M", s);
+    let* s = arrow_introduction("h", s);
+    let* s = obvious(s);
+    let (c, _) = goal(s);
+    let* target = switch(lookup_index(c, 0)) {
+        | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
+        | _ => Error("cannot prove directly")
+    };
+    let* s = modus_ponens(s, target);
+    let* s = assumed(s);
+    let* s = weaken_goal(s);
+    let* s = weaken_goal(s);
+    Ok(s)
+}
+
+// attempt(s, arrow_introduction("M", s), s1 => {
+    //             let (s2, r1) = check_demo(s1, Obvious);
+    //             attempt(s2, arrow_introduction("h", s2), s3 => {
+    //                 let (s4, r2) = check_demo(s3, Obvious);
+    //                 let (c, _) = pair_of_judgment(Result.get_ok(focused(s4)));
+    //                 let target = switch(lookup_index(c, 0)) {
+    //                     | Arrow(_, ty_a, _) => ty_a 
+    //                     | _ => failwith("impossible")
+    //                 };
+    //                 attempt(s4, modus_ponens(s4, target), s5 => {
+    //                     attempt(s5, assumed(s5), s6 => {
+    //                         attempt(s6, weaken(s6), s7 => {
+    //                             attempt(s7, weaken(s7), s8 => {
+    //                                 let (s9, r3) = check_demo(s8, d);
+    //                                 (s9, merge_report_list([r1, r2, r3]))
+    //                             })
+    //                         })
+    //                     })
+    //                 })
+    //             })
+    //         })
 
 // let rec nth_premise(ty : tm, n : int, downshift : int) : result (tm, error) = {
 //     switch(ty) {
@@ -479,31 +534,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     //         }
     //     }
     // }
-    // | Tactic(Direct, ds) => switch(ds) {
-    //     | [d] => 
-    //         attempt(s, arrow_introduction("M", s), s1 => {
-    //             let (s2, r1) = check_demo(s1, Obvious);
-    //             attempt(s2, arrow_introduction("h", s2), s3 => {
-    //                 let (s4, r2) = check_demo(s3, Obvious);
-    //                 let (c, _) = pair_of_judgment(Result.get_ok(focused(s4)));
-    //                 let target = switch(lookup_index(c, 0)) {
-    //                     | Arrow(_, ty_a, _) => ty_a 
-    //                     | _ => failwith("impossible")
-    //                 };
-    //                 attempt(s4, modus_ponens(s4, target), s5 => {
-    //                     attempt(s5, assumed(s5), s6 => {
-    //                         attempt(s6, weaken(s6), s7 => {
-    //                             attempt(s7, weaken(s7), s8 => {
-    //                                 let (s9, r3) = check_demo(s8, d);
-    //                                 (s9, merge_report_list([r1, r2, r3]))
-    //                             })
-    //                         })
-    //                     })
-    //                 })
-    //             })
-    //         })
-    //     | _ => skip_and_error(s, "wrong number of args to direct")
-    // }
+    | Tactic(Direct, ds) => switch(ds) {
+        | [d] => attempt(s, direct(s), s => check_demo(s, d))
+        | _ => skip_and_error(s, "wrong number of args to direct")
+    }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
             let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));

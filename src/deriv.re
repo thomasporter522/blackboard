@@ -174,3 +174,5 @@ module PartialDerivation : {
         }
     })
 }
+
+let goal(s : PartialDerivation.t) : (ctx, tm) = pair_of_judgment(Result.get_ok(PartialDerivation.focused(s)));

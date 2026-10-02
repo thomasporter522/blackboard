@@ -103,5 +103,5 @@ let demo :=
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
   | UNLAMBDATYPE; d = demo_atom; { ArrowElim (d) }
-  // | DIRECT; d = demo; { Tactic (Direct, d :: []) }
+  | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

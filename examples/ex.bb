@@ -9,6 +9,12 @@ valid by check
 construct 
 mythm : eq type type type
 by 
-given M : type valid by check,
-given portal : (mythm : eq type type type) -> M valid by check,
+given M : type,
+given portal : (mythm : eq type type type) -> M,
 portal @ (refl type type)
+
+construct
+thm : (A1 A2 : type) -> eq type ((A : type) -> eq type A A1) ((A : type) -> eq type A A2)
+by
+direct 
+?
