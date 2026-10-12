@@ -316,11 +316,16 @@ let obvious(s : t) : result(t, error) = {
     Error(e)
 }
 
+// // if the goal is c |- (y : A) -> B, refines to c |- A : type and c, x : A |- B
+// let forall_introduction(s : t, x : name) = {
+//     let* s = 
+// }
+
 // if the goal is (M : type) -> (A -> M) -> M, refines to goal A.
 let direct(s : t) : result(t, error) = {
-    let* s = arrow_introduction(s, "M");
+    let* s = arrow_introduction(s);
     let* s = obvious(s);
-    let* s = arrow_introduction(s, "h");
+    let* s = arrow_introduction(s);
     let* s = obvious(s);
     let (c, _) = goal(s);
     let* target = switch(lookup_index(c, 0)) {
@@ -489,7 +494,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
                 if (!equiv(ty_elab, ty1)) {
                     skip_and_error(s, "wrong given type")
                 } else {
-                    attempt(s, arrow_introduction(s, x), s' => {
+                    attempt(s, arrow_introduction(s), s' => {
                     let (s'', r1) = check_demo(s', d1);
                     let (s''', r2) = check_demo(s'', d2);
                     (s''', merge_reports(r1, r2))
@@ -547,7 +552,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (_c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
             switch(ty_goal) {
             | Arrow(x, _, _) when x != "_" => {
-                attempt(s, arrow_introduction(s, x), s1 => {
+                attempt(s, arrow_introduction(s), s1 => {
                     let (s2, r1) = check_demo(s1, Obvious);
                     let (s3, r2) = check_demo(s2, Tactic(GivenAll, [d]));
                     (s3, merge_reports(r1, r2))
