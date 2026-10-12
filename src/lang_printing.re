@@ -48,18 +48,18 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     | Lam(x, ty, a) => 
         if (rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
             ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty) ++ ")")
-            ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty, Typ), a) 
+            ++ " |-> " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty, Typ), a) 
         }
     // | Unlam(x, a) => 
     //     if (lp >= fst(unlam_prec)) { wrap(c, outer_a) } else {
     //         prec_string_of_term(lp, fst(unlam_prec), tail_of_ctx(c), a) ++ "[" ++ x ++ "]"
     //     }
     | Var(x) => string_of_var(c, x)
-    | StrictAp(a1, a2) => 
+    | Ap(Strict, a1, a2) => 
         if (lp >= fst(strictap_prec)) { wrap(c, outer_a) } else {
             prec_string_of_term(lp, fst(ap_prec), c, a1) ++ "[" ++ prec_string_of_term(snd(ap_prec), rp, c, a2) ++ "]"
         }
-    | Ap(a1, a2) => 
+    | Ap(Lax, a1, a2) => 
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
             prec_string_of_term(lp, fst(ap_prec), c, a1) ++ " " ++ prec_string_of_term(snd(ap_prec), rp, c, a2)
         }

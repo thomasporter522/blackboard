@@ -7,6 +7,10 @@ type arrow =
     | Pi 
     | Guard
 
+type strictness = 
+    | Strict 
+    | Lax
+
 type tm = 
     | Prop
     | Typ 
@@ -15,8 +19,7 @@ type tm =
     | Lam(name, tm, tm)
     // | Unlam(name, tm)
     | Var(int)
-    | StrictAp(tm, tm)
-    | Ap(tm, tm);
+    | Ap(strictness, tm, tm);
 
 type assumption = 
     | Prop 
@@ -66,18 +69,16 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (Prop, Prop) => true 
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Arrow(a, _, a1, a2), Arrow(a', _, a3, a4)) when a == a' => equiv(a1, a3) && equiv(a2, a4)
+    | (Arrow(a, _, a1, a2), Arrow(a', _, a3, a4)) => a == a' && equiv(a1, a3) && equiv(a2, a4)
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     // | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
     | (Var(x1), Var(x2)) => x1 == x2
-    | (StrictAp(a1, a2), StrictAp(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
     | (Prop, _) => false
     | (Typ, _) => false
     | (In(_), _) => false
     | (Arrow(_), _) => false
     | (Lam(_), _) => false
-    | (StrictAp(_), _) => false
     // | (Unlam(_), _) => false
     | (Var(_), _) => false
     | (Ap(_), _) => false
@@ -96,21 +97,11 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | In(a, ty) => In(wkn(n, a), wkn(n, ty))
     | Arrow(a, y, ty1, ty2) => Arrow(a, y, wkn(n, ty1), wkn(n+1, ty2))
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
-    | StrictAp(a1, a2) => StrictAp(wkn(n, a1), wkn(n, a2))
-    // | Unlam(y, a) =>
-    //     if (n > 0) { Unlam(y, wkn(n-1, a)) } 
-    //     else { failwith("unweakenable") }
     | Var(y) => Var(wknvar(n, y))
-    | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
+    | Ap(s, a1, a2) => Ap(s, wkn(n, a1), wkn(n, a2))
 }
 
-let getwk(a : tm) : tm = wkn(0, a)
-
-let wk(a : tm) : result(tm, error) = {
-    try { Ok(getwk(a)) } {
-    | _ => Error("unweakenable")
-    }
-}
+let wk(a : tm) : tm = wkn(0, a)
 
 let rec substnvar(n : int, s : tm, m : int) : tm = {
     if (n == 0 && m == 0) { s } else
@@ -125,20 +116,11 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
     | Arrow(a, y, ty1, ty2) => Arrow(a, y, substn(n, s, ty1), substn(n+1, s, ty2))
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
-    | StrictAp(a1, a2) => StrictAp(substn(n, s, a1), substn(n, s, a2))
-    // | Unlam(y, a) =>
-    //     if (n > 0) { Unlam(y, substn(n-1, s, a)) } 
-    //     else { failwith("unsubstnable") }
     | Var(y) => substnvar(n, s, y)
-    | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
+    | Ap(r, a1, a2) => Ap(r, substn(n, s, a1), substn(n, s, a2))
 }
 
-let getsubst(s : tm, t : tm) : tm = substn(0, s, t)
-
-let subst(s : tm, t : tm) : result(tm, error) = 
-    try { Ok(getsubst(s, t)) } {
-    | _ => Error("unsubstable")
-    }
+let subst(s : tm, t : tm) : tm = substn(0, s, t)
 
 // // applies f to each variable in [a] greater than or equal to [n]
 // let rec varmap (a : tm, x : int, f : int => int) : tm = {
@@ -183,18 +165,37 @@ let subst(s : tm, t : tm) : result(tm, error) =
 //     }
 // }
 
-let rec get_lookup_index(c : ctx, x : int) : tm = {
+let rec get_lookup_index(c : ctx, x : int, a : assumption) : tm = {
     switch(c, x) {
-    | (Cons(_, _, t, _), 0) => getwk(t)
-    | (Cons(c, _, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
+    | (Cons(_, _, t, a'), 0) when a' == a => wk(t)
+    | (Cons(_, _, _, _), 0) => failwith("Variable is the wrong kind of assumption")
+    | (Cons(c, _, _, _), x) when x > 0 => wk(get_lookup_index(c, x-1, a))
     | _ => failwith("Context lookup out of bounds")
     }
 }
 
-let lookup_index(c : ctx, x : int) : result(tm, error) = 
-    try { Ok(get_lookup_index(c, x)) } {
-    | _ => Error("lookup index failed")
+let lookup_index_prop(c : ctx, x : int) : result(tm, error) = 
+    try { Ok(get_lookup_index(c, x, Prop)) } {
+    | _ => Error("lookup index prop failed")
     }
+
+let lookup_index_typ(c : ctx, x : int) : result(tm, error) = 
+    try { Ok(get_lookup_index(c, x, Typ)) } {
+    | _ => Error("lookup index type failed")
+    }
+
+// let rec get_lookup_index(c : ctx, x : int) : tm = {
+//     switch(c, x) {
+//     | (Cons(_, _, t, _), 0) => getwk(t)
+//     | (Cons(c, _, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
+//     | _ => failwith("Context lookup out of bounds")
+//     }
+// }
+
+// let lookup_index(c : ctx, x : int) : result(tm, error) = 
+//     try { Ok(get_lookup_index(c, x)) } {
+//     | _ => Error("lookup index failed")
+//     }
 
 // let rec no_x (a : tm, x : int) : bool = {
 //     switch(a) {
