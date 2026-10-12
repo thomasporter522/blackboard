@@ -5,7 +5,7 @@ type arrow =
     | Implies
     | Forall 
     | Pi 
-    | Gaurd
+    | Guard
 
 type tm = 
     | Prop
@@ -18,9 +18,13 @@ type tm =
     | StrictAp(tm, tm)
     | Ap(tm, tm);
 
+type assumption = 
+    | Prop 
+    | Typ
+
 type ctx = 
     | Empty 
-    | Cons(ctx, name, tm);
+    | Cons(ctx, name, tm, assumption);
 
 type error = string;
 
@@ -38,15 +42,22 @@ let ( let! ) = (x: result('a, 'b), f: 'b => result('a, 'b)): result('a, 'b) =>
 
 let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     switch(c, x) {
-    | (Cons(_, y, _), x) when y == x => Ok(0)
-    | (Cons(c, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
+    | (Cons(_, y, _, _), x) when y == x => Ok(0)
+    | (Cons(c, _, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
     | _ => Error("Context lookup unbound name")
     }
 }
 
 let tail_of_ctx(c : ctx) : ctx = switch(c) {
     | Empty => failwith("tail of empty context")
-    | Cons(c', _, _) => c'
+    | Cons(c', _, _, _) => c'
+}
+
+let assumption_of_arrow(a : arrow) : assumption = switch(a) {
+    | Implies => Prop
+    | Forall => Typ
+    | Pi => Typ
+    | Guard => Prop
 }
 
 // alpha equivalence
@@ -174,8 +185,8 @@ let subst(s : tm, t : tm) : result(tm, error) =
 
 let rec get_lookup_index(c : ctx, x : int) : tm = {
     switch(c, x) {
-    | (Cons(_, _, t), 0) => getwk(t)
-    | (Cons(c, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
+    | (Cons(_, _, t, _), 0) => getwk(t)
+    | (Cons(c, _, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
     | _ => failwith("Context lookup out of bounds")
     }
 }
