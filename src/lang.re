@@ -1,14 +1,21 @@
 
 type name = string;
 
+type arrow = 
+    | Implies
+    | Forall 
+    | Pi 
+    | Gaurd
+
 type tm = 
+    | Prop
     | Typ 
     | In(tm, tm)
-    | Arrow(name, tm, tm)
+    | Arrow(arrow, name, tm, tm)
     | Lam(name, tm, tm)
-    | StrictAp(tm, tm)
     // | Unlam(name, tm)
     | Var(int)
+    | StrictAp(tm, tm)
     | Ap(tm, tm);
 
 type ctx = 
@@ -45,14 +52,16 @@ let tail_of_ctx(c : ctx) : ctx = switch(c) {
 // alpha equivalence
 let rec equiv(a1 : tm, a2 : tm) : bool = {
     switch(a1, a2) {
+    | (Prop, Prop) => true 
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Arrow(a, _, a1, a2), Arrow(a', _, a3, a4)) when a == a' => equiv(a1, a3) && equiv(a2, a4)
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (StrictAp(a1, a2), StrictAp(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     // | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
     | (Var(x1), Var(x2)) => x1 == x2
+    | (StrictAp(a1, a2), StrictAp(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Prop, _) => false
     | (Typ, _) => false
     | (In(_), _) => false
     | (Arrow(_), _) => false
@@ -71,9 +80,10 @@ let rec wknvar(n : int, m : int) : int = {
 }
 
 let rec wkn(n : int, a : tm) : tm = switch(a) {
+    | Prop => Prop
     | Typ => Typ
     | In(a, ty) => In(wkn(n, a), wkn(n, ty))
-    | Arrow(y, ty1, ty2) => Arrow(y, wkn(n, ty1), wkn(n+1, ty2))
+    | Arrow(a, y, ty1, ty2) => Arrow(a, y, wkn(n, ty1), wkn(n+1, ty2))
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
     | StrictAp(a1, a2) => StrictAp(wkn(n, a1), wkn(n, a2))
     // | Unlam(y, a) =>
@@ -99,9 +109,10 @@ let rec substnvar(n : int, s : tm, m : int) : tm = {
 }
 
 let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
+    | Prop => Prop
     | Typ => Typ
     | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
-    | Arrow(y, ty1, ty2) => Arrow(y, substn(n, s, ty1), substn(n+1, s, ty2))
+    | Arrow(a, y, ty1, ty2) => Arrow(a, y, substn(n, s, ty1), substn(n+1, s, ty2))
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
     | StrictAp(a1, a2) => StrictAp(substn(n, s, a1), substn(n, s, a2))
     // | Unlam(y, a) =>
