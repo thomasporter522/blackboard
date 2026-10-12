@@ -84,15 +84,15 @@ module PartialDerivation : {
 
     let weaken (s : t, ty : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(Cons(c, _, _, _), ty_goal) when equiv(ty_goal, wk(ty)) => 
-            Ok([J(c, ty)])
+        | J(Cons(c, _, _, _), ty_goal, mode) when equiv(ty_goal, wk(ty)) => 
+            Ok([J(c, ty, mode)])
         | _ => Error("weaken failure")
         }
     })
 
     let hyp_prop (s : t, x : int) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, ty) => 
+        | J(c, ty, _) =>
             let* found = lookup_index_prop(c, x);
             if (equiv(found, ty)) Ok([]) else Error(
                 "hyp failure: " 
@@ -105,7 +105,7 @@ module PartialDerivation : {
 
     let hyp_typ (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Var(x), ty)) => 
+        | J(c, In(Var(x), ty), _) => 
             let* found = lookup_index_typ(c, x);
             if (equiv(found, ty)) Ok([]) else Error(
                 "hyp failure: " 
@@ -122,75 +122,75 @@ module PartialDerivation : {
 
     let in_formation (s : t, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(In(a, ty1), Typ)) => {
-            Ok([J(c, In(ty1, Typ)), J(c, In(a, ty2))])
+        | J(c, In(In(a, ty1), Typ), mode) => {
+            Ok([J(c, In(ty1, Typ), mode), J(c, In(a, ty2), mode)])
         }
         | _ => Error("in_formation failure")
         }
     })
 
     let cut (s : t, x : name, ty1 : tm)  : result(t, error) = refine(s, j => {
-        let (c, ty2) = pair_of_judgment(j);
-        Ok([J(c, ty1), J(Cons(c, x, ty1, Prop), wk(ty2))])
+        let (c, ty2, mode) = tuple_of_judgment(j);
+        Ok([J(c, ty1, mode), J(Cons(c, x, ty1, Prop), wk(ty2), mode)])
     })
 
     let prop_formation (s : t)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(_, In(Prop, Typ)) => Ok([])
+        | J(_, In(Prop, Typ), _) => Ok([])
         | _ => Error("prop_formation failure")
         }
     })
 
     let typ_formation (s : t)  : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(_, In(Typ, Typ)) => Ok([])
+        | J(_, In(Typ, Typ), _) => Ok([])
         | _ => Error("typ_formation failure")
         }
     })
 
     let arrow_formation (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Arrow(Implies, _, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Prop)), J(Cons(c, x, ty1, Prop), In(ty2, Prop))])
-        | J(c, In(Arrow(Forall, _, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1, Typ), In(ty2, Prop))])
-        | J(c, In(Arrow(Pi, _, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1, Typ), In(ty2, Typ))])
-        | J(c, In(Arrow(Guard, _, ty1, ty2), Typ)) => Ok([J(c, In(ty1, Prop)), J(Cons(c, x, ty1, Prop), In(ty2, Typ))])
+        | J(c, In(Arrow(Implies, _, ty1, ty2), Typ), mode) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1, Prop), In(ty2, Prop), mode)])
+        | J(c, In(Arrow(Forall, _, ty1, ty2), Typ), mode) => Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1, Typ), In(ty2, Prop), mode)])
+        | J(c, In(Arrow(Pi, _, ty1, ty2), Typ), mode) => Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1, Typ), In(ty2, Typ), mode)])
+        | J(c, In(Arrow(Guard, _, ty1, ty2), Typ), mode) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1, Prop), In(ty2, Typ), mode)])
         | _ => Error("arrow_formation failure")
         }
     })
 
     let implies_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, Arrow(Implies, _, p1, p2)) => Ok([J(c, In(p1, Prop)), J(Cons(c, x, p1, Prop), p2)])
+        | J(c, Arrow(Implies, _, p1, p2), mode) => Ok([J(c, In(p1, Prop), mode), J(Cons(c, x, p1, Prop), p2, mode)])
         | _ => Error("implies_introduction failure")
         }
     })
 
     let implies_elimination (s : t, p1 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, p2) => 
-            Ok([J(c, Arrow(Implies, "_", p1, wk(p2))), J(c, p1)])
+        | J(c, p2, mode) => 
+            Ok([J(c, Arrow(Implies, "_", p1, wk(p2)), mode), J(c, p1, mode)])
         }
     })
 
     let forall_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, Arrow(Forall, _, t1, p2)) => Ok([J(c, In(t1, Typ)), J(Cons(c, x, t1, Typ), p2)])
+        | J(c, Arrow(Forall, _, t1, p2), mode) => Ok([J(c, In(t1, Typ), mode), J(Cons(c, x, t1, Typ), p2, mode)])
         | _ => Error("forall_introduction failure")
         }
     })
 
     let forall_elimination (s : t, x : name, t1 : tm, p2 : tm, a : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, m) when equiv(subst(a, p2), m)  => 
-            Ok([J(c, Arrow(Forall, x, t1, p2)), J(c, In(a, t1))])
+        | J(c, goal, mode) when equiv(subst(a, p2), goal)  => 
+            Ok([J(c, Arrow(Forall, x, t1, p2), mode), J(c, In(a, t1), mode)])
         | _ => failwith("forall_elimination failure")
         }
     })
 
     let pi_introduction (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Lam(x, ty1, a), Arrow(Pi, _, ty1', ty2))) when equiv(ty1, ty1') => 
-            Ok([J(c, In(ty1, Typ)), J(Cons(c, x, ty1, Typ), In(a, ty2))])
+        | J(c, In(Lam(x, ty1, a), Arrow(Pi, _, ty1', ty2)), mode) when equiv(ty1, ty1') => 
+            Ok([J(c, In(ty1, Typ), mode), J(Cons(c, x, ty1, Typ), In(a, ty2), mode)])
         | _ => Error("pi_introduction failure")
         }
     })
@@ -204,10 +204,10 @@ module PartialDerivation : {
 
     let ap (s : t, x : name, ty1 : tm, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Ap(_st, a1, a2), ty_expected)) => {
+        | J(c, In(Ap(st, a1, a2), ty_expected), mode) when (mode == Red || st == Lax) => {
             let ty_found = subst(a2, ty2);
             if (equiv(ty_found, ty_expected))
-                Ok([J(c, In(a1, Arrow(Pi, x, ty1, ty2))), J(c, In(a2, ty1))])
+                Ok([J(c, In(a1, Arrow(Pi, x, ty1, ty2)), mode), J(c, In(a2, ty1), mode)])
             else Error(
                 "ap failure: found = " 
                 ++ string_of_term(c, ty_found)
@@ -215,7 +215,9 @@ module PartialDerivation : {
                 ++ string_of_term(c, ty_expected)
             )
         } 
-        | J(c, ty) => Error(
+        | J(_, In(Ap(st, _, _), _), mode) when !(mode == Red || st == Lax) => 
+            Error("no strict applications except in assumptions!")
+        | J(c, ty, _) => Error(
             "ap failure: goal = " 
             ++ string_of_term(c, ty)
             ++ " ≠ `_ _ : _`"
@@ -224,4 +226,4 @@ module PartialDerivation : {
     })
 }
 
-let goal(s : PartialDerivation.t) : (ctx, tm) = pair_of_judgment(Result.get_ok(PartialDerivation.focused(s)));
+let goal(s : PartialDerivation.t) : (ctx, tm, mode) = tuple_of_judgment(Result.get_ok(PartialDerivation.focused(s)));

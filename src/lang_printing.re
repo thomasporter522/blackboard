@@ -83,7 +83,7 @@ let rec string_of_ctx_short(c : ctx) : string = switch(c) {
 
 let string_of_judgment_short(j : judgment) : string = {
     switch(j) {
-    | J(c, a) =>  string_of_ctx_short(c) ++ " |- " ++ string_of_term(c, a)
+    | J(c, a, _) =>  string_of_ctx_short(c) ++ " |- " ++ string_of_term(c, a)
     }
 }
 
@@ -95,7 +95,7 @@ let rec string_of_ctx(c : ctx) : string = switch(c) {
 
 let string_of_judgment(j : judgment) : string = {
     switch(j) {
-    | J(c, a) => 
+    | J(c, a, _) => 
         let s = string_of_term(c, a);
         let bar = String.make(String.length(s), '-');
         s ++ "\n" ++ bar ++ "\n" ++ string_of_ctx(c)

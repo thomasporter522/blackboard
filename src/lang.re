@@ -207,11 +207,27 @@ let lookup_index_typ(c : ctx, x : int) : result(tm, error) =
 //     }
 // }
 
-type judgment = J(ctx, tm);
+type mode = 
+    | Blue 
+    | Red
 
-let pair_of_judgment (j : judgment) : (ctx, tm) = switch(j) {
-    | J(c, ty) => (c, ty)
+type judgment = J(ctx, tm, mode);
+
+let tuple_of_judgment (j : judgment) : (ctx, tm, mode) = switch(j) {
+    | J(c, ty, m) => (c, ty, m)
 }
 
-let ctx_of_judgment (j : judgment) : ctx = fst(pair_of_judgment(j))
-let typ_of_judgment (j : judgment) : tm = snd(pair_of_judgment(j))
+let ctx_of_judgment (j : judgment) : ctx = {
+    let (c, _, _) = tuple_of_judgment(j);
+    c
+}
+
+let goal_of_judgment (j : judgment) : tm = {
+    let (_, p, _) = tuple_of_judgment(j);
+    p
+}
+
+let mode_of_judgment (j : judgment) : mode = {
+    let (_, _, m) = tuple_of_judgment(j);
+    m
+}
