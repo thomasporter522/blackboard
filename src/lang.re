@@ -17,7 +17,6 @@ type tm =
     | In(tm, tm)
     | Arrow(arrow, name, tm, tm)
     | Lam(name, tm, tm)
-    // | Unlam(name, tm)
     | Var(int)
     | Ap(strictness, tm, tm);
 
@@ -71,7 +70,6 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Arrow(a, _, a1, a2), Arrow(a', _, a3, a4)) => a == a' && equiv(a1, a3) && equiv(a2, a4)
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    // | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
     | (Prop, _) => false
@@ -79,7 +77,6 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (In(_), _) => false
     | (Arrow(_), _) => false
     | (Lam(_), _) => false
-    // | (Unlam(_), _) => false
     | (Var(_), _) => false
     | (Ap(_), _) => false
     }
