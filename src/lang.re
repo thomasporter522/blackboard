@@ -6,7 +6,8 @@ type tm =
     | In(tm, tm)
     | Arrow(name, tm, tm)
     | Lam(name, tm, tm)
-    | Unlam(name, tm)
+    | StrictAp(tm, tm)
+    // | Unlam(name, tm)
     | Var(int)
     | Ap(tm, tm);
 
@@ -48,14 +49,16 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
+    | (StrictAp(a1, a2), StrictAp(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    // | (Unlam(_, a1), Unlam(_, a3)) => equiv(a1, a3)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Typ, _) => false
     | (In(_), _) => false
     | (Arrow(_), _) => false
     | (Lam(_), _) => false
-    | (Unlam(_), _) => false
+    | (StrictAp(_), _) => false
+    // | (Unlam(_), _) => false
     | (Var(_), _) => false
     | (Ap(_), _) => false
     }
@@ -72,9 +75,10 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | In(a, ty) => In(wkn(n, a), wkn(n, ty))
     | Arrow(y, ty1, ty2) => Arrow(y, wkn(n, ty1), wkn(n+1, ty2))
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
-    | Unlam(y, a) =>
-        if (n > 0) { Unlam(y, wkn(n-1, a)) } 
-        else { failwith("unweakenable") }
+    | StrictAp(a1, a2) => StrictAp(wkn(n, a1), wkn(n, a2))
+    // | Unlam(y, a) =>
+    //     if (n > 0) { Unlam(y, wkn(n-1, a)) } 
+    //     else { failwith("unweakenable") }
     | Var(y) => Var(wknvar(n, y))
     | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
 }
@@ -99,9 +103,10 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
     | Arrow(y, ty1, ty2) => Arrow(y, substn(n, s, ty1), substn(n+1, s, ty2))
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
-    | Unlam(y, a) =>
-        if (n > 0) { Unlam(y, substn(n-1, s, a)) } 
-        else { failwith("unsubstnable") }
+    | StrictAp(a1, a2) => StrictAp(substn(n, s, a1), substn(n, s, a2))
+    // | Unlam(y, a) =>
+    //     if (n > 0) { Unlam(y, substn(n-1, s, a)) } 
+    //     else { failwith("unsubstnable") }
     | Var(y) => substnvar(n, s, y)
     | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
 }
