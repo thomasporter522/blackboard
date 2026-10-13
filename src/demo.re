@@ -119,6 +119,46 @@ let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
 }
 
 
+// inverse of wknvar(n, _)
+let invert_wknvar(n : int, m : int) : result(int, error) = {
+    if (n == m) { Error("unstrengthenable var") } else 
+    if (n > m) { Ok(m) } else { Ok(m-1) }
+}
+
+// inverse of wkn(n, _)
+let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
+    | Prop => Ok(Prop)
+    | Typ => Ok(Typ)
+    | In(a, ty) => {
+        let* a' = invert_wkn(n, a);
+        let* ty' = invert_wkn(n, ty);
+        Ok(In(a', ty'))
+    }
+    | Arrow(y, ty1, ty2) => {
+        let* ty1' = invert_wkn(n, ty1);
+        let* ty2' = invert_wkn(n+1, ty2);
+        Ok(Arrow(y, ty1', ty2'))
+    }
+    | Lam(y, ty, a) => {
+        let* ty' = invert_wkn(n, ty);
+        let* a' = invert_wkn(n+1, a);
+        Ok(Lam(y, ty', a'))
+    }
+    | Var(y) => {
+        let* y' = invert_wknvar(n, y);
+        Ok(Var(y'))
+    }
+    | Ap(st, a1, a2) => {
+        let* a1' = invert_wkn(n, a1);
+        let* a2' = invert_wkn(n, a2);
+        Ok(Ap(st, a1', a2'))
+    } 
+}
+
+// inverse of wk(_)
+let invert_wk(a : tm) : result(tm, error) = invert_wkn(0, a)
+
+
 let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
     switch(tds) {
     | [] => switch(hd_ty) {
@@ -152,12 +192,13 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
         | _ => Error("ap of non-arrow")
         })
     }
-    // | Use(d1, _) => {
-    //     Result.bind(infer_proven_ty(c, d1), inferred_ty => switch(inferred_ty) {
-    //     | Arrow(_, _, ty_b) when no_x(ty_b, 0) => Ok(downshift(ty_b, 0))
-    //     | _ => Error("use of non-arrow or non-simple arrow")
-    //     })
-    // }
+    | Use(d1, _) => {
+        let* d1_proves = infer_proven_ty(c, d1);
+        switch(d1_proves) {
+        | Arrow(_, _, ty_b) => invert_wk(ty_b)
+        | _ => Error("use of non-arrow or non-simple arrow")
+        }
+    }
     | _ => Error("cannot infer what it proves") // todo: make this message better
 }
 
@@ -198,45 +239,6 @@ let assumed(s : t) : result (t, error) = {
     let* x = find_assumption(c, ty_goal, 0);
     hyp_prop(s, x)
 }
-
-// inverse of wknvar(n, _)
-let invert_wknvar(n : int, m : int) : result(int, error) = {
-    if (n == m) { Error("unstrengthenable var") } else 
-    if (n > m) { Ok(m) } else { Ok(m-1) }
-}
-
-// inverse of wkn(n, _)
-let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
-    | Prop => Ok(Prop)
-    | Typ => Ok(Typ)
-    | In(a, ty) => {
-        let* a' = invert_wkn(n, a);
-        let* ty' = invert_wkn(n, ty);
-        Ok(In(a', ty'))
-    }
-    | Arrow(y, ty1, ty2) => {
-        let* ty1' = invert_wkn(n, ty1);
-        let* ty2' = invert_wkn(n+1, ty2);
-        Ok(Arrow(y, ty1', ty2'))
-    }
-    | Lam(y, ty, a) => {
-        let* ty' = invert_wkn(n, ty);
-        let* a' = invert_wkn(n+1, a);
-        Ok(Lam(y, ty', a'))
-    }
-    | Var(y) => {
-        let* y' = invert_wknvar(n, y);
-        Ok(Var(y'))
-    }
-    | Ap(st, a1, a2) => {
-        let* a1' = invert_wkn(n, a1);
-        let* a2' = invert_wkn(n, a2);
-        Ok(Ap(st, a1', a2'))
-    } 
-}
-
-// inverse of wk(_)
-let invert_wk(a : tm) : result(tm, error) = invert_wkn(0, a)
 
 // if the focus of [s] is c, x : A |- T, refines to goal c |- T' where wk(T') = T
 let weaken_goal(s : t) : result(t, error) = {
