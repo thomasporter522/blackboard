@@ -14,6 +14,7 @@ open Program
 %token PROP "prop"
 %token TYPE "type"
 %token COLON ":"
+%token DOUBLECOLON "::"
 %token ARROW "->"
 %token LAMBDA "=>"
 
@@ -75,6 +76,7 @@ let id_list :=
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; LAMBDA; t2 = term; { SurfaceLambda (xs, t1, t2) }
+  | t1 = atom; DOUBLECOLON; t2 = atom; { SurfaceIn(t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
   | t1 = atom; LSQAREN; t2 = term; RSQAREN; { SurfaceStrictAp(t1, t2) }
   | x = atom_list; { x }

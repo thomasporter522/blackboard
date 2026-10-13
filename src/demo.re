@@ -294,13 +294,17 @@ let rec check(s : t) : result(t, error) = {
             | _ => Error("applying a non-arrow")
             }
         }
-        | In(Lam(_), _) => {
+        | In(Lam(_), _) => 
             let* s = pi_introduction(s);
             let* s = check(s);
             let* s = check(s);
             Ok(s)
-        }
-        | In(In(_, _), _) => failwith("unimplemented: In")
+        | In(In(t, _), _) =>
+            let* ty = infer_typ(c, t);
+            let* s = in_formation(s, ty);
+            let* s = check(s);
+            let* s = check(s);
+            Ok(s)
         // | In(_, _) => failwith("impossible")
         | _ => Error("not a type obligation")
     }

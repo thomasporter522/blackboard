@@ -9,22 +9,20 @@ eq : (A : type) -> (a b : A) -> prop,
 valid by
 check
 
-construct 
-(sym) (A : type) -> (a b : A) -> (h : eq A a b) -> eq A b a 
-by 
-direct
-givenall
-((subst @ A @ ((x : A) => eq A x a) @ a @ b) h) (refl @ A @ a)
+assume 
+small : type -> prop,
+pi-small : 
+    (A : type) -> (sA : small A) -> 
+    (B : (a : A) -> type) -> (sB : (a : A) -> small (B[a])) -> 
+    small ((a : A) -> B[a]),
+abs-id : (X : type) -> (sX : small X) -> (x : X) -> X,
+abs-id-eq : (X : type) -> (sX : small X) -> (x : X) -> eq X (abs-id X sX x) x,
+valid by 
+check
 
-assume
+assume 
 nat : type, 
+nat-small : small nat,
 zero : nat, 
-suc : nat -> nat, 
-plus : nat -> nat -> nat
+suc : nat -> nat,
 valid by check
-
-construct
-my-nat : (nat -> nat),
-my-nat-eq : eq (nat -> nat) my-nat suc
-by 
-definition

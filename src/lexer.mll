@@ -19,6 +19,7 @@ rule read =
   | "prop" { PROP }
   | "type" { TYPE }
   | ":" { COLON }
+  | "::" { DOUBLECOLON }
   | "->" { ARROW }
   | "=>" { LAMBDA }
   | "prove" { PROVE }
