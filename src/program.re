@@ -1,8 +1,8 @@
 open Lang
 open Demo
 
-type surface_signature = list((name, surface_tm))
-type signature = list((name, tm))
+type surface_signature = list((name, surface_tm, assumption))
+// type signature = list((name, tm))
 
 type surface_program = 
     | Empty 
@@ -16,36 +16,36 @@ type program =
     | Construct(ctx, tm, demo, program)
     | Prove(ctx, tm, demo, program)
 
-let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) = switch(s) {
-    | [] => (c, [])
-    | [(x, ty),...s'] => {
-        let ty_elab = tm_of_surface(c, ty);
-        let c' = Cons(c, x, ty_elab);
-        let (c'', s'') = signature_of_surface(c', s');
-        (c'', [(x, ty_elab), ...s''])
-    }
-}
+// let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) = switch(s) {
+//     | [] => (c, [])
+//     | [(x, ty, a),...s'] => {
+//         let ty_elab = tm_of_surface(c, ty);
+//         let c' = Cons(c, x, ty_elab, a);
+//         let (c'', s'') = signature_of_surface(c', s');
+//         (c'', [(x, ty_elab), ...s''])
+//     }
+// }
 
 let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx = switch(s) {
     | [] => c
-    | [(x, ty),...s'] => {
+    | [(x, ty, a),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
-        let c' = Cons(c, x, ty_elab);
+        let c' = Cons(c, x, ty_elab, a);
         extend_context_surface_signature(c', s');
     }
 }
 
 let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature, depth : int) : tm = switch(s){
     | [] => Var(depth)
-    | [(x, ty),...s'] => {
+    | [(x, ty, a),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
-        let c' = Cons(c, x, ty_elab);
+        let c' = Cons(c, x, ty_elab, a);
         Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
     }
 }
 
 let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
-    Arrow("M", Typ, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Typ), s, 0), Var(1)))
+    Arrow("M", Prop, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Prop, Typ), s, 0), Var(1)))
 }
 
 let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) {
@@ -66,8 +66,8 @@ type program_check_report = list(demo_check_report);
 let rec check_program (p : program) : program_check_report = {
     switch(p) {
     | Empty => []
-    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Typ)), d),... check_program(p)]
-    | Construct(c, ty, d, p) => [check_demo_root(J(c, ty), d),... check_program(p)]
-    | Prove(c, ty, d, p) => [check_demo_root(J(c, ty), d),... check_program(p)]
+    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Typ), Blue), d),... check_program(p)]
+    | Construct(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
+    | Prove(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
     }
 }

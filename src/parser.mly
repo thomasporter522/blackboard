@@ -27,7 +27,6 @@ open Program
 %token HOLE "?"
 %token TYPETYPE "type-type"
 %token ARROWTYPE "arrow-type"
-%token UNLAMBDATYPE "unlambda-type"
 %token TYPEOF "type-of"
 %token AP "ap"
 %token AT "@"
@@ -51,8 +50,10 @@ let prog :=
 
 let signature := 
   | { [] }
-  | x = ID; COLON; t = term; { (x, t) :: [] }
-  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
+  | x = ID; COLON; t = term; { (x, t, Typ) :: [] }
+  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t, Typ) :: s }
+  | LPAREN; x = ID; RPAREN; t = term; { (x, t, Prop) :: [] }
+  | LPAREN; x = ID; RPAREN; t = term; COMMA; s = signature; { (x, t, Prop) :: s }
 
 let atom := 
   | x = ID; { SurfaceVar x }
@@ -61,7 +62,7 @@ let atom :=
 
 let atom_list := 
   | x = atom; { x }
-  | t1 = atom_list; t2 = atom; { SurfaceAp (t1, t2) }
+  | t1 = atom_list; t2 = atom; { SurfaceLaxAp (t1, t2) }
 
 let id_list := 
   | x = ID; { [x] }
@@ -71,7 +72,7 @@ let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; LAMBDA; t2 = term; { SurfaceLambda (xs, t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
-  | t1 = atom; LSQAREN; x = ID; RSQAREN; { SurfaceUnlam(t1, x) }
+  | t1 = atom; LSQAREN; t2 = term; RSQAREN; { SurfaceStrictAp(t1, t2) }
   | x = atom_list; { x }
 
 let demo_atom := 
@@ -104,6 +105,5 @@ let demo :=
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
   | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
-  | UNLAMBDATYPE; d = demo_atom; { ArrowElim (d) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

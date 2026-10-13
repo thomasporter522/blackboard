@@ -30,7 +30,6 @@ rule read =
   | "," { COMMA }
   | "type-type" { TYPETYPE }
   | "arrow-type" { ARROWTYPE }
-  | "unlambda-type" { UNLAMBDATYPE }
   | "type-of" { TYPEOF }
   | "ap" { AP }
   | "@" { AT }
