@@ -188,7 +188,11 @@ module PartialDerivation : {
         switch(j) {
         | J(c, goal, mode) when equiv(subst(a, p2), goal)  => 
             Ok([J(c, Arrow(x, t1, p2), mode), J(c, In(a, t1), mode)])
-        | _ => failwith("forall_elimination failure")
+        | J(c, goal, _) => 
+            Error("forall_elimination failure: found = " 
+                ++ string_of_term(c, subst(a, p2))
+                ++ " ≠ "
+                ++ string_of_term(c, goal))
         }
     })
 
@@ -196,6 +200,11 @@ module PartialDerivation : {
         switch(j) {
         | J(c, In(Lam(x, ty1, a), Arrow(_, ty1', ty2)), mode) when equiv(ty1, ty1') => 
             Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1, Typ), In(a, ty2), mode)])
+        | J(c, In(Lam(_, ty1, _), Arrow(_, ty1', _)), _) => 
+            Error("pi_introduction failure: found = " 
+                ++ string_of_term(c, ty1)
+                ++ " ≠ "
+                ++ string_of_term(c, ty1'))
         | _ => Error("pi_introduction failure")
         }
     })

@@ -14,4 +14,9 @@ construct
 by 
 direct
 givenall
+claim lemma : (a b : A) -> 
+    (h : eq A a b) -> 
+    (((x : A) => eq A x a)[a]) -> (((x : A) => eq A x a)[b]) 
+    by 
+    subst @ A @ ((x : A) => eq A x a), 
 ?
