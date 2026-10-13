@@ -1,5 +1,5 @@
+[] normalize printed context and goal
 [] error localization and better reporting
 [] hole display
-[] type checking
-[] usage-style forall elimination
+[] localize typing feedback
 [] factor construction obligation (or general doc structure) through core so that its generation isn't trusted code
