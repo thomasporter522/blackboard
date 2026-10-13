@@ -602,11 +602,13 @@ and definition(s : t) : result(t, error) = {
             let* str_ty = invert_wk(ty);
             let* str_ty' = invert_wk(ty');
             let* str_str_ty' = invert_wk(str_ty');
-            if (!equiv(str_ty, str_str_ty')) { Error("not a definition obligation: the term type does not match the equation type: " ++ Lang_printing.string_of_term(c, str_ty) ++ " ≠ " ++ Lang_printing.string_of_term(c, str_str_ty')) } else {
+            if (!equiv(str_ty, str_str_ty')) { 
+                Error("not a definition obligation: the term type does not match the equation type: " ++ Lang_printing.string_of_term(c, str_ty) ++ " ≠ " ++ Lang_printing.string_of_term(c, str_str_ty')) 
+            } else {
                 let* refl = find_refl(c, eq-2, eq-2);
                 undry(check_demo(s, ElabGiven("M", Prop, PropForm, 
                     ElabGiven("h", Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
-                    Use(ElabAt(ElabHypProp(0), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2), ty, Obvious), xthing, Obvious))
+                    Use(ElabAt(ElabHypProp(0), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2), wk(ty), Obvious), xthing, Obvious))
                     ))))
             }
         }

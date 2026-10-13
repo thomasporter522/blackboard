@@ -24,7 +24,7 @@ plus : nat -> nat -> nat
 valid by check
 
 construct
-my-nat : nat,
-my-nat-eq : eq nat my-nat zero
+my-nat : (nat -> nat),
+my-nat-eq : eq (nat -> nat) my-nat suc
 by 
 definition
