@@ -21,7 +21,7 @@ type tactic =
     | Check
     | Direct
     | GivenAll
-    // | Schema(schema)
+    | Schema(schema)
 
 type demo = 
     | Hole
@@ -31,6 +31,7 @@ type demo =
     | InForm(tm, demo, demo)
     | Claim(name, surface_tm, demo, demo)
     | Suffices(name, surface_tm, demo, demo)
+    | PropForm
     | TypForm
     | PropArrowForm(name, demo, demo)
     | TypArrowForm(name, demo, demo)
@@ -49,40 +50,61 @@ and tm_or_demo =
     | Tm(surface_tm)
     | Demo(demo)
 
-type demo_check_report = {
+type report = {
     open_goals : list(judgment),
-    errors : list(string)
+    errors : list(error)
 }
 
-let report (open_goals : list(judgment), errors : list(string)) : demo_check_report = {
+let mk_report (open_goals : list(judgment), errors : list(string)) : report = {
     open_goals, errors
 }
 
-let merge_reports(r1 : demo_check_report, r2 : demo_check_report) : demo_check_report = {
+let pure_report : report = mk_report([], [])
+
+let merge_reports(r1 : report, r2 : report) : report = {
     open_goals : r1.open_goals @ r2.open_goals,
     errors : r1.errors @ r2.errors
 }
 
-
-let rec merge_report_list(rs : list(demo_check_report)) : demo_check_report = switch(rs){
-    | [] => report([], [])
+let rec merge_report_list(rs : list(report)) : report = switch(rs){
+    | [] => pure_report
     | [h, ...t] => merge_reports(h, merge_report_list(t))
 }
 
-let skip_and_error(s : t, e : error) : (t, demo_check_report) {
-    let s' = Result.get_ok(skip(s));
-    (s', report([], [e]))
+type demo_result = (t, report)
+
+let dry(s : t, x : result(t, error)) : demo_result = switch(x) {
+    | Ok(s') => (s', pure_report)
+    | Error(e) => (Result.get_ok(skip(s)), mk_report([], [e]))
 }
 
+let undry(x : demo_result) : result(t, error) =
+    if (snd(x).errors == []) { Ok(fst(x)) } else { Error("Errors:\n" ++ String.concat("\n", snd(x).errors ) )}
 
-let attempt_option(v : result('a, error), f : 'a => (t, demo_check_report), backup : (t, demo_check_report)) : (t, demo_check_report) = {
+let (let-?) = (x: demo_result, f: list(error) => demo_result): demo_result =>
+  if(snd(x).errors == []) { x } else { f(snd(x).errors) }
+
+let (let-+) = (x: demo_result, f: t => demo_result): demo_result =>
+  if(snd(x).errors == []) { f(fst(x)) } else { x }
+
+let (let-*) = (x: demo_result, f: t => demo_result): demo_result => {
+  let (s, r) = f(fst(x));
+  (s, merge_reports(snd(x), r))
+}
+
+let skip_and_error(s : t, e : error) : (t, report) {
+    let s' = Result.get_ok(skip(s));
+    (s', mk_report([], [e]))
+}
+
+let attempt_option(v : result('a, error), f : 'a => (t, report), backup : (t, report)) : (t, report) = {
     switch(v) {
     | Ok(v) => f(v)
     | Error(_) => backup
     }
 }
 
-let attempt(s : t, v : result('a, error), f : 'a => (t, demo_check_report)) : (t, demo_check_report) = {
+let attempt(s : t, v : result('a, error), f : 'a => (t, report)) : (t, report) = {
     switch(v) {
     | Ok(v) => f(v)
     | Error(e) => skip_and_error(s, e)
@@ -242,7 +264,7 @@ let assumed(s : t) : result (t, error) = {
 
 // if the focus of [s] is c, x : A |- T, refines to goal c |- T' where wk(T') = T
 let weaken_goal(s : t) : result(t, error) = {
-    let (_, ty, _) = goal(s);
+    let (_, ty, _) = goal_tuple(s);
     let* ty_inv_wk = invert_wk(ty);
     weaken(s, ty_inv_wk)
 }
@@ -267,7 +289,7 @@ let weaken_goal(s : t) : result(t, error) = {
 //     let* s = cut(s, "#a", ty_a);
 //     let* s = swap(s);
 //     let* ty_a' = wk(ty_a);
-//     let (_, ty_b) = goal(s);
+//     let (_, ty_b) = goal_tuple(s);
 //     let* ty_b' = wk(ty_b);
 //     let* s = forall_elim(s, "_", ty_a', ty_b', Var(0));
 //     let* s = hyp(s);
@@ -278,7 +300,7 @@ let weaken_goal(s : t) : result(t, error) = {
 
 // tries to discharge goals of the form `t : T`
 let rec check(s : t) : result(t, error) = {
-    let (c, ty_goal, _) = goal(s);
+    let (c, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
         | In(Prop, _) => prop_formation(s)
         | In(Typ, _) => typ_formation(s)
@@ -325,7 +347,7 @@ let obvious(s : t) : result(t, error) = {
 }
 
 let given(s : t, x) : result(t, error) = {
-    let (c, ty_goal, _) = goal(s);
+    let (c, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
     | Arrow(_, ty1, _) => 
         switch(infer_typ(c, ty1)) {
@@ -337,7 +359,7 @@ let given(s : t, x) : result(t, error) = {
 }
 
 let given_type(s : t, x, ty_elab) : result(t, error) = {
-    let (_, ty_goal, _) = goal(s);
+    let (_, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
     | Arrow(_, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
     | _ => given(s, x)
@@ -355,7 +377,7 @@ let direct(s : t) : result(t, error) = {
     let* s = obvious(s);
     let* s = implies_introduction(s, "h");
     let* s = obvious(s);
-    let (c, _, _) = goal(s);
+    let (c, _, _) = goal_tuple(s);
     let* target = switch(lookup_index_prop(c, 0)) {
         | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
         | _ => Error("cannot prove directly")
@@ -366,6 +388,12 @@ let direct(s : t) : result(t, error) = {
     let* s = weaken_goal(s);
     Ok(s)
 }
+
+let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
+    switch(ty1) {
+    | Arrow(x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
+    | _ => Error("Cannot 'at' non-arrow type")
+    }
 
 // attempt(s, arrow_introduction("M", s), s1 => {
     //             let (s2, r1) = check_demo(s1, Obvious);
@@ -399,9 +427,9 @@ let direct(s : t) : result(t, error) = {
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
-        switch(get_lookup_index(c, current, Typ)) {
-        | Arrow(_, Typ, Arrow(_, Var(0), 
-            Ap(Lax, Ap(Lax, Ap(Lax, Var(eq'), Var(1)), Var(0)), Var(0)))) 
+        switch(lookup_index_prop(c, current)) {
+        | Ok(Arrow(_, Typ, Arrow(_, Var(0), 
+            Ap(Lax, Ap(Lax, Ap(Lax, Var(eq'), Var(1)), Var(0)), Var(0)))))
             when eq == eq'-2  => Ok(current)
         | _ => find_refl(c, eq, current-1)
         } 
@@ -411,37 +439,35 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
-let rec check_demo(s : t, d : demo) : (t, demo_check_report) = 
+let rec check_demo(s : t, d : demo) : (t, report) = 
     switch(d) {
     | Hole =>
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));
-        (s', report([j], []))
+        (s', mk_report([j], []))
     | HypProp(x) =>
         let f = Result.get_ok(focused(s));
         attempt(s, index_of_name(ctx_of_judgment(f), x), n => 
             check_demo(s, ElabHypProp(n)))
     | ElabHypProp(n) =>
-        attempt(s, hyp_prop(s, n), s' => (s', report([], [])))
+        attempt(s, hyp_prop(s, n), s' => (s', pure_report))
     | HypTyp(x) =>
-        let (c, ty_goal, _) = goal(s);
+        let (c, ty_goal, _) = goal_tuple(s);
         attempt(s, index_of_name(c, x), n => {
             switch(ty_goal) {
             | In(Var(n'), _) when n' == n => {
                 attempt(s, hyp_typ(s), s' => 
-                    (s', report([], [])))
+                    (s', pure_report))
             }
             | _ => skip_and_error(s, "typ-of failure")
             }
         })
-    | InForm(ty, d1, d2) => 
-        attempt(s, in_formation(s, ty), s' => {
-            let (s'', r1) = check_demo(s', d1);
-            let (s''', r2) = check_demo(s'', d2);
-            (s''', merge_reports(r1, r2))
-        });
+    | InForm(ty, d1, d2) =>
+        let-+ s = dry(s, in_formation(s, ty));
+        let-* s = check_demo(s, d1);
+        check_demo(s, d2)
     | Claim(x, ty, d1, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         let ty_elab = tm_of_surface(c, ty);
         attempt(s, cut(s, x, ty_elab), s' => {
             let (s'', r1) = check_demo(s', d1);
@@ -450,7 +476,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         });
     }
     | Suffices(x, ty, d1, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         let ty_elab = tm_of_surface(c, ty);
         attempt(s, cut(s, x, ty_elab), s' => {
             attempt(s', swap(s'), s'' => {
@@ -460,8 +486,10 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             });
         });
     }
+    | PropForm =>
+        attempt(s, prop_formation(s), s' => (s', pure_report))
     | TypForm =>
-        attempt(s, typ_formation(s), s' => (s', report([], [])))
+        attempt(s, typ_formation(s), s' => (s', pure_report))
     | PropArrowForm(x, d1, d2) => 
         attempt(s, prop_arrow_formation(s, x), s' => {
             let (s'', r1) = check_demo(s', d1);
@@ -476,7 +504,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         });
     // | ArrowElim(d) => attempt(s, arrow_elimination(s), s' => check_demo(s', d));
     | ApTyp(x, ty1, ty2, d1, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         let ty1_elab = tm_of_surface(c, ty1);
         let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab, Typ), ty2);
         check_demo(s, ElabApTyp(x, ty1_elab, ty2_elab, d1, d2))
@@ -489,27 +517,23 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         });
     }
     | At(d1, a, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         let a_elab = tm_of_surface(c, a);
         check_demo(s, ElabAt(d1, a_elab, d2))
     }
     | ElabAt(d1, a, d2) => {
-        let (c, _, _) = goal(s);
-        attempt(s, infer_proven_ty(c, d1), d1_ty => 
-            switch(d1_ty) {
-            | Arrow(x, ty_1, ty_2) => {
-                attempt(s, forall_elimination(s, x, ty_1, ty_2, a), s1 => {
-                let (s2, r1) = check_demo(s1, d1);
-                let (s3, r2) = check_demo(s2, d2);
-                (s3, merge_report_list([r1, r2]))
-            })
-            }
-            | _ => skip_and_error(s, "applying non arrow")
-            }
-        )
+        let (c, _, _) = goal_tuple(s);
+        attempt(s, {
+            let* d1_ty = infer_proven_ty(c, d1);
+            at_ty(s, d1_ty, a)}
+            , s1 => {
+            let (s2, r1) = check_demo(s1, d1);
+            let (s3, r2) = check_demo(s2, d2);
+            (s3, merge_report_list([r1, r2]))
+        })
     }
     | Given(x, ty, d1, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         let ty_elab = tm_of_surface(c, ty);
         check_demo(s, ElabGiven(x, ty_elab, d1, d2));
     }
@@ -521,7 +545,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         })
     }
     | Use(d1, d2) => {
-        let (c, _, _) = goal(s);
+        let (c, _, _) = goal_tuple(s);
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
             switch(d1_ty) {
             | Arrow(_, ty_1, _)  => {
@@ -535,39 +559,28 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             }
         )
     }
-    | Obvious =>  attempt(s, obvious(s), s' => (s', report([], [])))
+    | Obvious =>  attempt(s, obvious(s), s' => (s', pure_report))
     | Tactic(Check, ds) => {
         if(ds != []) {
             skip_and_error(s, "side conditions not supported yet")
         } else {
-            attempt(s, check(s), s' => (s', report([], [])))
+            attempt(s, check(s), s' => (s', pure_report))
         }
     }
-    // | Tactic(Schema(Definition), ds) => {
-    //     if (ds != []) {
-    //         skip_and_error(s, "side conditions not supported yet")
-    //     } else {
-    //         let (c, ty_goal) = goal(s);
-    //         switch(ty_goal) {
-    //         | Arrow(_, Typ, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) 
-    //             when equiv(ty, ty') => 
-    //             attempt(s, find_refl(c, eq-2, eq-2), refl => {
-    //             check_demo(s, ElabGiven("M", Typ, TypForm, 
-    //                 ElabGiven("portal", Arrow(xname, ty, Arrow(xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
-    //                 ElabAt(ElabAt(ElabHyp(0), xthing, Obvious), Ap(Ap(Var(refl+2), ty), xthing), Obvious)
-    //                 )))
-    //             })
-    //         | _ => skip_and_error(s, "not a definition obligation")
-    //         }
-    //     }
-    // }
+    | Tactic(Schema(Definition), ds) => {
+        if (ds != []) {
+            skip_and_error(s, "side conditions not supported yet")
+        } else {
+            dry(s, definition(s));
+        }
+    }
     | Tactic(Direct, ds) => switch(ds) {
         | [d] => attempt(s, direct(s), s => check_demo(s, d))
         | _ => skip_and_error(s, "wrong number of args to direct")
     }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
-            let (_, ty_goal, _) = goal(s);
+            let (_, ty_goal, _) = goal_tuple(s);
             switch(ty_goal) {
             | Arrow(x, _, _) when x != "_" => {
                 attempt(s, given(s, x), s1 => {
@@ -582,8 +595,35 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
     }
 }
 
+and definition(s : t) : result(t, error) = {
+    let (c, ty_goal, _) = goal_tuple(s);
+    switch(ty_goal) {
+    | Arrow(_, Prop, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
+            let* str_ty = invert_wk(ty);
+            let* str_ty' = invert_wk(ty');
+            let* str_str_ty' = invert_wk(str_ty');
+            if (!equiv(str_ty, str_str_ty')) { Error("not a definition obligation: the term type does not match the equation type: " ++ Lang_printing.string_of_term(c, str_ty) ++ " ≠ " ++ Lang_printing.string_of_term(c, str_str_ty')) } else {
+                let* refl = find_refl(c, eq-2, eq-2);
+                undry(check_demo(s, ElabGiven("M", Prop, PropForm, 
+                    ElabGiven("h", Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), 
+                    Use(ElabAt(ElabHypProp(0), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2), ty, Obvious), xthing, Obvious))
+                    ))))
+            }
+        }
+    | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), Var(2))), _)) 
+        => Error("not a definition obligation: motive is not " ++ m)
+    | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), _)), _)) 
+        => Error("not a definition obligation: inner motive is not " ++ m)
+    | Arrow(_, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), _), _), _)), _)) 
+        => Error("not a definition obligation: LHS of equation is not the declared object")
+    | Arrow(_, Prop, Arrow(_, Arrow(_, _, Arrow(_, _, _)), _)) 
+        => Error("not a definition obligation: second component is not an equation")
+    | _ => Error("not a definition obligation: not a construction with two components")
+    }
+}
 
-let check_demo_root(root : judgment, d : demo) : demo_check_report = {
+
+let check_demo_root(root : judgment, d : demo) : report = {
     let (s, r) = check_demo(init(root), d);
     assert(verify(s,root));
     r

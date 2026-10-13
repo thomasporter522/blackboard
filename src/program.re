@@ -61,7 +61,7 @@ let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) 
     | Prove(a, d, p) => Prove(c, tm_of_surface(Empty, a), d, program_of_surface(c, p))
 }
 
-type program_check_report = list(demo_check_report);
+type program_check_report = list(report);
 
 let rec check_program (p : program) : program_check_report = {
     switch(p) {

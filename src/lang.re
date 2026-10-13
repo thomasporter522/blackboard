@@ -275,7 +275,7 @@ let ctx_of_judgment (j : judgment) : ctx = {
     c
 }
 
-let goal_of_judgment (j : judgment) : tm = {
+let type_of_judgment (j : judgment) : tm = {
     let (_, p, _) = tuple_of_judgment(j);
     p
 }

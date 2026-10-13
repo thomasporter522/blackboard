@@ -86,7 +86,7 @@ let demo_atom :=
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
   | CHECK; { Tactic (Check, []) }
-  // | DEFINITION; { Tactic (Schema(Definition), []) }
+  | DEFINITION; { Tactic (Schema(Definition), []) }
 
 let demo_list := 
   | d = demo_atom; { d :: [] }

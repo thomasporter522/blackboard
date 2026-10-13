@@ -240,4 +240,8 @@ module PartialDerivation : {
     })
 }
 
-let goal(s : PartialDerivation.t) : (ctx, tm, mode) = tuple_of_judgment(Result.get_ok(PartialDerivation.focused(s)));
+let goal(s : PartialDerivation.t) : judgment = Result.get_ok(PartialDerivation.focused(s));
+let goal_tuple(s : PartialDerivation.t) : (ctx, tm, mode) = tuple_of_judgment(goal(s));
+let goal_ctx(s : PartialDerivation.t) : ctx = ctx_of_judgment(goal(s));
+let goal_type(s : PartialDerivation.t) : tm = type_of_judgment(goal(s));
+let goal_mode(s : PartialDerivation.t) : mode = mode_of_judgment(goal(s));
