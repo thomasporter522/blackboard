@@ -15,3 +15,11 @@ by
 direct
 givenall
 ((subst @ A @ ((x : A) => eq A x a) @ a @ b) h) (refl @ A @ a)
+
+construct
+my-type : type,
+my-type-eq : eq type my-type (type -> type)
+by 
+given M : prop, 
+given h : (my-type : type) -> (my-type-eq : eq type my-type (type -> type)) -> M,
+h @ (type -> type) (refl @ type @ (type -> type))
