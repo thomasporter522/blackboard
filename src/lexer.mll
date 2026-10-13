@@ -29,7 +29,8 @@ rule read =
   | "valid" { VALID }
   | "," { COMMA }
   | "type-type" { TYPETYPE }
-  | "arrow-type" { ARROWTYPE }
+  | "prop-arrow-type" { PROPARROWTYPE }
+  | "type-arrow-type" { TYPARROWTYPE }
   | "type-of" { TYPEOF }
   | "ap" { AP }
   | "@" { AT }

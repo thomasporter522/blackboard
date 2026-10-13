@@ -1,4 +1,5 @@
 %{
+open Lang
 open Demo
 open Program
 %}
@@ -26,7 +27,8 @@ open Program
 %token COMMA ","
 %token HOLE "?"
 %token TYPETYPE "type-type"
-%token ARROWTYPE "arrow-type"
+%token PROPARROWTYPE "prop-arrow-type"
+%token TYPARROWTYPE "type-arrow-type"
 %token TYPEOF "type-of"
 %token AP "ap"
 %token AT "@"
@@ -77,7 +79,7 @@ let term :=
 
 let demo_atom := 
   | _ = HOLE; { Hole }
-  | x = ID; { Hyp x }
+  | x = ID; { HypProp x }
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
@@ -104,6 +106,7 @@ let demo :=
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
   | TYPEOF; x = ID; { HypTyp (x) }
-  | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
+  | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
+  | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

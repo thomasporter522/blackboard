@@ -56,7 +56,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
             prec_string_of_term(lp, fst(ap_prec), c, a1) ++ " " ++ prec_string_of_term(snd(ap_prec), rp, c, a2)
         }
     }
-    
+
 } and wrap(c : ctx, a : tm) : string = {
     "(" ++ string_of_term(c, a) ++ ")"
 } and string_of_term(c : ctx, a : tm) : string = {
