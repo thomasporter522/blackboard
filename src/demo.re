@@ -41,7 +41,7 @@ type demo =
     | ElabAt(demo, tm, demo)
     | Given(name, surface_tm, demo, demo)
     | ElabGiven(name, tm, demo, demo)
-    // | Use(demo, demo)
+    | Use(demo, demo)
     | Obvious
     | Tactic(tactic, list(demo))
 
@@ -311,6 +311,7 @@ let rec check(s : t) : result(t, error) = {
             Ok(s)
         }
         | In(In(_, _), _) => failwith("unimplemented: In")
+        // | In(_, _) => failwith("impossible")
         | _ => Error("not a type obligation")
     }
 }
@@ -495,9 +496,9 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         attempt(s, infer_proven_ty(c, d1), d1_ty => 
             switch(d1_ty) {
             | Arrow(x, ty_1, ty_2) => {
-                attempt(s, forall_elimination(s, x, ty_1, ty_2, a), s' => {
-                let (s2, r1) = check_demo(s', d2);
-                let (s3, r2) = check_demo(s2, d1);
+                attempt(s, forall_elimination(s, x, ty_1, ty_2, a), s1 => {
+                let (s2, r1) = check_demo(s1, d1);
+                let (s3, r2) = check_demo(s2, d2);
                 (s3, merge_report_list([r1, r2]))
             })
             }
@@ -517,21 +518,21 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             (s''', merge_reports(r1, r2))
         })
     }
-    // | Use(d1, d2) => {
-    //     let (c, _, _) = goal(s);
-    //     attempt(s, infer_proven_ty(c, d1), d1_ty => 
-    //         switch(d1_ty) {
-    //         | Arrow(_, ty_1, ty_2) when no_x(ty_2, 0) => {
-    //             attempt(s, modus_ponens(s, ty_1), s' => {
-    //                 let (s2, r1) = check_demo(s', d1);
-    //                 let (s3, r2) = check_demo(s2, d2);
-    //                 (s3, merge_report_list([r1, r2]))
-    //             })
-    //         }
-    //         | _ => skip_and_error(s, "not a simple arrow") 
-    //         }
-    //     )
-    // }
+    | Use(d1, d2) => {
+        let (c, _, _) = goal(s);
+        attempt(s, infer_proven_ty(c, d1), d1_ty => 
+            switch(d1_ty) {
+            | Arrow(_, ty_1, _)  => {
+                attempt(s, implies_elimination(s, ty_1), s' => {
+                    let (s2, r1) = check_demo(s', d1);
+                    let (s3, r2) = check_demo(s2, d2);
+                    (s3, merge_report_list([r1, r2]))
+                })
+            }
+            | _ => skip_and_error(s, "not an arrow") 
+            }
+        )
+    }
     | Obvious =>  attempt(s, obvious(s), s' => (s', report([], [])))
     | Tactic(Check, ds) => {
         if(ds != []) {

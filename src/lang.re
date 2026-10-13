@@ -62,26 +62,6 @@ let assumption_of_arrow(a : arrow) : assumption = switch(a) {
     | Guard => Prop
 }
 
-// alpha equivalence
-let rec equiv(a1 : tm, a2 : tm) : bool = {
-    switch(a1, a2) {
-    | (Prop, Prop) => true 
-    | (Typ, Typ) => true 
-    | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Var(x1), Var(x2)) => x1 == x2
-    | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
-    | (Prop, _) => false
-    | (Typ, _) => false
-    | (In(_), _) => false
-    | (Arrow(_), _) => false
-    | (Lam(_), _) => false
-    | (Var(_), _) => false
-    | (Ap(_), _) => false
-    }
-}
-
 let rec wknvar(n : int, m : int) : int = {
     if (n == 0) { m+1 } else
     if (n > 0 && m == 0) { 0 } else 
@@ -118,6 +98,44 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
 }
 
 let subst(s : tm, t : tm) : tm = substn(0, s, t)
+
+let rec normalize(t : tm) : tm = switch(t) {
+    | Prop => Prop
+    | Typ => Typ
+    | In(t1, t2) => In(normalize(t1), normalize(t2))
+    | Arrow(x, t1, t2) => Arrow(x, normalize(t1), normalize(t2))
+    | Lam(x, t1, t2) => Lam(x, normalize(t1), normalize(t2))
+    | Var(x) => Var(x)
+    | Ap(Lax, t1, t2) => Ap(Lax, normalize(t1), normalize(t2))
+    | Ap(Strict, t1, t2) => {
+        switch(normalize(t1)) {
+        | Lam(_, _, body) => normalize(subst(t2, body))
+        | t1' => Ap(Strict, t1', normalize(t2))
+        }
+    }
+}
+
+let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
+    switch(a1, a2) {
+    | (Prop, Prop) => true 
+    | (Typ, Typ) => true 
+    | (In(a1, a2), In(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Var(x1), Var(x2)) => x1 == x2
+    | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Prop, _) => false
+    | (Typ, _) => false
+    | (In(_), _) => false
+    | (Arrow(_), _) => false
+    | (Lam(_), _) => false
+    | (Var(_), _) => false
+    | (Ap(_), _) => false
+    }
+}
+
+// definitional equality
+let rec equiv(a1 : tm, a2 : tm) : bool = alphaequiv(normalize(a1), normalize(a2))
 
 // // applies f to each variable in [a] greater than or equal to [n]
 // let rec varmap (a : tm, x : int, f : int => int) : tm = {
