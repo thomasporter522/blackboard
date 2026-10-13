@@ -156,12 +156,12 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
 let rec equiv(a1 : tm, a2 : tm) : bool = {
     if (alphaequiv(a1, a2)) { true } else {
         switch(headnormalize(a1), headnormalize(a2)) {
-        // | (Prop, Prop) => true 
-        // | (Typ, Typ) => true 
+        | (Prop, Prop) => true 
+        | (Typ, Typ) => true 
         | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        // | (Var(x1), Var(x2)) => x1 == x2
+        | (Var(x1), Var(x2)) => x1 == x2
         | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
         | (Prop, _) => false
         | (Typ, _) => false

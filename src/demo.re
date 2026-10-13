@@ -222,7 +222,7 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
 let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     | Prop => Ok(Typ)
     | Typ => Ok(Typ)
-    | In(_) => Ok(Typ)
+    | In(_) => Ok(Prop)
     | Arrow(x, ty1, ty2) => 
         let* ty1_assumption : assumption = switch(infer_typ(c, ty1)) {
             | Ok(Prop) => Ok(Prop)
@@ -283,13 +283,18 @@ let rec check(s : t) : result(t, error) = {
             Ok(s)
         }
         | In(Var(_), _) => hyp_typ(s)
-        | In(Ap(_, a1, _), _) => {
+        | In(Ap(_, a1, a2), ty_expected) => {
             switch(infer_typ(c, a1)) {
             | Ok(Arrow(x, ty1, ty2)) => {
-                let* s = ap(s, x, ty1, ty2);
-                let* s = check(s);
-                let* s = check(s);
-                Ok(s)
+                switch(ap(s, x, ty1, ty2)) {
+                | Ok(s) => 
+                    let* s = check(s);
+                    let* s = check(s);
+                    Ok(s)
+                | Error(_) => 
+                    let ty_found = subst(a2, ty2);
+                    Error("Can't apply: " ++ Lang_printing.string_of_term(c, ty_found) ++ " isn't " ++ Lang_printing.string_of_term(c, ty_expected));
+                }
             }
             | _ => Error("applying a non-arrow")
             }
@@ -312,8 +317,9 @@ let rec check(s : t) : result(t, error) = {
 
 let obvious(s : t) : result(t, error) = {
     let! _ = assumed(s);
-    let! _ = check(s);
-    Error("not obvious")
+    let! e = check(s);
+    Error(e)
+    // Error("not obvious: " ++ Lang_printing.string_of_term(goal_ctx(s), goal_type(s)));
 }
 
 let given(s : t, x) : result(t, error) = {

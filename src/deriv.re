@@ -97,9 +97,9 @@ module PartialDerivation : {
             let* found = lookup_index_prop(c, x);
             if (equiv(found, ty)) Ok([]) else Error(
                 "hyp failure: " 
-                ++ string_of_term(c, found)
+                ++ string_of_term(c, normalize(found))
                 ++ " ≠ "
-                ++ string_of_term(c, ty)
+                ++ string_of_term(c, normalize(ty))
             )
         }
     })
@@ -123,9 +123,11 @@ module PartialDerivation : {
 
     let in_formation (s : t, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(In(a, ty1), Typ), mode) => {
+        | J(c, In(In(a, ty1), Prop), mode) => {
             Ok([J(c, In(ty1, Typ), mode), J(c, In(a, ty2), mode)])
         }
+        | J(_, In(In(_), _), _) => Error("in_formation failure: not inhabiting prop")
+        | J(_, In(_, _), _) => Error("in_formation failure: not membership of (_ : _)")
         | _ => Error("in_formation failure")
         }
     })
