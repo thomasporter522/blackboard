@@ -66,7 +66,7 @@ type program_check_report = list(demo_check_report);
 let rec check_program (p : program) : program_check_report = {
     switch(p) {
     | Empty => []
-    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Typ), Blue), d),... check_program(p)]
+    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Prop), Blue), d),... check_program(p)]
     | Construct(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
     | Prove(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
     }

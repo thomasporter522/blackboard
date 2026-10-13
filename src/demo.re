@@ -4,7 +4,8 @@ open Deriv.PartialDerivation
 open Deriv
 
 type surface_tm = 
-    | Typ 
+    | SurfaceProp 
+    | SurfaceTyp 
     | SurfaceIn(surface_tm, surface_tm)
     | SurfaceArrow(list(name), surface_tm, surface_tm)
     | SurfaceLambda(list(name), surface_tm, surface_tm)
@@ -96,7 +97,8 @@ let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
 }
 
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
-    | Typ => Typ
+    | SurfaceProp => Prop
+    | SurfaceTyp => Typ
     | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
     | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1), Typ), SurfaceArrow(xs, t1, t2)))
     | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
@@ -161,10 +163,17 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
 
 // infers the type of a term in a context
 let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
-    | Prop => Ok(Prop)
+    | Prop => Ok(Typ)
     | Typ => Ok(Typ)
     | In(_) => Ok(Typ)
-    | Arrow(_) => Ok(Typ)
+    | Arrow(x, ty1, ty2) => 
+        let* ty1_assumption : assumption = switch(infer_typ(c, ty1)) {
+            | Ok(Prop) => Ok(Prop)
+            | Ok(Typ) => Ok(Typ)
+            | _ => Error("domain is not a prop or type")
+        };
+        let* ty2_typ = infer_typ(Cons(c, x, ty1, ty1_assumption), ty2);
+        Ok(ty2_typ)
     | Lam(x, ty, b) => 
         let* ty_body = infer_typ(Cons(c, x, ty, Typ), b);
         Ok(Arrow(x, ty, ty_body))
@@ -269,6 +278,7 @@ let weaken_goal(s : t) : result(t, error) = {
 let rec check(s : t) : result(t, error) = {
     let (c, ty_goal, _) = goal(s);
     switch(ty_goal) {
+        | In(Prop, _) => prop_formation(s)
         | In(Typ, _) => typ_formation(s)
         | In(Arrow(x, t1, _), _) => {
             let* s = 
@@ -309,6 +319,26 @@ let obvious(s : t) : result(t, error) = {
     let! _ = assumed(s);
     let! e = check(s);
     Error(e)
+}
+
+let given(s : t, x) : result(t, error) = {
+    let (c, ty_goal, _) = goal(s);
+    switch(ty_goal) {
+    | Arrow(_, ty1, _) => 
+        switch(infer_typ(c, ty1)) {
+        | Ok(Prop) => implies_introduction(s, x)
+        | _ => forall_introduction(s, x)
+        }
+    | _ => Error("not an arrow")
+    }
+}
+
+let given_type(s : t, x, ty_elab) : result(t, error) = {
+    let (_, ty_goal, _) = goal(s);
+    switch(ty_goal) {
+    | Arrow(_, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
+    | _ => given(s, x)
+    }
 }
 
 // // if the goal is c |- (y : A) -> B, refines to c |- A : type and c, x : A |- B
@@ -481,20 +511,12 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
         check_demo(s, ElabGiven(x, ty_elab, d1, d2));
     }
     | ElabGiven(x, ty_elab, d1, d2) => {
-        let (_c, ty_goal, _) = goal(s);
-        switch(ty_goal) {
-            | Arrow(_, ty1, _) => 
-                if (!equiv(ty_elab, ty1)) {
-                    skip_and_error(s, "wrong given type")
-                } else {
-                    attempt(s, forall_introduction(s, x), s' => {
-                    let (s'', r1) = check_demo(s', d1);
-                    let (s''', r2) = check_demo(s'', d2);
-                    (s''', merge_reports(r1, r2))
-                })
-                }
-            | _ => skip_and_error(s, "not an arrow")
-        }}
+        attempt(s, given_type(s, x, ty_elab), s' => {
+            let (s'', r1) = check_demo(s', d1);
+            let (s''', r2) = check_demo(s'', d2);
+            (s''', merge_reports(r1, r2))
+        })
+    }
     // | Use(d1, d2) => {
     //     let (c, _, _) = goal(s);
     //     attempt(s, infer_proven_ty(c, d1), d1_ty => 
@@ -545,7 +567,7 @@ let rec check_demo(s : t, d : demo) : (t, demo_check_report) =
             let (_, ty_goal, _) = goal(s);
             switch(ty_goal) {
             | Arrow(x, _, _) when x != "_" => {
-                attempt(s, forall_introduction(s, x), s1 => {
+                attempt(s, given(s, x), s1 => {
                     let (s2, r1) = check_demo(s1, Obvious);
                     let (s3, r2) = check_demo(s2, Tactic(GivenAll, [d]));
                     (s3, merge_reports(r1, r2))

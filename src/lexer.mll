@@ -16,6 +16,7 @@ rule read =
   | ")" { RPAREN }
   | "[" { LSQAREN }
   | "]" { RSQAREN }
+  | "prop" { PROP }
   | "type" { TYPE }
   | ":" { COLON }
   | "->" { ARROW }

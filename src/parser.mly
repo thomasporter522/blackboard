@@ -11,6 +11,7 @@ open Program
 %token RSQAREN "]"
 %token EOF
 
+%token PROP "prop"
 %token TYPE "type"
 %token COLON ":"
 %token ARROW "->"
@@ -59,7 +60,8 @@ let signature :=
 
 let atom := 
   | x = ID; { SurfaceVar x }
-  | TYPE; { Typ }
+  | PROP; { SurfaceProp }
+  | TYPE; { SurfaceTyp }
   | LPAREN; t = term; RPAREN; { t }
 
 let atom_list := 
