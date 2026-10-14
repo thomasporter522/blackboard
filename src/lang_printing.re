@@ -10,7 +10,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
 }
 
 let show_indices = false;
-let show_indices = true;
+// let show_indices = true;
 
 let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
@@ -80,7 +80,7 @@ let string_of_judgment_short(j : judgment) : string = {
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
     | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, ty)
-    | Cons(c, x, ty) => ctx_prefix(x) ++ string_of_term(c, ty) ++ ",\n" ++ string_of_ctx(c)
+    | Cons(c, x, ty) => string_of_ctx(c) ++ ",\n" ++ ctx_prefix(x) ++ string_of_term(c, ty)
 }
 
 let string_of_judgment(j : judgment) : string = {
@@ -88,6 +88,6 @@ let string_of_judgment(j : judgment) : string = {
     | J(c, a, _) => 
         let s = string_of_term(c, a);
         let bar = String.make(String.length(s), '-');
-        s ++ "\n" ++ bar ++ "\n" ++ string_of_ctx(c)
+        string_of_ctx(c) ++ "\n" ++ bar ++ "\n" ++ s
     }
 }
