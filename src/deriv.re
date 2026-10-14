@@ -245,7 +245,7 @@ module PartialDerivation : {
     let guard_elimination (s : t, x : name, p : tm) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Unguard(a), t), mode) => 
-            Ok([J(c, p, mode), J(c, In(a, Arrow(x, p, t)), mode)])
+            Ok([J(c, p, mode), J(c, In(a, Arrow(x, p, wk(t))), mode)])
         | J(_) => 
             Error("guard_elimination failure")
         }
