@@ -13,6 +13,7 @@ open Program
 
 %token PROP "prop"
 %token TYPE "type"
+%token PERIOD "."
 %token COLON ":"
 %token DOUBLECOLON "::"
 %token ARROW "->"
@@ -67,6 +68,7 @@ let atom :=
 
 let atom_list := 
   | x = atom; { x }
+  | t = atom_list; PERIOD; { SurfaceUnguard(t) }
   | t1 = atom_list; t2 = atom; { SurfaceLaxAp (t1, t2) }
 
 let id_list := 

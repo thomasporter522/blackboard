@@ -18,6 +18,7 @@ rule read =
   | "]" { RSQAREN }
   | "prop" { PROP }
   | "type" { TYPE }
+  | "." { PERIOD }
   | ":" { COLON }
   | "::" { DOUBLECOLON }
   | "->" { ARROW }

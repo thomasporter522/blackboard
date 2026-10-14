@@ -1,5 +1,5 @@
 open Lang
-// open Lang_printing
+open Lang_printing
 open Deriv.PartialDerivation
 open Deriv
 
@@ -12,7 +12,8 @@ type surface_tm =
     | SimpleArrow(surface_tm, surface_tm)
     | SurfaceVar(name)
     | SurfaceStrictAp(surface_tm, surface_tm)
-    | SurfaceLaxAp(surface_tm, surface_tm);
+    | SurfaceLaxAp(surface_tm, surface_tm)
+    | SurfaceUnguard(surface_tm);
 
 type schema = 
     | Definition
@@ -124,13 +125,15 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceStrictAp(t1, t2) => Ap(Strict, tm_of_surface(c, t1),tm_of_surface(c, t2));
     | SurfaceVar(x) => Var(var_of_surface(c, x))
     | SurfaceLaxAp(t1, t2) => Ap(Lax, tm_of_surface(c, t1),tm_of_surface(c, t2));
+    | SurfaceUnguard(t) => Unguard(tm_of_surface(c, t));
 }
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
-    try {
-        if (equiv(ty, get_lookup_index(c, n, Prop))) { Ok(n) } else { find_assumption(c, ty, n+1) }
-    } {
-       | _ => Error("can't find assumption")
+    switch(lookup_index(c, n, Prop)) {
+    | Ok(ty') when equiv(ty, ty') => Ok(n)
+    | Ok(_) => find_assumption(c, ty, n+1)
+    | WrongKind => find_assumption(c, ty, n+1)
+    | OutOfBounds => Error("can't find assumption")
     }
 }
 
@@ -168,6 +171,10 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
         let* a1' = invert_wkn(n, a1);
         let* a2' = invert_wkn(n, a2);
         Ok(Ap(st, a1', a2'))
+    } 
+    | Unguard(a) => {
+        let* a' = invert_wkn(n, a);
+        Ok(Unguard(a'))
     } 
 }
 
@@ -248,6 +255,11 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
         | Ok(_) => Error("Applied term does not have arrow type")
         | Error(e) => Error(e)
     }
+    | Unguard(a) => switch(infer_typ(c, a)) {
+        | Ok(Arrow(_, _, ty2)) => invert_wk(ty2)
+        | Ok(_) => Error("Unguarded term does not have arrow type")
+        | Error(e) => Error(e)
+    }
 }
 
 let assumed(s : t) : result (t, error) = {
@@ -283,7 +295,7 @@ let rec check(s : t) : result(t, error) = {
             Ok(s)
         }
         | In(Var(_), _) => hyp_typ(s)
-        | In(Ap(_, a1, a2), ty_expected) => {
+        | In(Ap(st, a1, a2), ty_expected) => {
             switch(infer_typ(c, a1)) {
             | Ok(Arrow(x, ty1, ty2)) => {
                 switch(ap(s, x, ty1, ty2)) {
@@ -293,7 +305,7 @@ let rec check(s : t) : result(t, error) = {
                     Ok(s)
                 | Error(_) => 
                     let ty_found = subst(a2, ty2);
-                    Error("Can't apply: " ++ Lang_printing.string_of_term(c, ty_found) ++ " isn't " ++ Lang_printing.string_of_term(c, ty_expected));
+                    Error("Failure checking: " ++ string_of_term(c, In(Ap(st, a1, a2), ty_expected)) ++ ". \n" ++ string_of_term(c, ty_found) ++ " \n≠ " ++ string_of_term(c, ty_expected));
                 }
             }
             | _ => Error("applying a non-arrow")
@@ -310,16 +322,25 @@ let rec check(s : t) : result(t, error) = {
             let* s = check(s);
             let* s = check(s);
             Ok(s)
+        | In(Unguard(a), _) => 
+            switch(infer_typ(c, a)) {
+            | Ok(Arrow(x, ty1, _)) => 
+                let* s = guard_elimination(s, x, ty1);
+                let* s = obvious(s);
+                let* s = check(s);
+                Ok(s)
+            | _ => Error("unguarding a non-arrow")
+            }
         // | In(_, _) => failwith("impossible")
-        | _ => Error("not a type obligation")
+        | _ => Error("not a type obligation: " ++ string_of_term(c, ty_goal))
     }
 }
 
-let obvious(s : t) : result(t, error) = {
+and obvious(s : t) : result(t, error) = {
     let! _ = assumed(s);
-    let! e = check(s);
-    Error(e)
-    // Error("not obvious: " ++ Lang_printing.string_of_term(goal_ctx(s), goal_type(s)));
+    let! _e = check(s);
+    // Error(_e)
+    Error("not obvious: " ++ string_of_term(goal_ctx(s), goal_type(s)) ++ "\n" ++ string_of_ctx(goal_ctx(s)));
 }
 
 let given(s : t, x) : result(t, error) = {
@@ -521,7 +542,7 @@ and definition(s : t) : result(t, error) = {
                 let my_subdemo = Use(ElabAt(ElabHypProp(0), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2), wk(ty), Obvious), xthing, Obvious))
                 let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
                 simplify(check_demo(s, my_demo))
-            } else { Error("not a definition obligation: the term type does not match the equation type: " ++ Lang_printing.string_of_term(c, str_ty) ++ " ≠ " ++ Lang_printing.string_of_term(c, str_str_ty')) }
+            } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }
         }
     | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), Var(2))), _)) => Error("not a definition obligation: motive is not " ++ m)
     | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), _)), _)) => Error("not a definition obligation: inner motive is not " ++ m)

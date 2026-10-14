@@ -18,7 +18,8 @@ type tm =
     | Arrow(name, tm, tm)
     | Lam(name, tm, tm)
     | Var(int)
-    | Ap(strictness, tm, tm);
+    | Ap(strictness, tm, tm)
+    | Unguard(tm);
 
 type assumption = 
     | Prop 
@@ -76,6 +77,7 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
     | Var(y) => Var(wknvar(n, y))
     | Ap(s, a1, a2) => Ap(s, wkn(n, a1), wkn(n, a2))
+    | Unguard(a) => Unguard(wkn(n, a))
 }
 
 let wk(a : tm) : tm = wkn(0, a)
@@ -95,6 +97,7 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
     | Var(y) => substnvar(n, s, y)
     | Ap(r, a1, a2) => Ap(r, substn(n, s, a1), substn(n, s, a2))
+    | Unguard(a) => Unguard(substn(n, s, a))
 }
 
 let subst(s : tm, t : tm) : tm = substn(0, s, t)
@@ -114,6 +117,7 @@ let rec headnormalize(t : tm) : tm = switch(t) {
         | _ => Ap(Strict, t1, t2)
         }
     }
+    | Unguard(t) => Unguard(t)
 }
 
 let rec normalize(t : tm) : tm = switch(t) {
@@ -130,6 +134,7 @@ let rec normalize(t : tm) : tm = switch(t) {
         | t1' => Ap(Strict, t1', normalize(t2))
         }
     }
+    | Unguard(t) => Unguard(normalize(t))
 }
 
 let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
@@ -141,6 +146,7 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Unguard(a1), Unguard(a2)) => alphaequiv(a1, a2)
     | (Prop, _) => false
     | (Typ, _) => false
     | (In(_), _) => false
@@ -148,6 +154,7 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Lam(_), _) => false
     | (Var(_), _) => false
     | (Ap(_), _) => false
+    | (Unguard(_), _) => false
     }
 }
 
@@ -163,6 +170,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Var(x1), Var(x2)) => x1 == x2
         | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
+        | (Unguard(a1), Unguard(a2)) => equiv(a1, a2)
         | (Prop, _) => false
         | (Typ, _) => false
         | (In(_), _) => false
@@ -170,6 +178,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Lam(_), _) => false
         | (Var(_), _) => false
         | (Ap(_), _) => false
+        | (Unguard(_), _) => false
         }
     }
 }
@@ -218,22 +227,33 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
 //     }
 // }
 
-let rec get_lookup_index(c : ctx, x : int, a : assumption) : tm = {
+type lookup_index_result = 
+    | Ok(tm)
+    | WrongKind
+    | OutOfBounds
+
+let rec lookup_index(c : ctx, x : int, a : assumption) : lookup_index_result = {
     switch(c, x) {
-    | (Cons(_, _, t, a'), 0) when a' == a => wk(t)
-    | (Cons(_, _, _, _), 0) => failwith("Variable is the wrong kind of assumption")
-    | (Cons(c, _, _, _), x) when x > 0 => wk(get_lookup_index(c, x-1, a))
-    | _ => failwith("Context lookup out of bounds")
+    | (Cons(_, _, t, a'), 0) when a' == a => Ok(wk(t))
+    | (Cons(_, _, _, _), 0) => WrongKind
+    | (Cons(c, _, _, _), x) when x > 0 => 
+        switch(lookup_index(c, x-1, a)) {
+        | Ok(t) => Ok(wk(t))
+        | e => e
+        }
+    | _ => OutOfBounds
     }
 }
 
 let lookup_index_prop(c : ctx, x : int) : result(tm, error) = 
-    try { Ok(get_lookup_index(c, x, Prop)) } {
+    switch(lookup_index(c, x, Prop)) {
+    | Ok(t) => Ok(t)
     | _ => Error("lookup index prop failed")
     }
 
 let lookup_index_typ(c : ctx, x : int) : result(tm, error) = 
-    try { Ok(get_lookup_index(c, x, Typ)) } {
+    switch(lookup_index(c, x, Typ)) {
+    | Ok(t) => Ok(t)
     | _ => Error("lookup index type failed")
     }
 

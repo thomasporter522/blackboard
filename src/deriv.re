@@ -23,6 +23,7 @@ module PartialDerivation : {
     let forall_elimination : (t, name, tm, tm, tm) => result(t, error);
     let pi_introduction : t => result(t, error);
     let ap : (t, name, tm, tm) => result(t, error);
+    let guard_elimination : (t, name, tm) => result(t, error);
 
 } = {
     type t = {
@@ -238,6 +239,15 @@ module PartialDerivation : {
             ++ string_of_term(c, ty)
             ++ " ≠ `_ _ : _`"
         )
+        }
+    })
+
+    let guard_elimination (s : t, x : name, p : tm) : result(t, error) = refine(s, j => {
+        switch(j) {
+        | J(c, In(Unguard(a), t), mode) => 
+            Ok([J(c, p, mode), J(c, In(a, Arrow(x, p, t)), mode)])
+        | J(_) => 
+            Error("guard_elimination failure")
         }
     })
 }

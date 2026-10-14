@@ -55,6 +55,10 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
             prec_string_of_term(lp, fst(ap_prec), c, a1) ++ " " ++ prec_string_of_term(snd(ap_prec), rp, c, a2)
         }
+    | Unguard(a) => 
+        if (lp >= fst(strictap_prec)) { wrap(c, outer_a) } else {
+            prec_string_of_term(lp, fst(ap_prec), c, a) ++ " ."
+        }
     }
 
 } and wrap(c : ctx, a : tm) : string = {
