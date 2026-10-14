@@ -1,12 +1,30 @@
 assume 
-eq : (A B : type) -> (a : A) -> (b : B) -> type,
-refl : (A : type) -> (a : A) -> eq A A a a
+eq : (A : type) -> (a b : A) -> prop,
+(refl) (A : type) -> (a : A) -> eq A a a,
+(subst) (A : type) -> 
+    (P : A -> prop) -> 
+    (a b : A) -> 
+    (h : eq A a b) -> 
+    (P[a]) -> (P[b]),
+valid by
+check
+
+construct 
+(sym) (A : type) -> (a b : A) -> (h : eq A a b) -> eq A b a 
+by 
+direct
+givenall
+((subst @ A @ ((x : A) => eq A x a) @ a @ b) h) (refl @ A @ a)
+
+assume
+nat : U,
+zero : nat, 
+suc : nat -> nat, 
+plus : nat -> nat -> nat
 valid by check
 
 construct
-my-type : type,
-my-type-eq : eq type type my-type (type -> type)
+my-nat : (nat -> nat),
+my-nat-eq : eq (nat -> nat) my-nat suc
 by 
-given M : type, 
-given portal : ((my-type : type) -> (my-type-eq : eq type type my-type (type -> type)) -> M),
-portal @ (type -> type) @ (refl type (type -> type))
+definition

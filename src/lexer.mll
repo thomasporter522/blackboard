@@ -16,9 +16,13 @@ rule read =
   | ")" { RPAREN }
   | "[" { LSQAREN }
   | "]" { RSQAREN }
+  | "prop" { PROP }
   | "type" { TYPE }
+  | "." { PERIOD }
   | ":" { COLON }
+  | "::" { DOUBLECOLON }
   | "->" { ARROW }
+  | "=>" { LAMBDA }
   | "prove" { PROVE }
   | "by" { BY }
   | "assume" { ASSUME }
@@ -28,10 +32,8 @@ rule read =
   | "valid" { VALID }
   | "," { COMMA }
   | "type-type" { TYPETYPE }
-  | "arrow-type" { ARROWTYPE }
-  | "open-type" { OPENTYPE }
-  | "open-up" { OPENUP }
-  | "open-down" { OPENDOWN }
+  | "prop-arrow-type" { PROPARROWTYPE }
+  | "type-arrow-type" { TYPARROWTYPE }
   | "type-of" { TYPEOF }
   | "ap" { AP }
   | "@" { AT }

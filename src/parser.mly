@@ -1,4 +1,5 @@
 %{
+open Lang
 open Demo
 open Program
 %}
@@ -10,9 +11,13 @@ open Program
 %token RSQAREN "]"
 %token EOF
 
+%token PROP "prop"
 %token TYPE "type"
+%token PERIOD "."
 %token COLON ":"
+%token DOUBLECOLON "::"
 %token ARROW "->"
+%token LAMBDA "=>"
 
 %token PROVE "prove"
 %token BY "by"
@@ -25,10 +30,8 @@ open Program
 %token COMMA ","
 %token HOLE "?"
 %token TYPETYPE "type-type"
-%token ARROWTYPE "arrow-type"
-%token OPENTYPE "open-type"
-%token OPENUP "open-up"
-%token OPENDOWN "open-down"
+%token PROPARROWTYPE "prop-arrow-type"
+%token TYPARROWTYPE "type-arrow-type"
 %token TYPEOF "type-of"
 %token AP "ap"
 %token AT "@"
@@ -56,28 +59,32 @@ let signature :=
   | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
 
 let atom := 
-  | x = ID; { Var x }
-  | TYPE; { Typ }
+  | x = ID; { SurfaceVar x }
+  | PROP; { SurfaceProp }
+  | TYPE; { SurfaceTyp }
   | LPAREN; t = term; RPAREN; { t }
 
 let atom_list := 
   | x = atom; { x }
-  | t1 = atom_list; t2 = atom; { Ap (t1, t2) }
+  | t = atom_list; PERIOD; { SurfaceUnguard(t) }
+  | t1 = atom_list; t2 = atom; { SurfaceLaxAp (t1, t2) }
 
 let id_list := 
   | x = ID; { [x] }
   | x = ID; xs = id_list; { x :: xs }
 
 let term :=
-  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { Arrow (xs, t1, t2) }
-  | LSQAREN; xs = id_list; COLON; t1 = term; RSQAREN; t2 = term; { Open (xs, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; LAMBDA; t2 = term; { SurfaceLambda (xs, t1, t2) }
+  | t1 = atom; DOUBLECOLON; t2 = atom; { SurfaceIn(t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }
-  | LSQAREN; t1 = term; RSQAREN; t2 = term; { SimpleOpen (t1, t2) }
+  | t1 = atom; LSQAREN; t2 = term; RSQAREN; { SurfaceStrictAp(t1, t2) }
   | x = atom_list; { x }
 
 let demo_atom := 
   | _ = HOLE; { Hole }
-  | x = ID; { Hyp x }
+  | x = ID; { HypProp (x, Obvious) }
+  | LPAREN; x = ID; VALID; BY; d = demo; RPAREN; { HypProp (x, d) }
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
@@ -102,11 +109,9 @@ let demo :=
   | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim (x, t, Obvious, d2) }
   | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
-  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { Ap (x, t1, t2, d1, d2) }
-  | TYPEOF; x = ID; { HypTyp (x) }
-  | ARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { ArrowForm (x, d1, d2) }
-  | OPENTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { OpenForm (x, d1, d2) }
-  | OPENUP; x = ID; d1 = demo_atom; d2 = demo_atom; { OpenIntro (x, d1, d2) }
-  | OPENDOWN; x = ID; d = demo_atom; { OpenElim (x, d) }
+  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
+  | TYPEOF; x = ID; { HypTyp (x, Obvious) }
+  | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
+  | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }
