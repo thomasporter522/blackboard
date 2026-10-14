@@ -91,9 +91,9 @@ let demo_atom :=
   | CHECK; { Tactic (Check, []) }
   | DEFINITION; { Tactic (Schema(Definition), []) }
 
-let demo_list := 
-  | d = demo_atom; { d :: [] }
-  | d = demo_atom; ds = demo_list; { d :: ds }
+// let demo_list := 
+//   | d = demo_atom; { d :: [] }
+//   | d = demo_atom; ds = demo_list; { d :: ds }
 
 let chain_demo := 
   | d = demo_atom; { d }

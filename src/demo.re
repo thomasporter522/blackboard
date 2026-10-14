@@ -394,6 +394,23 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     } { | _ => Error("couldn't find refl") }
 }
 
+let rec check_var(s : t) : result (t, error) =
+    switch(hyp(s)) {
+    | Ok(s') => Ok(s')
+    | Error(_) => {
+        let (c, ty_goal) = pair_of_judgment(Result.get_ok(focused(s)));
+        switch(ty_goal) {
+        | In(Var(x), _) => {
+            switch(lookup_index(c, x)) {
+            | Open(y, _, _) => Result.bind(open_elimination(y, s), s' => check_var(s'))
+            | bad => Error("check_var failed: var " ++ Lang_printing.text_of_var(c, x, 0) ++ " has type "++Lang_printing.string_of_term(c, bad))
+            }
+        }
+        | _ => Error("check_var not checking a var")
+        }
+    }
+    }
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]

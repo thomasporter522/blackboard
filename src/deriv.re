@@ -112,7 +112,7 @@ module PartialDerivation : {
             if (equiv(found, ty)) Ok([J(c, In(ty, Typ), Red)]) else Error(
                 "hyp failure: " 
                 ++ text_of_var(c, x, x) 
-                ++ " : "
+                ++ ") : "
                 ++ string_of_term(c, found)
                 ++ " ≠ "
                 ++ string_of_term(c, ty)
