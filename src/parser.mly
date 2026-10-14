@@ -55,10 +55,8 @@ let prog :=
 
 let signature := 
   | { [] }
-  | x = ID; COLON; t = term; { (x, t, Typ) :: [] }
-  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t, Typ) :: s }
-  | LPAREN; x = ID; RPAREN; t = term; { (x, t, Prop) :: [] }
-  | LPAREN; x = ID; RPAREN; t = term; COMMA; s = signature; { (x, t, Prop) :: s }
+  | x = ID; COLON; t = term; { (x, t) :: [] }
+  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
 
 let atom := 
   | x = ID; { SurfaceVar x }
@@ -85,7 +83,7 @@ let term :=
 
 let demo_atom := 
   | _ = HOLE; { Hole }
-  | x = ID; { HypProp x }
+  | x = ID; { HypProp (x, Obvious) }
   | OBVIOUS; { Obvious }
   | TYPETYPE; { TypForm }
   | LPAREN; d = demo; RPAREN; { d }
@@ -111,7 +109,7 @@ let demo :=
   | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
   | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
   | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
-  | TYPEOF; x = ID; { HypTyp (x) }
+  | TYPEOF; x = ID; { HypTyp (x, Obvious) }
   | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
   | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }

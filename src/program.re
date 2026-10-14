@@ -1,7 +1,7 @@
 open Lang
 open Demo
 
-type surface_signature = list((name, surface_tm, assumption))
+type surface_signature = list((name, surface_tm))
 // type signature = list((name, tm))
 
 type surface_program = 
@@ -28,24 +28,24 @@ type program =
 
 let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx = switch(s) {
     | [] => c
-    | [(x, ty, a),...s'] => {
+    | [(x, ty),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
-        let c' = Cons(c, x, ty_elab, a);
+        let c' = Cons(c, x, ty_elab);
         extend_context_surface_signature(c', s');
     }
 }
 
 let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature, depth : int) : tm = switch(s){
     | [] => Var(depth)
-    | [(x, ty, a),...s'] => {
+    | [(x, ty),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
-        let c' = Cons(c, x, ty_elab, a);
+        let c' = Cons(c, x, ty_elab);
         Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
     }
 }
 
 let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
-    Arrow("M", Prop, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Prop, Typ), s, 0), Var(1)))
+    Arrow("M", Prop, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Prop), s, 0), Var(1)))
 }
 
 let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) {

@@ -86,7 +86,7 @@ module PartialDerivation : {
 
     let weaken (s : t, ty : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(Cons(c, _, _, _), ty_goal, mode) when equiv(ty_goal, wk(ty)) => 
+        | J(Cons(c, _, _), ty_goal, mode) when equiv(ty_goal, wk(ty)) => 
             Ok([J(c, ty, mode)])
         | _ => Error("weaken failure")
         }
@@ -94,13 +94,13 @@ module PartialDerivation : {
 
     let hyp_prop (s : t, x : int) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, ty, _) =>
-            let* found = lookup_index_prop(c, x);
-            if (equiv(found, ty)) Ok([]) else Error(
+        | J(c, p, _) =>
+            let* found = lookup_index(c, x);
+            if (equiv(found, p)) Ok([J(c, In(p, Prop), Red)]) else Error(
                 "hyp failure: " 
                 ++ string_of_term(c, normalize(found))
                 ++ " ≠ "
-                ++ string_of_term(c, normalize(ty))
+                ++ string_of_term(c, normalize(p))
             )
         }
     })
@@ -108,8 +108,8 @@ module PartialDerivation : {
     let hyp_typ (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Var(x), ty), _) => 
-            let* found = lookup_index_typ(c, x);
-            if (equiv(found, ty)) Ok([]) else Error(
+            let* found = lookup_index(c, x);
+            if (equiv(found, ty)) Ok([J(c, In(ty, Typ), Red)]) else Error(
                 "hyp failure: " 
                 ++ text_of_var(c, x, x) 
                 ++ " : "
@@ -135,7 +135,7 @@ module PartialDerivation : {
 
     let cut (s : t, x : name, ty1 : tm)  : result(t, error) = refine(s, j => {
         let (c, ty2, mode) = tuple_of_judgment(j);
-        Ok([J(c, ty1, mode), J(Cons(c, x, ty1, Prop), wk(ty2), mode)])
+        Ok([J(c, ty1, mode), J(Cons(c, x, ty1), wk(ty2), mode)])
     })
 
     let prop_formation (s : t)  : result(t, error) = refine(s, j => {
@@ -154,21 +154,21 @@ module PartialDerivation : {
 
     let prop_arrow_formation (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Arrow(_, ty1, ty2), a2), mode) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1, Prop), In(ty2, a2), mode)])
+        | J(c, In(Arrow(_, ty1, ty2), a2), mode) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1), In(ty2, a2), mode)])
         | _ => Error("prop_arrow_formation failure")
         }
     })
 
     let typ_arrow_formation (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Arrow(_, ty1, ty2), a2), mode) => Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1, Typ), In(ty2, a2), mode)])
+        | J(c, In(Arrow(_, ty1, ty2), a2), mode) => Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1), In(ty2, a2), mode)])
         | _ => Error("typ_arrow_formation failure")
         }
     })
 
     let implies_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, Arrow(_, p1, p2), mode) => Ok([J(c, In(p1, Prop), Red), J(Cons(c, x, p1, Prop), p2, mode)])
+        | J(c, Arrow(_, p1, p2), mode) => Ok([J(c, In(p1, Prop), Red), J(Cons(c, x, p1), p2, mode)])
         | _ => Error("implies_introduction failure")
         }
     })
@@ -182,7 +182,7 @@ module PartialDerivation : {
 
     let forall_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, Arrow(_, t1, p2), mode) => Ok([J(c, In(t1, Typ), Red), J(Cons(c, x, t1, Typ), p2, mode)])
+        | J(c, Arrow(_, t1, p2), mode) => Ok([J(c, In(t1, Typ), Red), J(Cons(c, x, t1), p2, mode)])
         | _ => Error("forall_introduction failure")
         }
     })
@@ -202,7 +202,7 @@ module PartialDerivation : {
     let pi_introduction (s : t) : result(t, error) = refine(s, j => {
         switch(j) {
         | J(c, In(Lam(x, ty1, a), Arrow(_, ty1', ty2)), mode) when equiv(ty1, ty1') => 
-            Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1, Typ), In(a, ty2), mode)])
+            Ok([J(c, In(ty1, Typ), Red), J(Cons(c, x, ty1), In(a, ty2), mode)])
         | J(c, In(Lam(_, ty1, _), Arrow(_, ty1', _)), _) => 
             Error("pi_introduction failure: found = " 
                 ++ string_of_term(c, ty1)

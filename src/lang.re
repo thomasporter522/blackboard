@@ -21,13 +21,9 @@ type tm =
     | Ap(strictness, tm, tm)
     | Unguard(tm);
 
-type assumption = 
-    | Prop 
-    | Typ
-
 type ctx = 
     | Empty 
-    | Cons(ctx, name, tm, assumption);
+    | Cons(ctx, name, tm);
 
 type error = string;
 
@@ -45,22 +41,15 @@ let ( let! ) = (x: result('a, 'b), f: 'b => result('a, 'b)): result('a, 'b) =>
 
 let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     switch(c, x) {
-    | (Cons(_, y, _, _), x) when y == x => Ok(0)
-    | (Cons(c, _, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
+    | (Cons(_, y, _), x) when y == x => Ok(0)
+    | (Cons(c, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
     | _ => Error("Context lookup unbound name")
     }
 }
 
 let tail_of_ctx(c : ctx) : ctx = switch(c) {
     | Empty => failwith("tail of empty context")
-    | Cons(c', _, _, _) => c'
-}
-
-let assumption_of_arrow(a : arrow) : assumption = switch(a) {
-    | Implies => Prop
-    | Forall => Typ
-    | Pi => Typ
-    | Guard => Prop
+    | Cons(c', _, _) => c'
 }
 
 let rec wknvar(n : int, m : int) : int = {
@@ -232,30 +221,16 @@ type lookup_index_result =
     | WrongKind
     | OutOfBounds
 
-let rec lookup_index(c : ctx, x : int, a : assumption) : lookup_index_result = {
+let rec lookup_index(c : ctx, x : int) : result(tm, error) = {
     switch(c, x) {
-    | (Cons(_, _, t, a'), 0) when a' == a => Ok(wk(t))
-    | (Cons(_, _, _, _), 0) => WrongKind
-    | (Cons(c, _, _, _), x) when x > 0 => 
-        switch(lookup_index(c, x-1, a)) {
-        | Ok(t) => Ok(wk(t))
-        | e => e
-        }
-    | _ => OutOfBounds
+    | (Cons(_, _, t), 0) => Ok(wk(t))
+    | (Cons(c, _, _), x) when x > 0 => 
+        let* t = lookup_index(c, x-1); 
+        Ok(wk(t))
+    | _ => Error("lookup_index out of bounds")
     }
 }
 
-let lookup_index_prop(c : ctx, x : int) : result(tm, error) = 
-    switch(lookup_index(c, x, Prop)) {
-    | Ok(t) => Ok(t)
-    | _ => Error("lookup index prop failed")
-    }
-
-let lookup_index_typ(c : ctx, x : int) : result(tm, error) = 
-    switch(lookup_index(c, x, Typ)) {
-    | Ok(t) => Ok(t)
-    | _ => Error("lookup index type failed")
-    }
 
 // let rec get_lookup_index(c : ctx, x : int) : tm = {
 //     switch(c, x) {

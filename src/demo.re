@@ -26,10 +26,10 @@ type tactic =
 
 type demo = 
     | Hole
-    | HypProp(name)
-    | ElabHypProp(int)
-    | HypTyp(name)
-    | ElabHypTyp(int)
+    | HypProp(name, demo)
+    | ElabHypProp(int, demo)
+    | HypTyp(name, demo)
+    | ElabHypTyp(int, demo)
     | InForm(tm, demo, demo)
     | Claim(name, surface_tm, demo, demo)
     | Suffices(name, surface_tm, demo, demo)
@@ -108,8 +108,8 @@ let (let-&) = (x : (t, result('a, error)), f : 'a => demo_result) : demo_result 
 }
 
 let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
-    | Cons(_, y, _, _) when x == y => 0 
-    | Cons(c, _, _, _) => 1+var_of_surface(c, x)
+    | Cons(_, y, _) when x == y => 0 
+    | Cons(c, _, _) => 1+var_of_surface(c, x)
     | Empty => failwith("unbound variable: " ++ x)
 }
 
@@ -117,11 +117,11 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceProp => Prop
     | SurfaceTyp => Typ
     | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
-    | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1), Typ), SurfaceArrow(xs, t1, t2)))
+    | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(xs, t1, t2)))
     | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
-    | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1), Typ), SurfaceLambda(xs, t1, t2)))
+    | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceLambda(xs, t1, t2)))
     | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
-    | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1), Typ), t2))
+    | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | SurfaceStrictAp(t1, t2) => Ap(Strict, tm_of_surface(c, t1),tm_of_surface(c, t2));
     | SurfaceVar(x) => Var(var_of_surface(c, x))
     | SurfaceLaxAp(t1, t2) => Ap(Lax, tm_of_surface(c, t1),tm_of_surface(c, t2));
@@ -129,11 +129,10 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
 }
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
-    switch(lookup_index(c, n, Prop)) {
+    switch(lookup_index(c, n)) {
     | Ok(ty') when equiv(ty, ty') => Ok(n)
     | Ok(_) => find_assumption(c, ty, n+1)
-    | WrongKind => find_assumption(c, ty, n+1)
-    | OutOfBounds => Error("can't find assumption")
+    | _ => Error("can't find assumption")
     }
 }
 
@@ -203,8 +202,8 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
 
 // infers the type proven by a demo in a context
 let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
-    | HypProp(x) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHypProp(n)))
-    | ElabHypProp(n) => lookup_index_prop(c, n)
+    | HypProp(x, d) => Result.bind(index_of_name(c, x), n => infer_proven_ty(c, ElabHypProp(n, d)))
+    | ElabHypProp(n, _) => lookup_index(c, n)
     | At(d1, a, d2) => {
         let elab_a = tm_of_surface(c, a);
         infer_proven_ty(c, ElabAt(d1, elab_a, d2))
@@ -231,15 +230,10 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     | Typ => Ok(Typ)
     | In(_) => Ok(Prop)
     | Arrow(x, ty1, ty2) => 
-        let* ty1_assumption : assumption = switch(infer_typ(c, ty1)) {
-            | Ok(Prop) => Ok(Prop)
-            | Ok(Typ) => Ok(Typ)
-            | _ => Error("domain is not a prop or type")
-        };
-        let* ty2_typ = infer_typ(Cons(c, x, ty1, ty1_assumption), ty2);
+        let* ty2_typ = infer_typ(Cons(c, x, ty1), ty2);
         Ok(ty2_typ)
     | Lam(x, ty, b) => 
-        let* ty_body = infer_typ(Cons(c, x, ty, Typ), b);
+        let* ty_body = infer_typ(Cons(c, x, ty), b);
         Ok(Arrow(x, ty, ty_body))
     // | Unlam(_, f) => switch(c) {
     //     | Empty => Error("Unlambda has no type in the empty context")
@@ -249,7 +243,7 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     //         | Error(e) => Error(e)
     //         }   
     //     }
-    | Var(x) => lookup_index_typ(c, x)
+    | Var(x) => lookup_index(c, x)
     | Ap(_, a1, a2) => switch(infer_typ(c, a1)) {
         | Ok(Arrow(_, _, ty2)) => Ok(subst(a2, ty2))
         | Ok(_) => Error("Applied term does not have arrow type")
@@ -260,12 +254,6 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
         | Ok(_) => Error("Unguarded term does not have arrow type")
         | Error(e) => Error(e)
     }
-}
-
-let assumed(s : t) : result (t, error) = {
-    let (c, ty_goal, _) = tuple_of_judgment(Result.get_ok(focused(s)));
-    let* x = find_assumption(c, ty_goal, 0);
-    hyp_prop(s, x)
 }
 
 // if the focus of [s] is c, x : A |- T, refines to goal c |- T' where wk(T') = T
@@ -294,7 +282,9 @@ let rec check(s : t) : result(t, error) = {
             let* s = check(s);
             Ok(s)
         }
-        | In(Var(_), _) => hyp_typ(s)
+        | In(Var(_), _) => 
+            let* s = hyp_typ(s);
+            check(s)
         | In(Ap(st, a1, a2), ty_expected) => {
             switch(infer_typ(c, a1)) {
             | Ok(Arrow(x, ty1, ty2)) => {
@@ -339,8 +329,15 @@ let rec check(s : t) : result(t, error) = {
 and obvious(s : t) : result(t, error) = {
     let! _ = assumed(s);
     let! _e = check(s);
-    // Error(_e)
-    Error("not obvious: " ++ string_of_term(goal_ctx(s), goal_type(s)) ++ "\n" ++ string_of_ctx(goal_ctx(s)));
+    Error(_e)
+    // Error("not obvious: " ++ string_of_term(goal_ctx(s), goal_type(s)) ++ "\n" ++ string_of_ctx(goal_ctx(s)));
+}
+
+and assumed(s : t) : result (t, error) = {
+    let (c, ty_goal, _) = tuple_of_judgment(Result.get_ok(focused(s)));
+    let* x = find_assumption(c, ty_goal, 0);
+    let* s = hyp_prop(s, x);
+    obvious(s);
 }
 
 let given(s : t, x) : result(t, error) = {
@@ -369,7 +366,7 @@ let direct(s : t) : result(t, error) = {
     let* s = implies_introduction(s, "h");
     let* s = obvious(s);
     let c = goal_ctx(s);
-    let* target = switch(lookup_index_prop(c, 0)) {
+    let* target = switch(lookup_index(c, 0)) {
         | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
         | _ => Error("cannot prove directly")
     };
@@ -388,7 +385,7 @@ let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) =
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
-        switch(lookup_index_prop(c, current)) {
+        switch(lookup_index(c, current)) {
         | Ok(Arrow(_, Typ, Arrow(_, Var(0), 
             Ap(Lax, Ap(Lax, Ap(Lax, Var(eq'), Var(1)), Var(0)), Var(0)))))
             when eq == eq'-2  => Ok(current)
@@ -406,18 +403,22 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));
         (s', mk_report([j], []))
-    | HypProp(x) =>
+    | HypProp(x, d) =>
         let c = goal_ctx(s);
         let-& n = (s, index_of_name(c, x));
-        check_demo(s, ElabHypProp(n))
-    | ElabHypProp(n) => pure(s, hyp_prop(s, n))
-    | HypTyp(x) =>
+        check_demo(s, ElabHypProp(n, d))
+    | ElabHypProp(n, d) => 
+        let-& s = (s, hyp_prop(s, n));
+        check_demo(s, d)
+    | HypTyp(x, d) =>
         let c = goal_ctx(s);
         let-& n = (s, index_of_name(c, x));
-        check_demo(s, ElabHypTyp(n))
-    | ElabHypTyp(n) =>
+        check_demo(s, ElabHypTyp(n, d))
+    | ElabHypTyp(n, d) =>
         switch(goal_type(s)) {
-        | In(Var(n'), _) when n' == n => pure(s, hyp_typ(s));
+        | In(Var(n'), _) when n' == n => 
+            let-& s = (s, hyp_typ(s));
+            check_demo(s, d)
         | In(Var(_), _) => skip_and_error(s, "typ-of failure: wrong variable")
         | _ => skip_and_error(s, "typ-of failure: not a variable membership")
         }
@@ -453,7 +454,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     | ApTyp(x, ty1, ty2, d1, d2) => {
         let c = goal_ctx(s);
         let ty1_elab = tm_of_surface(c, ty1);
-        let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab, Typ), ty2);
+        let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
         check_demo(s, ElabApTyp(x, ty1_elab, ty2_elab, d1, d2))
     }
     | ElabApTyp(x, ty1, ty2, d1, d2) => {
@@ -539,7 +540,7 @@ and definition(s : t) : result(t, error) = {
             let* str_str_ty' = invert_wk(str_ty');
             if (equiv(str_ty, str_str_ty')) { 
                 let* refl = find_refl(c, eq-2, eq-2);
-                let my_subdemo = Use(ElabAt(ElabHypProp(0), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2), wk(ty), Obvious), xthing, Obvious))
+                let my_subdemo = Use(ElabAt(ElabHypProp(0, Obvious), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2, Obvious), wk(ty), Obvious), xthing, Obvious))
                 let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
                 simplify(check_demo(s, my_demo))
             } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }

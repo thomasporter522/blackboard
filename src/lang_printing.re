@@ -1,8 +1,8 @@
 open Lang
 
 let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
-    | Cons(_, y, _, _) when x == 0 => y
-    | Cons(c, y, _, _) when x > 0 => {
+    | Cons(_, y, _) when x == 0 => y
+    | Cons(c, y, _) when x > 0 => {
         let y' = text_of_var(c, x-1, original);
         if (y' == y) { y ++ " (shadowed)"} else y'
     }
@@ -10,7 +10,7 @@ let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
 }
 
 let show_indices = false;
-// let show_indices = true;
+let show_indices = true;
 
 let string_of_var(c : ctx, x : int) : string = {
     text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
@@ -35,12 +35,12 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     | Arrow(x, ty1, ty2) => 
         if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
             ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty1) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty1) ++ ")")
-            ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1, Typ), ty2) 
+            ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
         }
     | Lam(x, ty, a) => 
         if (rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
             ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty) ++ ")")
-            ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty, Typ), a) 
+            ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty), a) 
         }
     | Var(x) => string_of_var(c, x)
     | Ap(Strict, a1, a2) => 
@@ -63,15 +63,12 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     prec_string_of_term(0, 0, c, a)
 }
 
-let ctx_prefix_of_assumption(x : name, a : assumption) : string = switch(a) {
-    | Prop => "(" ++ x ++ ") "
-    | Typ => x ++ " : "
-}
+let ctx_prefix(x : name) : string = x ++ " : ";
 
 let rec string_of_ctx_short(c : ctx) : string = switch(c) {
     | Empty => ""
-    | Cons(Empty, x, ty, a) => ctx_prefix_of_assumption(x, a) ++ string_of_term(Empty, ty)
-    | Cons(c, x, ty, a) => string_of_ctx_short(c) ++ ", " ++ ctx_prefix_of_assumption(x, a) ++ string_of_term(c, ty)
+    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, ty)
+    | Cons(c, x, ty) => string_of_ctx_short(c) ++ ", " ++ ctx_prefix(x) ++ string_of_term(c, ty)
 }
 
 let string_of_judgment_short(j : judgment) : string = {
@@ -82,8 +79,8 @@ let string_of_judgment_short(j : judgment) : string = {
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
-    | Cons(Empty, x, ty, a) => ctx_prefix_of_assumption(x, a) ++ string_of_term(Empty, ty)
-    | Cons(c, x, ty, a) => ctx_prefix_of_assumption(x, a) ++ string_of_term(c, ty) ++ ",\n" ++ string_of_ctx(c)
+    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, ty)
+    | Cons(c, x, ty) => ctx_prefix(x) ++ string_of_term(c, ty) ++ ",\n" ++ string_of_ctx(c)
 }
 
 let string_of_judgment(j : judgment) : string = {
