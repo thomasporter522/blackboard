@@ -7,7 +7,7 @@ type surface_tm =
     | SurfaceProp 
     | SurfaceTyp 
     | SurfaceIn(surface_tm, surface_tm)
-    | SurfaceArrow(list(name), surface_tm, surface_tm)
+    | SurfaceArrow(strength, list(name), surface_tm, surface_tm)
     | SurfaceLambda(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
     | SurfaceVar(name)
@@ -117,11 +117,11 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceProp => Prop
     | SurfaceTyp => Typ
     | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
-    | SurfaceArrow([x,...xs], t1, t2) => Arrow(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(xs, t1, t2)))
-    | SurfaceArrow([], _, t2) => tm_of_surface(c, t2)
+    | SurfaceArrow(st, [x,...xs], t1, t2) => Arrow(st, x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(st, xs, t1, t2)))
+    | SurfaceArrow(_, [], _, t2) => tm_of_surface(c, t2)
     | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceLambda(xs, t1, t2)))
     | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
-    | SimpleArrow(t1, t2) => Arrow("_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
+    | SimpleArrow(t1, t2) => Arrow(Weak, "_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | SurfaceStrictAp(t1, t2) => Ap(Strict, tm_of_surface(c, t1),tm_of_surface(c, t2));
     | SurfaceVar(x) => Var(var_of_surface(c, x))
     | SurfaceLaxAp(t1, t2) => Ap(Lax, tm_of_surface(c, t1),tm_of_surface(c, t2));
@@ -152,10 +152,10 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
         let* ty' = invert_wkn(n, ty);
         Ok(In(a', ty'))
     }
-    | Arrow(y, ty1, ty2) => {
+    | Arrow(st, y, ty1, ty2) => {
         let* ty1' = invert_wkn(n, ty1);
         let* ty2' = invert_wkn(n+1, ty2);
-        Ok(Arrow(y, ty1', ty2'))
+        Ok(Arrow(st, y, ty1', ty2'))
     }
     | Lam(y, ty, a) => {
         let* ty' = invert_wkn(n, ty);
@@ -181,18 +181,18 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
 let invert_wk(a : tm) : result(tm, error) = invert_wkn(0, a)
 
 
-let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((name, tm, tm), error) = {
+let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((strength, name, tm, tm), error) = {
     switch(tds) {
     | [] => switch(hd_ty) {
-        | Arrow(x, a, b) => Ok((x, a, b))
+        | Arrow(st, x, a, b) => Ok((st, x, a, b))
         | _ => Error("head is not of arrow type")
         }
     | [(a, _), ...other_tds] => {
         Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
-            let (_, _, ty_b) = f;
+            let (_, _, _, ty_b) = f;
             let elab_a = tm_of_surface(c, a);
             switch(subst(elab_a, ty_b)) {
-            | Arrow(x, a, b) => Ok((x, a, b))
+            | Arrow(st, x, a, b) => Ok((st, x, a, b))
             | _ => Error("constituent is not of arrow type")
             }
         })
@@ -210,14 +210,14 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, error) = switch(d) {
     }
     | ElabAt(d, a, _) => {
         Result.bind(infer_proven_ty(c, d), inferred_ty => switch(inferred_ty) {
-        | Arrow(_, _, ty_b) => Ok(subst(a, ty_b))
+        | Arrow(_, _, _, ty_b) => Ok(subst(a, ty_b))
         | _ => Error("ap of non-arrow")
         })
     }
     | Use(d1, _) => {
         let* d1_proves = infer_proven_ty(c, d1);
         switch(d1_proves) {
-        | Arrow(_, _, ty_b) => invert_wk(ty_b)
+        | Arrow(_, _, _, ty_b) => invert_wk(ty_b)
         | _ => Error("use of non-arrow or non-simple arrow")
         }
     }
@@ -229,12 +229,12 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     | Prop => Ok(Typ)
     | Typ => Ok(Typ)
     | In(_) => Ok(Prop)
-    | Arrow(x, ty1, ty2) => 
+    | Arrow(_, x, ty1, ty2) => 
         let* ty2_typ = infer_typ(Cons(c, x, ty1), ty2);
         Ok(ty2_typ)
     | Lam(x, ty, b) => 
         let* ty_body = infer_typ(Cons(c, x, ty), b);
-        Ok(Arrow(x, ty, ty_body))
+        Ok(Arrow(Weak, x, ty, ty_body))
     // | Unlam(_, f) => switch(c) {
     //     | Empty => Error("Unlambda has no type in the empty context")
     //     | Cons(c', _, _) => switch(infer_typ(c', f)) {
@@ -245,12 +245,12 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     //     }
     | Var(x) => lookup_index(c, x)
     | Ap(_, a1, a2) => switch(infer_typ(c, a1)) {
-        | Ok(Arrow(_, _, ty2)) => Ok(subst(a2, ty2))
+        | Ok(Arrow(_, _, _, ty2)) => Ok(subst(a2, ty2))
         | Ok(_) => Error("Applied term does not have arrow type")
         | Error(e) => Error(e)
     }
     | Unguard(a) => switch(infer_typ(c, a)) {
-        | Ok(Arrow(_, _, ty2)) => invert_wk(ty2)
+        | Ok(Arrow(_, _, _, ty2)) => invert_wk(ty2)
         | Ok(_) => Error("Unguarded term does not have arrow type")
         | Error(e) => Error(e)
     }
@@ -270,7 +270,7 @@ let rec check(s : t) : result(t, error) = {
     switch(ty_goal) {
         | In(Prop, _) => prop_formation(s)
         | In(Typ, _) => typ_formation(s)
-        | In(Arrow(x, t1, _), _) => {
+        | In(Arrow(_, x, t1, _), _) => {
             let* s = 
                 switch(infer_typ(c, t1)) {
                 | Ok(Prop) => prop_arrow_formation(s, x)
@@ -287,7 +287,7 @@ let rec check(s : t) : result(t, error) = {
             check(s)
         | In(Ap(st, a1, a2), ty_expected) => {
             switch(infer_typ(c, a1)) {
-            | Ok(Arrow(x, ty1, ty2)) => {
+            | Ok(Arrow(_, x, ty1, ty2)) => {
                 switch(ap(s, x, ty1, ty2)) {
                 | Ok(s) => 
                     let* s = check(s);
@@ -314,7 +314,7 @@ let rec check(s : t) : result(t, error) = {
             Ok(s)
         | In(Unguard(a), _) => 
             switch(infer_typ(c, a)) {
-            | Ok(Arrow(x, ty1, _)) => 
+            | Ok(Arrow(_, x, ty1, _)) => 
                 let* s = guard_elimination(s, x, ty1);
                 let* s = obvious(s);
                 let* s = check(s);
@@ -343,7 +343,7 @@ and assumed(s : t) : result (t, error) = {
 let given(s : t, x) : result(t, error) = {
     let (c, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
-    | Arrow(_, ty1, _) => 
+    | Arrow(_, _, ty1, _) => 
         switch(infer_typ(c, ty1)) {
         | Ok(Prop) => implies_introduction(s, x)
         | _ => forall_introduction(s, x)
@@ -354,7 +354,7 @@ let given(s : t, x) : result(t, error) = {
 
 let given_type(s : t, x, ty_elab) : result(t, error) = {
     switch(goal_type(s)) {
-    | Arrow(_, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
+    | Arrow(_, _, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
     | _ => given(s, x)
     }
 }
@@ -367,7 +367,7 @@ let direct(s : t) : result(t, error) = {
     let* s = obvious(s);
     let c = goal_ctx(s);
     let* target = switch(lookup_index(c, 0)) {
-        | Ok(Arrow(_, ty_a, _)) => Ok(ty_a) 
+        | Ok(Arrow(_, _, ty_a, _)) => Ok(ty_a) 
         | _ => Error("cannot prove directly")
     };
     let* s = implies_elimination(s, target);
@@ -379,14 +379,14 @@ let direct(s : t) : result(t, error) = {
 
 let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
     switch(ty1) {
-    | Arrow(x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
+    | Arrow(_, x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
     | _ => Error("Cannot 'at' non-arrow type")
     }
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
         switch(lookup_index(c, current)) {
-        | Ok(Arrow(_, Typ, Arrow(_, Var(0), 
+        | Ok(Arrow(_, _, Typ, Arrow(_, _, Var(0), 
             Ap(Lax, Ap(Lax, Ap(Lax, Var(eq'), Var(1)), Var(0)), Var(0)))))
             when eq == eq'-2  => Ok(current)
         | _ => find_refl(c, eq, current-1)
@@ -488,7 +488,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         let c = goal_ctx(s);
         let-& d1_ty = (s, infer_proven_ty(c, d1));
         switch(d1_ty) {
-        | Arrow(_, ty_1, _)  => {
+        | Arrow(_, _, ty_1, _)  => {
             let-& s = (s, implies_elimination(s, ty_1));
             let-* s = check_demo(s, d1);
             check_demo(s, d2)
@@ -520,7 +520,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
             switch(goal_type(s)) {
-            | Arrow(x, _, _) when x != "_" => {
+            | Arrow(_, x, _, _) when x != "_" => {
                 let-& s = (s, given(s, x));
                 let-* s = check_demo(s, Obvious);
                 check_demo(s,  Tactic(GivenAll, [d]));
@@ -534,21 +534,21 @@ let rec check_demo(s : t, d : demo) : (t, report) =
 and definition(s : t) : result(t, error) = {
     let (c, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
-    | Arrow(_, Prop, Arrow(_, Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, xname, ty, Arrow(_, xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
             let* str_ty = invert_wk(ty);
             let* str_ty' = invert_wk(ty');
             let* str_str_ty' = invert_wk(str_ty');
             if (equiv(str_ty, str_str_ty')) { 
                 let* refl = find_refl(c, eq-2, eq-2);
                 let my_subdemo = Use(ElabAt(ElabHypProp(0, Obvious), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2, Obvious), wk(ty), Obvious), xthing, Obvious))
-                let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(xname, ty, Arrow(xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
+                let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(Weak, xname, ty, Arrow(Weak, xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
                 simplify(check_demo(s, my_demo))
             } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }
         }
-    | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), Var(2))), _)) => Error("not a definition obligation: motive is not " ++ m)
-    | Arrow(m, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), _)), _)) => Error("not a definition obligation: inner motive is not " ++ m)
-    | Arrow(_, Prop, Arrow(_, Arrow(_, _, Arrow(_, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), _), _), _)), _))  => Error("not a definition obligation: LHS of equation is not the declared object")
-    | Arrow(_, Prop, Arrow(_, Arrow(_, _, Arrow(_, _, _)), _)) => Error("not a definition obligation: second component is not an equation")
+    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), Var(2))), _)) => Error("not a definition obligation: motive is not " ++ m)
+    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), _)), _)) => Error("not a definition obligation: inner motive is not " ++ m)
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), _), _), _)), _))  => Error("not a definition obligation: LHS of equation is not the declared object")
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, _, _)), _)) => Error("not a definition obligation: second component is not an equation")
     | _ => Error("not a definition obligation: not a construction with two components")
     }
 }

@@ -11,11 +11,15 @@ type strictness =
     | Strict 
     | Lax
 
+type strength = 
+    | Strong 
+    | Weak
+
 type tm = 
     | Prop
     | Typ 
     | In(tm, tm)
-    | Arrow(name, tm, tm)
+    | Arrow(strength, name, tm, tm)
     | Lam(name, tm, tm)
     | Var(int)
     | Ap(strictness, tm, tm)
@@ -62,7 +66,7 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | Prop => Prop
     | Typ => Typ
     | In(a, ty) => In(wkn(n, a), wkn(n, ty))
-    | Arrow(y, ty1, ty2) => Arrow(y, wkn(n, ty1), wkn(n+1, ty2))
+    | Arrow(st, y, ty1, ty2) => Arrow(st, y, wkn(n, ty1), wkn(n+1, ty2))
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
     | Var(y) => Var(wknvar(n, y))
     | Ap(s, a1, a2) => Ap(s, wkn(n, a1), wkn(n, a2))
@@ -82,7 +86,7 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | Prop => Prop
     | Typ => Typ
     | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
-    | Arrow(y, ty1, ty2) => Arrow(y, substn(n, s, ty1), substn(n+1, s, ty2))
+    | Arrow(st, y, ty1, ty2) => Arrow(st, y, substn(n, s, ty1), substn(n+1, s, ty2))
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
     | Var(y) => substnvar(n, s, y)
     | Ap(r, a1, a2) => Ap(r, substn(n, s, a1), substn(n, s, a2))
@@ -96,7 +100,7 @@ let rec headnormalize(t : tm) : tm = switch(t) {
     | Prop => Prop
     | Typ => Typ
     | In(t1, t2) => In(t1, t2)
-    | Arrow(x, t1, t2) => Arrow(x, t1, t2)
+    | Arrow(st, x, t1, t2) => Arrow(st, x, t1, t2)
     | Lam(x, t1, t2) => Lam(x, t1, t2)
     | Var(x) => Var(x)
     | Ap(Lax, t1, t2) => Ap(Lax, t1, t2)
@@ -113,7 +117,7 @@ let rec normalize(t : tm) : tm = switch(t) {
     | Prop => Prop
     | Typ => Typ
     | In(t1, t2) => In(normalize(t1), normalize(t2))
-    | Arrow(x, t1, t2) => Arrow(x, normalize(t1), normalize(t2))
+    | Arrow(st, x, t1, t2) => Arrow(st, x, normalize(t1), normalize(t2))
     | Lam(x, t1, t2) => Lam(x, normalize(t1), normalize(t2))
     | Var(x) => Var(x)
     | Ap(Lax, t1, t2) => Ap(Lax, normalize(t1), normalize(t2))
@@ -131,7 +135,7 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Prop, Prop) => true 
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
-    | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Arrow(st1, _, a1, a2), Arrow(st2, _, a3, a4)) => st1 == st2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
@@ -155,7 +159,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Prop, Prop) => true 
         | (Typ, Typ) => true 
         | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        | (Arrow(_, a1, a2), Arrow(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+        | (Arrow(st1, _, a1, a2), Arrow(st2, _, a3, a4)) => st1 == st2 && equiv(a1, a3) && equiv(a2, a4)
         | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Var(x1), Var(x2)) => x1 == x2
         | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)

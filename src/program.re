@@ -40,12 +40,12 @@ let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature, depth : in
     | [(x, ty),...s'] => {
         let ty_elab = tm_of_surface(c, ty);
         let c' = Cons(c, x, ty_elab);
-        Arrow(x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
+        Arrow(Weak, x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
     }
 }
 
 let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
-    Arrow("M", Prop, Arrow("_", ty_arrow_of_surface_signature(Cons(c, "#M", Prop), s, 0), Var(1)))
+    Arrow(Weak, "M", Prop, Arrow(Weak, "_", ty_arrow_of_surface_signature(Cons(c, "#M", Prop), s, 0), Var(1)))
 }
 
 let rec program_of_surface (c : ctx, p : surface_program) : program = switch(p) {

@@ -74,7 +74,7 @@ let id_list :=
   | x = ID; xs = id_list; { x :: xs }
 
 let term :=
-  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (xs, t1, t2) }
+  | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (Weak, xs, t1, t2) }
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; LAMBDA; t2 = term; { SurfaceLambda (xs, t1, t2) }
   | t1 = atom; DOUBLECOLON; t2 = atom; { SurfaceIn(t1, t2) }
   | t1 = atom; ARROW; t2 = term; { SimpleArrow (t1, t2) }

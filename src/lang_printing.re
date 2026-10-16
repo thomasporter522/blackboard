@@ -23,6 +23,11 @@ let lam_prec = (-1, 15)
 let strictap_prec = (20, -1)
 let ap_prec = (20, 21)
 
+let string_of_strength(s : strength) : string = switch(s) {
+    | Strong => " |- "
+    | Weak => " ->"
+}
+
 let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string = {
     switch(outer_a) {
     | Prop => "prop"
@@ -32,10 +37,10 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
             prec_string_of_term(lp, fst(colon_prec), c, a) ++ " : " ++ prec_string_of_term(snd(colon_prec), rp,c, ty)
         }
     }
-    | Arrow(x, ty1, ty2) => 
+    | Arrow(st, x, ty1, ty2) => 
         if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
             ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty1) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty1) ++ ")")
-            ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
+            ++ string_of_strength(st) ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
         }
     | Lam(x, ty, a) => 
         if (rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
