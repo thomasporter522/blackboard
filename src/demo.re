@@ -555,6 +555,25 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     } { | _ => Error("couldn't find refl") }
 }
 
+let cooler_definition(s : t) : result(t, error) = {
+    let (c, ty, _) = goal_tuple(s);
+    switch(ty) {
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, xname, ty, Arrow(_, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
+        let* str_ty = invert_wk(ty);
+            let* str_ty' = invert_wk(ty');
+            let* str_str_ty' = invert_wk(str_ty');
+            if (equiv(str_ty, str_str_ty')) { 
+                // let* refl = find_refl(c, eq-2, eq-2);
+                // let my_subdemo = Use(ElabAt(ElabHypProp(0, Obvious), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2, Obvious), wk(ty), Obvious), xthing, Obvious))
+                // let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(Weak, xname, ty, Arrow(Weak, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
+                // simplify(check_demo(s, my_demo))
+                failwith("todo")
+            } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }
+    }
+    | _ => Error("wrong shape for definition")
+    }
+}
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]

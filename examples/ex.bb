@@ -75,3 +75,13 @@ direct (
         existsi @ A @ ((a : A) => P a b) @ a (h @ b)
     )
 )
+
+construct 
+sub (A B : type) : prop, 
+sub-eq : (A B : type) -> eq prop (sub A B) ((a : A) -> a :: B)
+by
+witness ((A : type) => (B : type) => (a : A) -> a :: B)
+direct (
+givenall 
+refl @ prop @ ((a : A) -> a :: B)
+)
