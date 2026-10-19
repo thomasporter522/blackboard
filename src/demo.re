@@ -3,6 +3,8 @@ open Lang_printing
 open Deriv.PartialDerivation
 open Deriv
 
+let probe(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_type(s));
+
 type surface_tm = 
     | SurfaceProp 
     | SurfaceTyp 
@@ -265,6 +267,12 @@ let weaken_goal(s : t) : result(t, error) = {
 }
 
 
+let mp_ty(s : t, ty1 : tm) : result(t, error) = 
+    switch(ty1) {
+    | Arrow(_, _, ty_1, _) => implies_elimination(s, ty_1)
+    | _ => Error("Cannot 'at' non-arrow type")
+    }
+
 let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
     switch(ty1) {
     | Arrow(_, x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
@@ -295,12 +303,9 @@ let rec unfurl_assumption(s : t, ty : tm, steps : list(unfurl_step)) : result(t,
         | _ => Error("can't unfurl_assumption")
         };
         let* s = unfurl_assumption(s, subst(a, ty_2), steps');
-        // print_endline("and now for FA")
         let* s = forall_elimination(s, x, ty_1, ty_2, a);
-        print_endline("checkering");
         let* s = swap(s);
         let* s = checker(s);
-        print_endline("checkered");
         Ok(s)
     | [Implies, ... steps'] => 
         let* (_, ty_1, ty_2) = switch(ty) {
@@ -309,8 +314,6 @@ let rec unfurl_assumption(s : t, ty : tm, steps : list(unfurl_step)) : result(t,
         };
         let* s = unfurl_assumption(s, wk(ty_2), steps');
         let* s = implies_elimination(s, ty_1);
-        // print_endline("look ma, MP");
-        // print_endline("now the goal is: " ++ string_of_goal_type(s));
         Ok(s)
 }
 
@@ -427,14 +430,79 @@ let direct(s : t) : result(t, error) = {
     Ok(s)
 }
 
+let empty_direct(s : t) : result(t, error) = {
+    switch(goal_type(s)) {
+    | Arrow(_, _, Prop, Arrow(_, _, Var(0), Var(1))) => {
+        let* s = forall_introduction(s, "M");
+        let* s = prop_formation(s);
+        let* s = implies_introduction(s, "h");
+        let* s = hyp_typ(s);
+        let* s = prop_formation(s);
+        let* s = hyp_prop(s, 0);
+        let* s = hyp_typ(s);
+        let* s = prop_formation(s);
+        Ok(s)
+    }
+    | _ => Error("wrong shape for empty_direct")
+    }
+}
+
+// if the goal is (M : prop) -> ((x : P) -> SIG -> M) -> M, refines to goals P and (M : prop) -> (subst(Var(0), SIG) -> M) -> M.
+let better_direct(s : t) : result(t, error) = {
+    // print_endline("CTX: " ++ string_of_goal_ctx(s));
+    // print_endline("GOALS: " ++ string_of_goal_types(s));
+    let* (tyP, rest) = switch(goal_type(s)) {
+        | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyP, rest), Var(1))) => Ok((tyP, rest))
+        | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
+    };
+    let newgoal = Arrow(Weak, "M", Prop, Arrow(Weak, "h", subst(Var(0), rest), Var(1)));
+    // print_endline("NEGOAL: " ++ string_of_term(goal_ctx(s), newgoal));
+    let* s = cut(s, "premise2", newgoal);
+    let* s = swap(s);
+    // let* strP = invert_wk(tyP);
+    // print_endline("strP: " ++ string_of_term(goal_ctx(s), tyP));
+    let* s = cut(s, "premise1", tyP);
+    let* s = weaken_goal(s);
+    let* s = swap(s);
+    // we now prove the goal using the premises
+    let* s = forall_introduction(s, "M");
+    let* s = obvious(s);
+    let* s = implies_introduction(s, "portal");
+    let* s = obvious(s);
+    let premise2 = 3;
+    let* premise2_ty = lookup_index(goal_ctx(s), premise2);
+    // print_endline("CHJECKEOPIOTN: " ++ string_of_term(goal_ctx(s), premise2_ty));
+    let checker(s : t) = {
+        let* s = hyp_typ(s);
+        prop_formation(s)
+    };
+    let* s = unfurl_assumption(s, premise2_ty, [Forall(Var(1), checker), Implies]);
+    let* s = hyp_prop(s, premise2);
+    let* s = check(s);
+    let portal = 0;
+    let* portal_ty = lookup_index(goal_ctx(s), portal);
+    let* s = mp_ty(s, portal_ty);
+    let* s = hyp_prop(s, portal);
+    let* s = check(s);
+    let premise1 = 2;
+    let* s = hyp_prop(s, premise1);
+    let* s = check(s);
+    // print_endline("CTX: " ++ string_of_goal_ctx(s));
+    // print_endline("GOALS: " ++ string_of_goal_types(s));
+    // let* s = check(s);
+    // print_endline("GOAL2: " ++ string_of_goal_type(s2));
+    // let* s3 = skip(s2);
+    // print_endline("GOAL3: " ++ string_of_goal_type(s3));
+    // let* s = check(s);
+    // let* s = check(s);
+    Ok(s)
+}
+
+
 // if the goal is (M : prop) -> ((x : A) -> SIG -> M) -> M, refines to goals a : A and (M : prop) -> (SIG[a/x] -> M) -> M.
 let witness(s : t, a : tm) : result(t, error) = {
     let* (tyA, rest) = switch(goal_type(s)) {
         | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyA, rest), Var(1))) => Ok((tyA, rest))
-        // | Arrow(Weak, "M", Prop, Arrow(Weak, "h", _, Var(1))) => failwith("huh1?")
-        // | Arrow(Weak, "M", Prop, Arrow(Weak, "h", _, _)) => failwith("huh12?")
-        // | Arrow(Weak, "M", Prop, Arrow(_, "h", _, _)) => failwith("huh12?")
-        // | Arrow(Weak, "M", Prop, _) => failwith("huh2?")
         | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
     };
     let newgoal = Arrow(Weak, "M", Prop, Arrow(Weak, "h", subst(wk(a), rest), Var(1)));
@@ -443,37 +511,32 @@ let witness(s : t, a : tm) : result(t, error) = {
     let a = wk(a);
     let* strA = invert_wk(tyA);
     let* s = cut(s, "premise1", In(a, strA));
-    // print_endline("NEW GOAL" ++ string_of_term(goal_ctx(s), goal_type(s)));
     let* s = weaken_goal(s);
-    // print_endline("asfd");
     let* s = swap(s);
-    // let a = wk(a);
+    let a = wk(a);
     // we now prove the goal using the premises
     let* s = forall_introduction(s, "M");
     let* s = obvious(s);
-    // let a = wk(a);
-    let* s = implies_introduction(s, "h");
+    let a = wk(a);
+    let* s = implies_introduction(s, "portal");
     let* s = obvious(s);
-    // let a = wk(a);
-    // let* s = forall_elimination(s, "x", wk(tyA), wk(rest), wk(wk(a)));
-    // print_endline(string_of_ctx(goal_ctx(s)));
+    let a = wk(a);
     let premise2 = 3;
     let* premise2_ty = lookup_index(goal_ctx(s), premise2);
-    // print_endline("UNFURLIN \n\n" ++ string_of_term(goal_ctx(s), premise2_ty));
-    // print_endline("UNFURLIN \n\n" ++ string_of_term(goal_ctx(s), Var(1)));
     let checker(s : t) = {
         let* s = hyp_typ(s);
         prop_formation(s)
     };
     let* s = unfurl_assumption(s, premise2_ty, [Forall(Var(1), checker), Implies]);
-    print_endline("unfurled!\n" ++ string_of_ctx(goal_ctx(s)));
-    print_endline("YAY goal is  \n\n" ++ string_of_goal_type(s));
-    // print_endline("YAY goalctx is  \n\n" ++ string_of_goal_ctx(s));
     let* s = hyp_prop(s, premise2);
     let* s = check(s);
-    print_endline("YAY goal1 is  \n\n" ++ string_of_goal_type(s));
-    // let* s' = skip(s);
-    // print_endline("YAY goal2 is  \n\n" ++ string_of_goal_type(s'));
+    let portal = 0;
+    let* portal_ty = lookup_index(goal_ctx(s), portal);
+    let* s = at_ty(s, portal_ty, a);
+    let* s = hyp_prop(s, portal);
+    let* s = check(s);
+    let* s = check(s);
+    let* s = check(s);
     Ok(s)
 }
 
@@ -606,9 +669,14 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         }
     }
     | Tactic(Direct, ds) => switch(ds) {
-        | [d] =>
-            let-& s = (s, direct(s));
-            check_demo(s, d)
+        | [d1] => 
+            let-& s = (s, better_direct(s));
+            let-* s = check_demo(s, d1);
+            pure(s, empty_direct(s))
+        | [d1, d2] =>
+            let-& s = (s, better_direct(s));
+            let-* s = check_demo(s, d1);
+            check_demo(s, d2)
         | _ => skip_and_error(s, "wrong number of args to direct")
     }
     | Tactic(Witness(a), ds) => switch(ds) {

@@ -91,7 +91,7 @@ let rec string_of_ctx(c : ctx) : string = switch(c) {
 let string_of_judgment(j : judgment) : string = {
     switch(j) {
     | J(c, a, _) => 
-        let s = string_of_term(c, a);
+        let s = string_of_term(c, normalize(a));
         let bar = String.make(String.length(s), '-');
         string_of_ctx(c) ++ "\n" ++ bar ++ "\n" ++ s
     }

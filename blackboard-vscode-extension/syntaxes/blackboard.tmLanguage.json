@@ -24,7 +24,7 @@
 				"match": "\\b(given|claim|suffices|obvious)\\b"
 			},{
 				"name": "keyword.other.blackboard.tactic",
-				"match": "\\b(direct|check|givenall|obvious)\\b"
+				"match": "\\b(direct|witness|check|givenall|obvious)\\b"
 			},{
 				"name": "keyword.other.blackboard.schema",
 				"match": "\\b(definition)\\b"

@@ -153,8 +153,9 @@ module PartialDerivation : {
     })
 
     let prop_arrow_formation (s : t, x : name) : result(t, error) = refine(s, j => {
-        switch(j) {
-        | J(c, In(Arrow(_, _, ty1, ty2), a2), mode) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1), In(ty2, a2), mode)])
+        let J(c, ty, mode) = j;
+        switch(normalize(ty)) {
+        | In(Arrow(_, _, ty1, ty2), a2) => Ok([J(c, In(ty1, Prop), Red), J(Cons(c, x, ty1), In(ty2, a2), mode)])
         | _ => Error("prop_arrow_formation failure")
         }
     })
@@ -167,8 +168,9 @@ module PartialDerivation : {
     })
 
     let implies_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
-        switch(j) {
-        | J(c, Arrow(_, _, p1, p2), mode) => Ok([J(c, In(p1, Prop), Red), J(Cons(c, x, p1), p2, mode)])
+        let J(c, ty, mode) = j;
+        switch(normalize(ty)) {
+        | Arrow(_, _, p1, p2) => Ok([J(c, In(p1, Prop), Red), J(Cons(c, x, p1), p2, mode)])
         | _ => Error("implies_introduction failure")
         }
     })
@@ -181,8 +183,9 @@ module PartialDerivation : {
     })
 
     let forall_introduction (s : t, x : name) : result(t, error) = refine(s, j => {
-        switch(j) {
-        | J(c, Arrow(_, _, t1, p2), mode) => Ok([J(c, In(t1, Typ), Red), J(Cons(c, x, t1), p2, mode)])
+        let J(c, ty, mode) = j;
+        switch(normalize(ty)) {
+        | Arrow(_, _, t1, p2) => Ok([J(c, In(t1, Typ), Red), J(Cons(c, x, t1), p2, mode)])
         | _ => Error("forall_introduction failure")
         }
     })
@@ -259,11 +262,24 @@ module PartialDerivation : {
     })
 }
 
-let goal(s : PartialDerivation.t) : judgment = Result.get_ok(PartialDerivation.focused(s));
-let goal_tuple(s : PartialDerivation.t) : (ctx, tm, mode) = tuple_of_judgment(goal(s));
-let goal_ctx(s : PartialDerivation.t) : ctx = ctx_of_judgment(goal(s));
-let goal_type(s : PartialDerivation.t) : tm = type_of_judgment(goal(s));
-let goal_mode(s : PartialDerivation.t) : mode = mode_of_judgment(goal(s));
+open PartialDerivation
 
-let string_of_goal_ctx(s : PartialDerivation.t) = string_of_ctx(goal_ctx(s));
-let string_of_goal_type(s : PartialDerivation.t) = string_of_term(goal_ctx(s), goal_type(s));
+let goal(s : t) : judgment = Result.get_ok(focused(s));
+let goal_tuple(s : t) : (ctx, tm, mode) = tuple_of_judgment(goal(s));
+let goal_ctx(s : t) : ctx = ctx_of_judgment(goal(s));
+let goal_type(s : t) : tm = type_of_judgment(goal(s));
+let goal_mode(s : t) : mode = mode_of_judgment(goal(s));
+
+let string_of_goal_ctx(s : t) = string_of_ctx(goal_ctx(s));
+let string_of_goal_type(s : t) = string_of_term(goal_ctx(s), goal_type(s));
+let rec string_of_goal_types(s : t) = {
+    switch(skip(s)) {
+    | Ok(s') => string_of_term(goal_ctx(s), goal_type(s)) ++ {
+        switch(skip(s')) {
+        | Ok(_) => "\n\n > " ++ string_of_goal_types(s')
+        | Error(_) => ""
+        }
+    }
+    | Error(_) => ""
+    }
+}

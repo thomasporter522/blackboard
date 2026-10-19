@@ -123,6 +123,7 @@ let demo :=
   | TYPEOF; x = ID; { HypTyp (x, Obvious) }
   | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
   | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
-  | DIRECT; d = demo; { Tactic (Direct, d :: []) }
+  | DIRECT; d1 = demo_atom; d2 = demo; { Tactic (Direct, d1 :: d2 :: []) }
+  | DIRECT; d = demo_atom; { Tactic (Direct, d :: []) }
   | WITNESS; t = atom; d = demo; { Tactic (Witness(t), d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }
