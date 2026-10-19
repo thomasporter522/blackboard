@@ -1,46 +1,93 @@
-assume 
-eq : (A : type) -> (a b : A) -> prop,
+construct 
+and (p1 p2 : prop) : prop,
+andi : (p1 p2 : prop) -> p1 -> p2 -> and p1 p2,
+ande : (p1 p2 : prop) -> (h : and p1 p2) -> (M : prop) -> (p1 -> p2 -> M) -> M,
+by 
+witness ((p1 : prop) => (p2 : prop) => ((M : prop) -> (h : (p1 -> p2 -> M)) -> M)),
+direct (
+    givenall
+    given h1 : p1, 
+    given h2 : p2, 
+    givenall
+    h h1 h2
+)
+direct (
+    givenall 
+    h @ M
+)
+
+
+construct 
+exists (A : type) (P : A -> prop) : prop,
+existsi : (A : type) -> (P : A -> prop) -> (a : A) -> (h : P a) -> exists A P,
+existse : (A : type) -> (P : A -> prop) -> (h : exists A P) -> (M : prop) -> ((a : A) -> (h : P a) -> M) -> M,
+by 
+witness ((A : type) => (P : A -> prop) => ((M : prop) -> ((a : A) -> (h : P a) -> M) -> M)),
+direct (
+    givenall
+    given e : (a : A) -> (h : P a) -> M,
+    e @ a h
+)
+direct (
+    given A : type, 
+    given P : A -> prop, 
+    given h : (M : prop) -> ((a : A) -> (h : P a) -> M) -> M,
+    h
+)
+
+construct 
+eq (A : type) (a b : A) : prop, 
 refl : (A : type) -> (a : A) -> eq A a a,
-subst : (A : type) -> 
-    (P : A -> prop) -> 
-    (a b : A) -> 
-    (h : eq A a b) -> 
-    (P[a]) -> (P[b]),
-valid by check
+subst : (A : type) -> (a b : A) -> (P : A -> prop) -> (q : eq A a b) -> (h : P a) -> P b,
+by 
+witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> P b),
+direct (
+    givenall 
+    h
+)
+direct (
+    given A : type, 
+    given a : A, 
+    given b : A, 
+    given P : A -> prop, 
+    given q : (P : A -> prop) -> (h : P a) -> P b, 
+    q @ P
+)
 
 construct 
-trans : (A : type) -> (a b c : A) -> (e1 : eq A a b) -> (e2 : eq A b c) -> eq A a c
+sym : (A : type) -> (a b : A) -> (h : eq A a b) -> eq A b a
 by 
-direct 
-givenall
-subst @ A @ ((x : A) => eq A a x) @ b @ c e2 e1
-
-construct 
-cast : (P Q : prop) -> (h : eq prop P Q) -> (p : P) -> Q
-by 
-direct 
+direct (
 givenall 
-subst @ prop @ ((P : prop) => P) @ P @ Q h p
-
-assume 
-sub : (A B : type) -> prop, 
-sub-eq : (A B : type) -> eq prop (sub A B) ((a : A) -> a :: B)
-valid by check
+subst @ A @ a @ b @ ((x : A) => eq A x a) h (refl @ A @ a)
+)
 
 construct 
-sub-cast : (A B : type) -> (h : sub A B) -> (a : A) -> a :: B
+existsforall : (A B : type) -> (P : A -> B -> prop) -> 
+    (h : exists A ((a : A) => (b : B) -> P a b)) ->
+    (b : B) -> exists A ((a : A) => P a b)
 by 
-direct
-given A : type, 
-given B : type,
-cast @ (sub A B) @ ((a : A) -> a :: B) (sub-eq @ A @ B)
+direct (
+    givenall 
+    (existse @ A @ ((a : A) => ((b : B) -> P a b)) h) 
+    @ (exists A ((a : A) => P a b)) (
+        givenall
+        existsi @ A @ ((a : A) => P a b) @ a (h @ b)
+    )
+)
+
+construct 
+sub (A B : type) : prop, 
+sub-eq : (A B : type) -> eq prop (sub A B) ((x : A) -> x :: B)
+by
+definition
 
 assume 
 small : type -> prop,
 pi-small : 
     (A : type) -> (sA : small A) -> 
-    (B : (a : A) -> type) -> (sB : (a : A) -> small (B[a])) -> 
-    small ((a : A) -> B[a]),
+    (B : (a : A) -> type) -> (sB : (a : A) -> small (B a)) -> 
+    small ((a : A) -> B a),
 abs-id : (X : type) -> (sX : small X) -> (x : X) -> X,
 abs-id-eq : (X : type) -> (sX : small X) -> (x : X) -> eq X (abs-id X . x) x,
 abs-k : (X A : type) -> (sX : small X) -> (sA : small A) -> (a : A) -> (x : X) -> A,
@@ -56,6 +103,12 @@ nat-small : small nat,
 zero : nat, 
 suc : nat -> nat,
 valid by check
+
+construct 
+addtwo : nat -> nat, 
+addtwo-eq : (n : nat) -> eq nat (addtwo n) (suc (suc n))
+by
+?
 
 construct 
 addtwo : nat -> nat, 

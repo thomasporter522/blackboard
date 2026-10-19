@@ -124,5 +124,6 @@ let demo :=
   | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
   | DIRECT; d1 = demo_atom; d2 = demo; { Tactic (Direct, d1 :: d2 :: []) }
   | DIRECT; d = demo_atom; { Tactic (Direct, d :: []) }
-  | WITNESS; t = atom; d = demo; { Tactic (Witness(t), d :: []) }
+  | WITNESS; t = atom; COMMA; d = demo; { Tactic (Witness(t), Obvious :: d :: []) }
+  | WITNESS; t = atom; VALID; BY; d1 = demo; COMMA; d2 = demo; { Tactic (Witness(t), d1 :: d2 :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

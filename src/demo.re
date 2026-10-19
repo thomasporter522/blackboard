@@ -554,7 +554,8 @@ let witness(s : t, a : tm) : result(t, error) = {
     let* s = at_ty(s, portal_ty, a);
     let* s = hyp_prop(s, portal);
     let* s = check(s);
-    let* s = check(s);
+    let premise1 = 2;
+    let* s = hyp_prop(s, premise1);
     let* s = check(s);
     Ok(s)
 }
@@ -592,6 +593,7 @@ let cooler_definition(s : t) : result(t, error) = {
         let* refl = find_refl(goal_ctx(s), eq-2, eq-2);
         let xwitness = build_witness(args, body);
         let* s = witness(s, xwitness);
+        let* s = obvious(s);
         let* s = better_direct(s);
         let* s = givenall(s);
         let refl = refl + List.length(args);
@@ -738,11 +740,12 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         | _ => skip_and_error(s, "wrong number of args to direct")
     }
     | Tactic(Witness(a), ds) => switch(ds) {
-        | [d] =>
+        | [d1, d2] =>
             let c = goal_ctx(s);
             let a_elab = tm_of_surface(c, a);
             let-& s = (s, witness(s, a_elab));
-            check_demo(s, d)
+            let-* s = check_demo(s, d1);
+            check_demo(s, d2)
         | _ => skip_and_error(s, "wrong number of args to witness")
     }
     | Tactic(GivenAll, ds) => switch(ds) {
