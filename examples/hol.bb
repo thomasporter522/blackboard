@@ -12,10 +12,8 @@ direct (
     h h1 h2
 )
 direct (
-    given p1 : prop,
-    given p2 : prop, 
-    given h : (M : prop) -> (h : p1 -> p2 -> M) -> M,
-    h
+    givenall 
+    h @ M
 )
 
 
@@ -37,22 +35,55 @@ direct (
     h
 )
 
-
-
 construct 
 eq (A : type) (a b : A) : prop, 
 refl : (A : type) -> (a : A) -> eq A a a,
-subst : (A : type) -> (a b : A) -> (q : eq A a b) -> (P : A -> prop) -> (h : P a) -> P b,
+subst : (A : type) -> (a b : A) -> (P : A -> prop) -> (q : eq A a b) -> (h : P a) -> P b,
 by 
-witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> (M : prop) -> ((h2 : P b) -> M) -> M)
+witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> P b)
 direct (
     givenall 
-    given e : (pa : P a) -> M,
-    e h
+    h
 )
 direct (
-    givenall
-    claim c : (M : prop) -> ((h2 : P b) -> M) -> M by q @ P h, 
-    claim c : ((h2 : P b) -> P b) -> P b by c @ (P b), 
-    ?
+    given A : type, 
+    given a : A, 
+    given b : A, 
+    given P : A -> prop, 
+    given q : (P : A -> prop) -> (h : P a) -> P b, 
+    q @ P
 )
+
+construct 
+sym : (A : type) -> (a b : A) -> (h : eq A a b) -> eq A b a
+by 
+direct (
+givenall 
+subst @ A @ a @ b @ ((x : A) => eq A x a) h (refl @ A @ a)
+)
+
+construct 
+existsforall : (A B : type) -> (P : A -> B -> prop) -> 
+    (h : exists A ((a : A) => (b : B) -> P a b)) ->
+    (b : B) -> exists A ((a : A) => P a b)
+by 
+direct (
+    givenall 
+    (existse @ A @ ((a : A) => ((b : B) -> P a b)) h) 
+    @ (exists A ((a : A) => P a b)) (
+        givenall
+        existsi @ A @ ((a : A) => P a b) @ a (h @ b)
+    )
+)
+
+assume 
+thing : type, 
+boo : thing
+valid by check
+
+construct 
+sub (A B C : type) : thing, 
+sub-eq : (A B C : type) -> eq thing (sub A B C) boo
+by
+witness ((A B C : type) => boo)
+?

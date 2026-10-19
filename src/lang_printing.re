@@ -34,7 +34,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     | Typ => "type"
     | In(a, ty) => {
         if (lp >= fst(colon_prec) || rp >= 5) { wrap(c, outer_a) } else {
-            prec_string_of_term(lp, fst(colon_prec), c, a) ++ " : " ++ prec_string_of_term(snd(colon_prec), rp,c, ty)
+            prec_string_of_term(lp, fst(colon_prec), c, a) ++ " :: " ++ prec_string_of_term(snd(colon_prec), rp,c, ty)
         }
     }
     | Arrow(st, x, ty1, ty2) => 

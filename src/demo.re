@@ -4,6 +4,7 @@ open Deriv.PartialDerivation
 open Deriv
 
 let probe(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_type(s));
+let probes(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_types(s));
 
 type surface_tm = 
     | SurfaceProp 
@@ -181,6 +182,11 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
 // inverse of wk(_)
 let invert_wk(a : tm) : result(tm, error) = invert_wkn(0, a)
 
+
+let codomain(t : tm) : result(tm, error) = switch(t) {
+    | Arrow(_, _, _, t') => invert_wk(t');
+    | _ => Error("not an arrow")
+}
 
 let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : result((strength, name, tm, tm), error) = {
     switch(tds) {
@@ -409,6 +415,16 @@ let given(s : t, x) : result(t, error) = {
     }
 }
 
+let rec givenall(s : t) : result(t, error) = 
+    switch(headnormalize(goal_type(s))) {
+    | Arrow(_, x, _, _) when x != "_" => {
+        let* s = given(s, x);
+        let* s = obvious(s);
+        givenall(s)
+    }
+    | _ => Ok(s)
+}
+
 let given_type(s : t, x, ty_elab) : result(t, error) = {
     switch(goal_type(s)) {
     | Arrow(_, _, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
@@ -416,23 +432,23 @@ let given_type(s : t, x, ty_elab) : result(t, error) = {
     }
 }
 
-// if the goal is (M : prop) -> (A -> M) -> M, refines to goal A.
-let direct(s : t) : result(t, error) = {
-    let* s = forall_introduction(s, "M");
-    let* s = obvious(s);
-    let* s = implies_introduction(s, "h");
-    let* s = obvious(s);
-    let c = goal_ctx(s);
-    let* target = switch(lookup_index(c, 0)) {
-        | Ok(Arrow(_, _, ty_a, _)) => Ok(ty_a) 
-        | _ => Error("cannot prove directly")
-    };
-    let* s = implies_elimination(s, target);
-    let* s = assumed(s);
-    let* s = weaken_goal(s);
-    let* s = weaken_goal(s);
-    Ok(s)
-}
+// // if the goal is (M : prop) -> (A -> M) -> M, refines to goal A.
+// let direct(s : t) : result(t, error) = {
+//     let* s = forall_introduction(s, "M");
+//     let* s = obvious(s);
+//     let* s = implies_introduction(s, "h");
+//     let* s = obvious(s);
+//     let c = goal_ctx(s);
+//     let* target = switch(lookup_index(c, 0)) {
+//         | Ok(Arrow(_, _, ty_a, _)) => Ok(ty_a) 
+//         | _ => Error("cannot prove directly")
+//     };
+//     let* s = implies_elimination(s, target);
+//     let* s = assumed(s);
+//     let* s = weaken_goal(s);
+//     let* s = weaken_goal(s);
+//     Ok(s)
+// }
 
 let empty_direct(s : t) : result(t, error) = {
     switch(goal_type(s)) {
@@ -505,6 +521,7 @@ let better_direct(s : t) : result(t, error) = {
 
 // if the goal is (M : prop) -> ((x : A) -> SIG -> M) -> M, refines to goals a : A and (M : prop) -> (SIG[a/x] -> M) -> M.
 let witness(s : t, a : tm) : result(t, error) = {
+    print_endline("begu...");
     let* (tyA, rest) = switch(goal_type(s)) {
         | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyA, rest), Var(1))) => Ok((tyA, rest))
         | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
@@ -513,8 +530,11 @@ let witness(s : t, a : tm) : result(t, error) = {
     let* s = cut(s, "premise2", newgoal);
     let* s = swap(s);
     let a = wk(a);
+    probes(s);
+    print_endline(">>>>>" ++ string_of_term(goal_ctx(s), tyA));
     let* strA = invert_wk(tyA);
-    let* s = cut(s, "premise1", In(a, strA));
+    let* s = cut(s, "premise1", In(a, tyA));
+    probes(s);
     let* s = weaken_goal(s);
     let* s = swap(s);
     let a = wk(a);
@@ -535,12 +555,17 @@ let witness(s : t, a : tm) : result(t, error) = {
     let* s = hyp_prop(s, premise2);
     let* s = check(s);
     let portal = 0;
+    print_endline("asdf");
     let* portal_ty = lookup_index(goal_ctx(s), portal);
     let* s = at_ty(s, portal_ty, a);
     let* s = hyp_prop(s, portal);
+    print_endline("c1");
     let* s = check(s);
+    print_endline("c23");
     let* s = check(s);
+    print_endline("c3");
     let* s = check(s);
+    print_endline("all done");
     Ok(s)
 }
 
@@ -550,29 +575,47 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
         | Ok(Arrow(_, _, Typ, Arrow(_, _, Var(0), 
             Ap(Ap(Ap(Var(eq'), Var(1)), Var(0)), Var(0)))))
             when eq == eq'-2  => Ok(current)
-        | _ => find_refl(c, eq, current-1)
+        | _ when current > 0 => find_refl(c, eq, current-1)
+        | _ => failwith("out of range")
         } 
     } { | _ => Error("couldn't find refl") }
 }
 
-let cooler_definition(s : t) : result(t, error) = {
-    let (c, ty, _) = goal_tuple(s);
-    switch(ty) {
-    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, xname, ty, Arrow(_, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
-        let* str_ty = invert_wk(ty);
-            let* str_ty' = invert_wk(ty');
-            let* str_str_ty' = invert_wk(str_ty');
-            if (equiv(str_ty, str_str_ty')) { 
-                // let* refl = find_refl(c, eq-2, eq-2);
-                // let my_subdemo = Use(ElabAt(ElabHypProp(0, Obvious), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2, Obvious), wk(ty), Obvious), xthing, Obvious))
-                // let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(Weak, xname, ty, Arrow(Weak, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
-                // simplify(check_demo(s, my_demo))
-                failwith("todo")
-            } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }
-    }
-    | _ => Error("wrong shape for definition")
-    }
-}
+// let cooler_definition(s : t) : result(t, error) = {
+//     let rec dissect_eq_ty(eq_ty : tm) : result((list((name, tm)), (int, tm, tm)), error) = switch(eq_ty) {
+//         | Ap(Ap(Ap(Var(eq), ty'), _), body) => Ok(([], (eq, ty', body)))
+//         | Arrow(_, x, ty1, eq_ty') => {
+//             let* (args, (eq, ty', body)) = dissect_eq_ty(eq_ty');
+//             // let* body' = invert_wk(body);
+//             Ok(([(x, ty1), ... args], (eq-1, ty', body)))
+//         }
+//         | _ => Error("wrong eq_ty")
+//     };
+//     let rec build_witness(args : list((name, tm)), body : tm) = switch(args) {
+//         | [] => body 
+//         | [(x, ty), ...args'] => Lam(x, ty, build_witness(args', body))
+//     }
+//     let (c, ty, _) = goal_tuple(s);
+//     switch(ty) {
+//     | Arrow(_, _, Prop, Arrow(_, _, Arrow(Weak, xname, ty, Arrow(Weak, xeq, eq_ty, Var(2))), Var(1))) => {
+//         let* eq_ty = invert_wkn(1, eq_ty);
+//         let* eq_ty = invert_wkn(1, eq_ty);
+//         let* (args, (eq, ty', body)) = dissect_eq_ty(eq_ty);
+//         let* refl = find_refl(goal_ctx(s), eq-2, eq-2);
+//         let xwitness = build_witness(args, body);
+//         let* s = witness(s, xwitness);
+//         let* s = better_direct(s);
+//         let* s = givenall(s);
+//         let refl = refl + List.length(args);
+//         print_endline(string_of_term(goal_ctx(s), Var(refl)));
+//         let* refl_ty = lookup_index(goal_ctx(s), refl);
+//         print_endline("hy" ++ string_of_term(goal_ctx(s), ty'));
+//         // let* s = unfurl_assumption(s, refl_ty, [Forall(ty)])
+//         failwith("todo")
+//     }
+//     | _ => Error("wrong shape for definition")
+//     }
+// }
 
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
@@ -712,14 +755,16 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
-            switch(headnormalize(goal_type(s))) {
-            | Arrow(_, x, _, _) when x != "_" => {
-                let-& s = (s, given(s, x));
-                let-* s = check_demo(s, Obvious);
-                check_demo(s,  Tactic(GivenAll, [d]));
-            }
-            | _ => check_demo(s, d)
-            }
+            let-& s = (s, givenall(s));
+            check_demo(s, d)
+            // switch(headnormalize(goal_type(s))) {
+            // | Arrow(_, x, _, _) when x != "_" => {
+            //     let-& s = (s, given(s, x));
+            //     let-* s = check_demo(s, Obvious);
+            //     check_demo(s,  Tactic(GivenAll, [d]));
+            // }
+            // | _ => check_demo(s, d)
+            // }
         | _ => skip_and_error(s, "wrong number of args to givenall")
     }
 }
