@@ -35,3 +35,21 @@ direct (
     given h : (M : prop) -> ((a : A) -> (h : P [a]) -> M) -> M,
     h
 )
+
+construct 
+eq (A : type) (a b : A) : prop, 
+refl : (A : type) -> (a : A) -> ((eq [A]) [a]) [a],
+subst : (A : type) -> (a b : A) -> (q : ((eq [A]) [a]) [b]) -> (P : A -> prop) -> (h : P [a]) -> (M : prop) -> ((h2 : P [b]) -> M) -> M,
+by 
+witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P [a]) -> (M : prop) -> ((h2 : P [b]) -> M) -> M)
+direct (
+    givenall 
+    given e : (pa : P[a]) -> M,
+    e h
+)
+direct (
+    given a : type, 
+    given a : A,
+    given b : A,
+    given b : A,
+)
