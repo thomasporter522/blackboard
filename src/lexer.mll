@@ -43,6 +43,7 @@ rule read =
   | "check" { CHECK }
   | "definition" { DEFINITION }
   | "direct" { DIRECT }
+  | "witness" { WITNESS }
   | "givenall" { GIVENALL }
   | id { ID (Lexing.lexeme lexbuf) }
   | eof { EOF }

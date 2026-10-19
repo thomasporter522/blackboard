@@ -25,7 +25,7 @@ let ap_prec = (20, 21)
 
 let string_of_strength(s : strength) : string = switch(s) {
     | Strong => " |- "
-    | Weak => " ->"
+    | Weak => " -> "
 }
 
 let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string = {

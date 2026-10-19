@@ -42,6 +42,7 @@ open Program
 %token CHECK "check"
 %token DEFINITION "definition"
 %token DIRECT "direct"
+%token WITNESS "witness"
 %token GIVENALL "givenall"
 
 %start <Program.surface_program> prog
@@ -53,10 +54,23 @@ let prog :=
   | CONSTRUCT; s = signature; BY; d = demo; p = prog; { Construct (s, d, p) }
   | PROVE; t = term; BY; d = demo; p = prog; { Prove (t, d, p) }
 
+let id_list := 
+  | x = ID; { [x] }
+  | x = ID; xs = id_list; { x :: xs }
+
+let sigarg := 
+  | LPAREN; xs = id_list; COLON; t = term; RPAREN; { (xs, t) }
+
+let sigargs := 
+  | s = sigarg; { s :: [] }
+  | s = sigarg; ss = sigargs; { s :: ss }
+
 let signature := 
   | { [] }
-  | x = ID; COLON; t = term; { (x, t) :: [] }
-  | x = ID; COLON; t = term; COMMA; s = signature; { (x, t) :: s }
+  | x = ID; COLON; t = term; { (x, [], t) :: [] }
+  | x = ID; COLON; t = term; COMMA; s = signature; { (x, [], t) :: s }
+  | x = ID; a = sigargs; COLON; t = term; { (x, a, t) :: [] }
+  | x = ID; a = sigargs; COLON; t = term; COMMA; s = signature; { (x, a, t) :: s }
 
 let atom := 
   | x = ID; { SurfaceVar x }
@@ -68,10 +82,6 @@ let atom_list :=
   | x = atom; { x }
   | t = atom_list; PERIOD; { SurfaceUnguard(t) }
   | t1 = atom_list; t2 = atom; { SurfaceLaxAp (t1, t2) }
-
-let id_list := 
-  | x = ID; { [x] }
-  | x = ID; xs = id_list; { x :: xs }
 
 let term :=
   | LPAREN; xs = id_list; COLON; t1 = term; RPAREN; ARROW; t2 = term; { SurfaceArrow (Weak, xs, t1, t2) }
@@ -114,4 +124,5 @@ let demo :=
   | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
   | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
   | DIRECT; d = demo; { Tactic (Direct, d :: []) }
+  | WITNESS; t = atom; d = demo; { Tactic (Witness(t), d :: []) }
   | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }

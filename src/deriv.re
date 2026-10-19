@@ -264,3 +264,6 @@ let goal_tuple(s : PartialDerivation.t) : (ctx, tm, mode) = tuple_of_judgment(go
 let goal_ctx(s : PartialDerivation.t) : ctx = ctx_of_judgment(goal(s));
 let goal_type(s : PartialDerivation.t) : tm = type_of_judgment(goal(s));
 let goal_mode(s : PartialDerivation.t) : mode = mode_of_judgment(goal(s));
+
+let string_of_goal_ctx(s : PartialDerivation.t) = string_of_ctx(goal_ctx(s));
+let string_of_goal_type(s : PartialDerivation.t) = string_of_term(goal_ctx(s), goal_type(s));

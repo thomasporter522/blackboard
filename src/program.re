@@ -1,7 +1,9 @@
 open Lang
 open Demo
 
-type surface_signature = list((name, surface_tm))
+type arg_chunk = (list(name), surface_tm)
+
+type surface_signature = list((name, list(arg_chunk), surface_tm))
 // type signature = list((name, tm))
 
 type surface_program = 
@@ -26,10 +28,15 @@ type program =
 //     }
 // }
 
+let rec form_strong_arrow(a : list(arg_chunk), ty : surface_tm) : surface_tm = switch(a) {
+    | [] => ty 
+    | [(xs, ty1), ... a'] => SurfaceArrow(Strong, xs, ty1, form_strong_arrow(a', ty))
+}
+
 let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx = switch(s) {
     | [] => c
-    | [(x, ty),...s'] => {
-        let ty_elab = tm_of_surface(c, ty);
+    | [(x, a, ty),...s'] => {
+        let ty_elab = tm_of_surface(c, form_strong_arrow(a, ty));
         let c' = Cons(c, x, ty_elab);
         extend_context_surface_signature(c', s');
     }
@@ -37,8 +44,8 @@ let rec extend_context_surface_signature(c : ctx, s : surface_signature) : ctx =
 
 let rec ty_arrow_of_surface_signature(c : ctx, s : surface_signature, depth : int) : tm = switch(s){
     | [] => Var(depth)
-    | [(x, ty),...s'] => {
-        let ty_elab = tm_of_surface(c, ty);
+    | [(x, a, ty),...s'] => {
+        let ty_elab = tm_of_surface(c, form_strong_arrow(a, ty));
         let c' = Cons(c, x, ty_elab);
         Arrow(Weak, x, ty_elab, ty_arrow_of_surface_signature(c', s', depth+1))
     }

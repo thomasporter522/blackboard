@@ -21,6 +21,7 @@ type schema =
 type tactic = 
     | Check
     | Direct
+    | Witness(surface_tm)
     | GivenAll
     | Schema(schema)
 
@@ -264,6 +265,55 @@ let weaken_goal(s : t) : result(t, error) = {
 }
 
 
+let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
+    switch(ty1) {
+    | Arrow(_, x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
+    | _ => Error("Cannot 'at' non-arrow type")
+    }
+
+// let rec multi_at_ty(s : t, ty : tm, a_list : list(tm)) : result(t, error) = 
+//     switch(a_list) {
+//     | [] => Ok(s)
+//     | [a, ... a_list'] =>
+//         let* ty' = switch(ty) {
+//         |  Arrow(_, _, _, ty_2) => Ok(subst(a, ty_2))
+//         | _ => Error("too many ats")
+//         };
+//         let* s = multi_at_ty(s, ty', a_list');
+//         at_ty(s, ty, a)
+//     }
+
+type unfurl_step = 
+    | Forall(tm, t => result(t, error))
+    | Implies
+
+let rec unfurl_assumption(s : t, ty : tm, steps : list(unfurl_step)) : result(t, error) = switch(steps) {
+    | [] => Ok(s)
+    | [Forall(a, checker), ... steps'] => 
+        let* (x, ty_1, ty_2) = switch(ty) {
+        |  Arrow(_, x, ty_1, ty_2) => Ok((x, ty_1, ty_2))
+        | _ => Error("can't unfurl_assumption")
+        };
+        let* s = unfurl_assumption(s, subst(a, ty_2), steps');
+        // print_endline("and now for FA")
+        let* s = forall_elimination(s, x, ty_1, ty_2, a);
+        print_endline("checkering");
+        let* s = swap(s);
+        let* s = checker(s);
+        print_endline("checkered");
+        Ok(s)
+    | [Implies, ... steps'] => 
+        let* (_, ty_1, ty_2) = switch(ty) {
+        |  Arrow(_, x, ty_1, ty_2) => Ok((x, ty_1, ty_2))
+        | _ => Error("can't unfurl_assumption")
+        };
+        let* s = unfurl_assumption(s, wk(ty_2), steps');
+        let* s = implies_elimination(s, ty_1);
+        // print_endline("look ma, MP");
+        // print_endline("now the goal is: " ++ string_of_goal_type(s));
+        Ok(s)
+}
+
 // tries to discharge goals of the form `t : T`
 let rec check(s : t) : result(t, error) = {
     let (c, ty_goal, _) = goal_tuple(s);
@@ -377,11 +427,55 @@ let direct(s : t) : result(t, error) = {
     Ok(s)
 }
 
-let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
-    switch(ty1) {
-    | Arrow(_, x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
-    | _ => Error("Cannot 'at' non-arrow type")
-    }
+// if the goal is (M : prop) -> ((x : A) -> SIG -> M) -> M, refines to goals a : A and (M : prop) -> (SIG[a/x] -> M) -> M.
+let witness(s : t, a : tm) : result(t, error) = {
+    let* (tyA, rest) = switch(goal_type(s)) {
+        | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyA, rest), Var(1))) => Ok((tyA, rest))
+        // | Arrow(Weak, "M", Prop, Arrow(Weak, "h", _, Var(1))) => failwith("huh1?")
+        // | Arrow(Weak, "M", Prop, Arrow(Weak, "h", _, _)) => failwith("huh12?")
+        // | Arrow(Weak, "M", Prop, Arrow(_, "h", _, _)) => failwith("huh12?")
+        // | Arrow(Weak, "M", Prop, _) => failwith("huh2?")
+        | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
+    };
+    let newgoal = Arrow(Weak, "M", Prop, Arrow(Weak, "h", subst(wk(a), rest), Var(1)));
+    let* s = cut(s, "premise2", newgoal);
+    let* s = swap(s);
+    let a = wk(a);
+    let* strA = invert_wk(tyA);
+    let* s = cut(s, "premise1", In(a, strA));
+    // print_endline("NEW GOAL" ++ string_of_term(goal_ctx(s), goal_type(s)));
+    let* s = weaken_goal(s);
+    // print_endline("asfd");
+    let* s = swap(s);
+    // let a = wk(a);
+    // we now prove the goal using the premises
+    let* s = forall_introduction(s, "M");
+    let* s = obvious(s);
+    // let a = wk(a);
+    let* s = implies_introduction(s, "h");
+    let* s = obvious(s);
+    // let a = wk(a);
+    // let* s = forall_elimination(s, "x", wk(tyA), wk(rest), wk(wk(a)));
+    // print_endline(string_of_ctx(goal_ctx(s)));
+    let premise2 = 3;
+    let* premise2_ty = lookup_index(goal_ctx(s), premise2);
+    // print_endline("UNFURLIN \n\n" ++ string_of_term(goal_ctx(s), premise2_ty));
+    // print_endline("UNFURLIN \n\n" ++ string_of_term(goal_ctx(s), Var(1)));
+    let checker(s : t) = {
+        let* s = hyp_typ(s);
+        prop_formation(s)
+    };
+    let* s = unfurl_assumption(s, premise2_ty, [Forall(Var(1), checker), Implies]);
+    print_endline("unfurled!\n" ++ string_of_ctx(goal_ctx(s)));
+    print_endline("YAY goal is  \n\n" ++ string_of_goal_type(s));
+    // print_endline("YAY goalctx is  \n\n" ++ string_of_goal_ctx(s));
+    let* s = hyp_prop(s, premise2);
+    let* s = check(s);
+    print_endline("YAY goal1 is  \n\n" ++ string_of_goal_type(s));
+    // let* s' = skip(s);
+    // print_endline("YAY goal2 is  \n\n" ++ string_of_goal_type(s'));
+    Ok(s)
+}
 
 let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
@@ -516,6 +610,14 @@ let rec check_demo(s : t, d : demo) : (t, report) =
             let-& s = (s, direct(s));
             check_demo(s, d)
         | _ => skip_and_error(s, "wrong number of args to direct")
+    }
+    | Tactic(Witness(a), ds) => switch(ds) {
+        | [d] =>
+            let c = goal_ctx(s);
+            let a_elab = tm_of_surface(c, a);
+            let-& s = (s, witness(s, a_elab));
+            check_demo(s, d)
+        | _ => skip_and_error(s, "wrong number of args to witness")
     }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 

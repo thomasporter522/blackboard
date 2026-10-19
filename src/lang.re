@@ -135,7 +135,7 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Prop, Prop) => true 
     | (Typ, Typ) => true 
     | (In(a1, a2), In(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
-    | (Arrow(st1, _, a1, a2), Arrow(st2, _, a3, a4)) => st1 == st2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4) // && st1 == st2
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
@@ -159,7 +159,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Prop, Prop) => true 
         | (Typ, Typ) => true 
         | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        | (Arrow(st1, _, a1, a2), Arrow(st2, _, a3, a4)) => st1 == st2 && equiv(a1, a3) && equiv(a2, a4)
+        | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => equiv(a1, a3) && equiv(a2, a4) // && st1 == st2
         | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Var(x1), Var(x2)) => x1 == x2
         | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
