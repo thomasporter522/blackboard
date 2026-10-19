@@ -48,11 +48,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
             ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty), a) 
         }
     | Var(x) => string_of_var(c, x)
-    | Ap(Strict, a1, a2) => 
-        if (lp >= fst(strictap_prec)) { wrap(c, outer_a) } else {
-            prec_string_of_term(lp, fst(ap_prec), c, a1) ++ "[" ++ prec_string_of_term(snd(ap_prec), rp, c, a2) ++ "]"
-        }
-    | Ap(Lax, a1, a2) => 
+    | Ap(a1, a2) => 
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
             prec_string_of_term(lp, fst(ap_prec), c, a1) ++ " " ++ prec_string_of_term(snd(ap_prec), rp, c, a2)
         }

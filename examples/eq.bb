@@ -5,7 +5,7 @@ eq : (A : type) -> (a b : A) -> prop,
     (P : A -> prop) -> 
     (a b : A) -> 
     (h : eq A a b) -> 
-    (P[a]) -> (P[b]),
+    (P a) -> (P b),
 valid by
 check
 

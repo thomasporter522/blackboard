@@ -7,10 +7,6 @@ type arrow =
     | Pi 
     | Guard
 
-type strictness = 
-    | Strict 
-    | Lax
-
 type strength = 
     | Strong 
     | Weak
@@ -22,7 +18,7 @@ type tm =
     | Arrow(strength, name, tm, tm)
     | Lam(name, tm, tm)
     | Var(int)
-    | Ap(strictness, tm, tm)
+    | Ap(tm, tm)
     | Unguard(tm);
 
 type ctx = 
@@ -69,7 +65,7 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | Arrow(st, y, ty1, ty2) => Arrow(st, y, wkn(n, ty1), wkn(n+1, ty2))
     | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
     | Var(y) => Var(wknvar(n, y))
-    | Ap(s, a1, a2) => Ap(s, wkn(n, a1), wkn(n, a2))
+    | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
     | Unguard(a) => Unguard(wkn(n, a))
 }
 
@@ -89,7 +85,7 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | Arrow(st, y, ty1, ty2) => Arrow(st, y, substn(n, s, ty1), substn(n+1, s, ty2))
     | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
     | Var(y) => substnvar(n, s, y)
-    | Ap(r, a1, a2) => Ap(r, substn(n, s, a1), substn(n, s, a2))
+    | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
     | Unguard(a) => Unguard(substn(n, s, a))
 }
 
@@ -103,11 +99,10 @@ let rec headnormalize(t : tm) : tm = switch(t) {
     | Arrow(st, x, t1, t2) => Arrow(st, x, t1, t2)
     | Lam(x, t1, t2) => Lam(x, t1, t2)
     | Var(x) => Var(x)
-    | Ap(Lax, t1, t2) => Ap(Lax, t1, t2)
-    | Ap(Strict, t1, t2) => {
+    | Ap(t1, t2) => {
         switch(headnormalize(t1)) {
         | Lam(_, _, body) => headnormalize(subst(t2, body))
-        | _ => Ap(Strict, t1, t2)
+        | _ => Ap(t1, t2)
         }
     }
     | Unguard(t) => Unguard(t)
@@ -120,11 +115,10 @@ let rec normalize(t : tm) : tm = switch(t) {
     | Arrow(st, x, t1, t2) => Arrow(st, x, normalize(t1), normalize(t2))
     | Lam(x, t1, t2) => Lam(x, normalize(t1), normalize(t2))
     | Var(x) => Var(x)
-    | Ap(Lax, t1, t2) => Ap(Lax, normalize(t1), normalize(t2))
-    | Ap(Strict, t1, t2) => {
+    | Ap(t1, t2) => {
         switch(normalize(t1)) {
         | Lam(_, _, body) => normalize(subst(t2, body))
-        | t1' => Ap(Strict, t1', normalize(t2))
+        | t1' => Ap(t1', normalize(t2))
         }
     }
     | Unguard(t) => Unguard(normalize(t))
@@ -138,7 +132,7 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4) // && st1 == st2
     | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Var(x1), Var(x2)) => x1 == x2
-    | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && alphaequiv(a1, a3) && alphaequiv(a2, a4)
+    | (Ap(a1, a2), Ap(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Unguard(a1), Unguard(a2)) => alphaequiv(a1, a2)
     | (Prop, _) => false
     | (Typ, _) => false
@@ -162,7 +156,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => equiv(a1, a3) && equiv(a2, a4) // && st1 == st2
         | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Var(x1), Var(x2)) => x1 == x2
-        | (Ap(s1, a1, a2), Ap(s2, a3, a4)) => s1 == s2 && equiv(a1, a3) && equiv(a2, a4)
+        | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Unguard(a1), Unguard(a2)) => equiv(a1, a2)
         | (Prop, _) => false
         | (Typ, _) => false

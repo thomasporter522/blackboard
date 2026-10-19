@@ -222,19 +222,12 @@ module PartialDerivation : {
     //     }
     // })
 
-    // strict application in blue mode demands a strong arrow
-    let ap_strength(st : strictness, m : mode) : strength = switch(st, m) {
-        | (Lax, _) => Weak
-        | (Strict, Red) => Weak 
-        | (Strict, Blue) => Strong
-    }
-
     let ap (s : t, x : name, ty1 : tm, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Ap(st, a1, a2), ty_expected), mode) when (mode == Red || st == Lax) => {
+        | J(c, In(Ap(a1, a2), ty_expected), Red) => {
             let ty_found = subst(a2, ty2);
             if (equiv(ty_found, ty_expected))
-                Ok([J(c, In(a1, Arrow(ap_strength(st, mode), x, ty1, ty2)), mode), J(c, In(a2, ty1), mode)])
+                Ok([J(c, In(a1, Arrow(Weak, x, ty1, ty2)), Red), J(c, In(a2, ty1), Red)])
             else Error(
                 "ap failure: found = " 
                 ++ string_of_term(c, ty_found)
@@ -242,7 +235,7 @@ module PartialDerivation : {
                 ++ string_of_term(c, ty_expected)
             )
         } 
-        | J(_, In(Ap(st, _, _), _), mode) when !(mode == Red || st == Lax) => 
+        | J(_, In(Ap(_, _), _), Blue) => 
             Error("no strict applications except in assumptions!")
         | J(c, ty, _) => Error(
             "ap failure: goal = " 

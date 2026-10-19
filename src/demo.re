@@ -13,8 +13,7 @@ type surface_tm =
     | SurfaceLambda(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
     | SurfaceVar(name)
-    | SurfaceStrictAp(surface_tm, surface_tm)
-    | SurfaceLaxAp(surface_tm, surface_tm)
+    | SurfaceAp(surface_tm, surface_tm)
     | SurfaceUnguard(surface_tm);
 
 type schema = 
@@ -125,9 +124,8 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceLambda(xs, t1, t2)))
     | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow(Weak, "_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
-    | SurfaceStrictAp(t1, t2) => Ap(Strict, tm_of_surface(c, t1),tm_of_surface(c, t2));
+    | SurfaceAp(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
     | SurfaceVar(x) => Var(var_of_surface(c, x))
-    | SurfaceLaxAp(t1, t2) => Ap(Lax, tm_of_surface(c, t1),tm_of_surface(c, t2));
     | SurfaceUnguard(t) => Unguard(tm_of_surface(c, t));
 }
 
@@ -169,10 +167,10 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
         let* y' = invert_wknvar(n, y);
         Ok(Var(y'))
     }
-    | Ap(st, a1, a2) => {
+    | Ap(a1, a2) => {
         let* a1' = invert_wkn(n, a1);
         let* a2' = invert_wkn(n, a2);
-        Ok(Ap(st, a1', a2'))
+        Ok(Ap(a1', a2'))
     } 
     | Unguard(a) => {
         let* a' = invert_wkn(n, a);
@@ -247,7 +245,7 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     //         }   
     //     }
     | Var(x) => lookup_index(c, x)
-    | Ap(_, a1, a2) => switch(infer_typ(c, a1)) {
+    | Ap(a1, a2) => switch(infer_typ(c, a1)) {
         | Ok(Arrow(_, _, _, ty2)) => Ok(subst(a2, ty2))
         | Ok(_) => Error("Applied term does not have arrow type")
         | Error(e) => Error(e)
@@ -338,7 +336,7 @@ let rec check(s : t) : result(t, error) = {
         | In(Var(_), _) => 
             let* s = hyp_typ(s);
             check(s)
-        | In(Ap(st, a1, a2), ty_expected) => {
+        | In(Ap(a1, a2), ty_expected) => {
             switch(infer_typ(c, a1)) {
             | Ok(Arrow(_, x, ty1, ty2)) => {
                 switch(ap(s, x, ty1, ty2)) {
@@ -348,7 +346,7 @@ let rec check(s : t) : result(t, error) = {
                     Ok(s)
                 | Error(_) => 
                     let ty_found = subst(a2, ty2);
-                    Error("Failure checking: " ++ string_of_term(c, In(Ap(st, a1, a2), ty_expected)) ++ ". \n" ++ string_of_term(c, ty_found) ++ " \n≠ " ++ string_of_term(c, ty_expected));
+                    Error("Failure checking: " ++ string_of_term(c, In(Ap(a1, a2), ty_expected)) ++ ". \n" ++ string_of_term(c, ty_found) ++ " \n≠ " ++ string_of_term(c, ty_expected));
                 }
             }
             | _ => Error("applying a non-arrow")
@@ -544,7 +542,7 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     try { 
         switch(lookup_index(c, current)) {
         | Ok(Arrow(_, _, Typ, Arrow(_, _, Var(0), 
-            Ap(Lax, Ap(Lax, Ap(Lax, Var(eq'), Var(1)), Var(0)), Var(0)))))
+            Ap(Ap(Ap(Var(eq'), Var(1)), Var(0)), Var(0)))))
             when eq == eq'-2  => Ok(current)
         | _ => find_refl(c, eq, current-1)
         } 
@@ -704,20 +702,20 @@ let rec check_demo(s : t, d : demo) : (t, report) =
 and definition(s : t) : result(t, error) = {
     let (c, ty_goal, _) = goal_tuple(s);
     switch(ty_goal) {
-    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, xname, ty, Arrow(_, xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, xname, ty, Arrow(_, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Var(1))) => {
             let* str_ty = invert_wk(ty);
             let* str_ty' = invert_wk(ty');
             let* str_str_ty' = invert_wk(str_ty');
             if (equiv(str_ty, str_str_ty')) { 
                 let* refl = find_refl(c, eq-2, eq-2);
                 let my_subdemo = Use(ElabAt(ElabHypProp(0, Obvious), xthing, Obvious), ElabAt(ElabAt(ElabHypProp(refl+2, Obvious), wk(ty), Obvious), xthing, Obvious))
-                let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(Weak, xname, ty, Arrow(Weak, xeq, Ap(Lax, Ap(Lax, Ap(Lax, Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
+                let my_demo = ElabGiven("M", Prop, PropForm, ElabGiven("h", Arrow(Weak, xname, ty, Arrow(Weak, xeq, Ap(Ap(Ap(Var(eq), ty'), Var(0)), xthing), Var(2))), Tactic(Check, []), my_subdemo));
                 simplify(check_demo(s, my_demo))
             } else { Error("not a definition obligation: the term type does not match the equation type: " ++ string_of_term(c, str_ty) ++ " ≠ " ++ string_of_term(c, str_str_ty')) }
         }
-    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), Var(2))), _)) => Error("not a definition obligation: motive is not " ++ m)
-    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), Var(0)), _), _)), _)) => Error("not a definition obligation: inner motive is not " ++ m)
-    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Lax, Ap(Lax, Ap(Lax, Var(_), _), _), _), _)), _))  => Error("not a definition obligation: LHS of equation is not the declared object")
+    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Ap(Ap(Var(_), _), Var(0)), _), Var(2))), _)) => Error("not a definition obligation: motive is not " ++ m)
+    | Arrow(_, m, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Ap(Ap(Var(_), _), Var(0)), _), _)), _)) => Error("not a definition obligation: inner motive is not " ++ m)
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, Ap(Ap(Ap(Var(_), _), _), _), _)), _))  => Error("not a definition obligation: LHS of equation is not the declared object")
     | Arrow(_, _, Prop, Arrow(_, _, Arrow(_, _, _, Arrow(_, _, _, _)), _)) => Error("not a definition obligation: second component is not an equation")
     | _ => Error("not a definition obligation: not a construction with two components")
     }
