@@ -80,8 +80,13 @@ let string_of_judgment_short(j : judgment) : string = {
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
-    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, ty)
-    | Cons(c, x, ty) => string_of_ctx(c) ++ ",\n" ++ ctx_prefix(x) ++ string_of_term(c, ty)
+    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, normalize(ty))
+    | Cons(c, x, ty) => string_of_ctx(c) ++ ",\n" ++ ctx_prefix(x) ++ string_of_term(c, normalize(ty))
+}
+
+let string_of_mode(m : mode) : string = switch(m) {
+    | Red => "red"
+    | Blue => "blue"
 }
 
 let string_of_judgment(j : judgment) : string = {

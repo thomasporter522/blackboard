@@ -1,24 +1,28 @@
 open import Data.Nat renaming (ℕ to nat)
 open import Data.List hiding (ap)
 
-data term : Set where 
-    var : nat -> term 
-    mem : term -> term -> term 
-    typ : term 
-    pi : term -> term -> term 
-    ap : term -> term -> term 
+mutual 
+    data ctx : Set where 
+        emtpy : ctx 
+        cons : (c : ctx) -> term c -> ctx
 
-ctx : Set 
-ctx = List term
+    data var : ctx -> Set where 
+        z : ∀{c a} -> var (cons c a)
+        s : ∀{c a} -> var c -> var (cons c a)
 
-inctx : nat -> term -> ctx -> Set 
-inctx = {!   !}
+    data term (c : ctx) : Set where 
+        typ : term c 
+        prop : term c
+        mem : term c -> term c -> term c
+        strongarrow : (a : term c) -> term (cons c a) -> term c
+        arrow : (a : term c) -> term (cons c a) -> term c
+        lambda : (a : term c) -> term (cons c a) -> term c
+        x : var c -> term c
+        ap : term c -> term c -> term c
+        -- unguard : term c -> term c
 
-
-data _⊢_ : ctx -> term -> Set where 
-    Var : ∀{x T c} -> 
-        inctx x T c ->
-        c ⊢ mem (var x) T
-    ø : ∀{x T c} -> 
-        inctx x T c ->
-        c ⊢ mem (var x) T
+data ⊢x : (c : ctx) -> var c -> term c -> Set where 
+    XZ : {c : ctx} ->
+        {a : term c} -> 
+        (z : var (cons c a)) -> 
+        ⊢x (cons c a) z {! wk a !}

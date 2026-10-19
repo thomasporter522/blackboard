@@ -12,10 +12,8 @@ direct (
     h h1 h2
 )
 direct (
-    given p1 : prop,
-    given p2 : prop, 
-    given h : (M : prop) -> (h : p1 -> p2 -> M) -> M,
-    h
+    givenall 
+    h @ M
 )
 
 
@@ -37,22 +35,20 @@ direct (
     h
 )
 
-
-
 construct 
 eq (A : type) (a b : A) : prop, 
 refl : (A : type) -> (a : A) -> eq A a a,
 subst : (A : type) -> (a b : A) -> (q : eq A a b) -> (P : A -> prop) -> (h : P a) -> P b,
 by 
-witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> (M : prop) -> ((h2 : P b) -> M) -> M)
+witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> P b)
 direct (
     givenall 
-    given e : (pa : P a) -> M,
-    e h
+    h
 )
 direct (
-    givenall
-    claim c : (M : prop) -> ((h2 : P b) -> M) -> M by q @ P h, 
-    claim c : ((h2 : P b) -> P b) -> P b by c @ (P b), 
-    ?
+    given A : type, 
+    given a : A, 
+    given b : A, 
+    given q : (P : A -> prop) -> (h : P a) -> P b, 
+    q
 )

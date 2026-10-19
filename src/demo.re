@@ -266,13 +266,13 @@ let weaken_goal(s : t) : result(t, error) = {
 
 
 let mp_ty(s : t, ty1 : tm) : result(t, error) = 
-    switch(ty1) {
+    switch(headnormalize(ty1)) {
     | Arrow(_, _, ty_1, _) => implies_elimination(s, ty_1)
     | _ => Error("Cannot 'at' non-arrow type")
     }
 
 let at_ty(s : t, ty1 : tm, a : tm) : result(t, error) = 
-    switch(ty1) {
+    switch(headnormalize(ty1)) {
     | Arrow(_, x, ty_1, ty_2) => forall_elimination(s, x, ty_1, ty_2, a)
     | _ => Error("Cannot 'at' non-arrow type")
     }
@@ -317,15 +317,20 @@ let rec unfurl_assumption(s : t, ty : tm, steps : list(unfurl_step)) : result(t,
 
 // tries to discharge goals of the form `t : T`
 let rec check(s : t) : result(t, error) = {
-    let (c, ty_goal, _) = goal_tuple(s);
+    let (c, ty_goal, m) = goal_tuple(s);
+    let* s = switch(m, ty_goal) {
+        | (Blue, In(_, Prop)) => power_prop(s)
+        | (Blue, In(_, Typ)) => power_typ(s)
+        | _ => Ok(s)
+    }
     switch(ty_goal) {
         | In(Prop, _) => prop_formation(s)
         | In(Typ, _) => typ_formation(s)
         | In(Arrow(_, x, t1, _), _) => {
             let* s = 
                 switch(infer_typ(c, t1)) {
-                | Ok(Prop) => prop_arrow_formation(s, x)
-                | Ok(Typ) => typ_arrow_formation(s, x)
+                | Ok(Prop) => prop_arrow_formation(s, x);
+                | Ok(Typ) => typ_arrow_formation(s, x);
                 | Ok(_) => Error("arrow domain is not a prop or type")
                 | Error(e) => Error(e)
                 };
@@ -354,6 +359,7 @@ let rec check(s : t) : result(t, error) = {
         }
         | In(Lam(_), _) => 
             let* s = pi_introduction(s);
+            let* s = power_typ(s);
             let* s = check(s);
             let* s = check(s);
             Ok(s)
@@ -393,7 +399,7 @@ and assumed(s : t) : result (t, error) = {
 
 let given(s : t, x) : result(t, error) = {
     let (c, ty_goal, _) = goal_tuple(s);
-    switch(ty_goal) {
+    switch(headnormalize(ty_goal)) {
     | Arrow(_, _, ty1, _) => 
         switch(infer_typ(c, ty1)) {
         | Ok(Prop) => implies_introduction(s, x)
@@ -687,7 +693,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     }
     | Tactic(GivenAll, ds) => switch(ds) {
         | [d] => 
-            switch(goal_type(s)) {
+            switch(headnormalize(goal_type(s))) {
             | Arrow(_, x, _, _) when x != "_" => {
                 let-& s = (s, given(s, x));
                 let-* s = check_demo(s, Obvious);
