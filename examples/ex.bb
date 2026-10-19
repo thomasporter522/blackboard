@@ -63,11 +63,15 @@ subst @ A @ a @ b @ ((x : A) => eq A x a) h (refl @ A @ a)
 )
 
 construct 
-nat : type, 
-zero : nat, 
-suc (n : nat) : nat, 
+existsforall : (A B : type) -> (P : A -> B -> prop) -> 
+    (h : exists A ((a : A) => (b : B) -> P a b)) ->
+    (b : B) -> exists A ((a : A) => P a b)
 by 
-witness ((A : type) -> (A -> A) -> (A -> A))
-witness ((A : type) => (f : A -> A) => (a : A) => a)
-witness ((n : (A : type) -> (A -> A) -> (A -> A)) => (A : type) => (f : A -> A) => (a : A) => n A f (f a))
-?
+direct (
+    givenall 
+    (existse @ A @ ((a : A) => ((b : B) -> P a b)) h) 
+    @ (exists A ((a : A) => P a b)) (
+        givenall
+        existsi @ A @ ((a : A) => P a b) @ a (h @ b)
+    )
+)

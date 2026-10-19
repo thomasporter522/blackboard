@@ -21,8 +21,12 @@ mutual
         ap : term c -> term c -> term c
         -- unguard : term c -> term c
 
+wk : {c : ctx} -> (a : term c) -> term c -> term (cons c a)
+wk a t = {!   !}
+
 data ⊢x : (c : ctx) -> var c -> term c -> Set where 
     XZ : {c : ctx} ->
         {a : term c} -> 
         (z : var (cons c a)) -> 
-        ⊢x (cons c a) z {! wk a !}
+        ⊢x (cons c a) z (wk a a)
+    

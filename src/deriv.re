@@ -231,19 +231,17 @@ module PartialDerivation : {
         }
     })
 
-    // let arrow_elimination (s : t)  : result(t, error) = refine(s, j => {
-    //     switch(j) {
-    //     | J(Cons(c, x, ty_a), In(Unlam(x', t), ty_b)) when x == x' => Ok([J(c, In(t, Arrow(x, ty_a, ty_b)))])
-    //     | _ => Error("arrow_elimination failure")
-    //     }
-    // })
+    let strength_of_mode (m : mode) = switch(m) {
+        | Red => Weak
+        | Blue => Strong
+    }
 
     let ap (s : t, x : name, ty1 : tm, ty2 : tm) : result(t, error) = refine(s, j => {
         switch(j) {
-        | J(c, In(Ap(a1, a2), ty_expected), Red) => {
+        | J(c, In(Ap(a1, a2), ty_expected), m) => {
             let ty_found = subst(a2, ty2);
             if (equiv(ty_found, ty_expected))
-                Ok([J(c, In(a1, Arrow(Weak, x, ty1, ty2)), Red), J(c, In(a2, ty1), Red)])
+                Ok([J(c, In(a1, Arrow(strength_of_mode(m), x, ty1, ty2)), m), J(c, In(a2, ty1), m)])
             else Error(
                 "ap failure: found = " 
                 ++ string_of_term(c, ty_found)
@@ -251,8 +249,6 @@ module PartialDerivation : {
                 ++ string_of_term(c, ty_expected)
             )
         } 
-        | J(_, In(Ap(_, _), _), Blue) => 
-            Error("no strict applications except in assumptions!")
         | J(c, ty, _) => Error(
             "ap failure: goal = " 
             ++ string_of_term(c, ty)
