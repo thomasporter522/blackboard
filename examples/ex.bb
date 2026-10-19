@@ -1,20 +1,24 @@
-assume
+construct 
 eq (A : type) (a b : A) : prop, 
 refl : (A : type) -> (a : A) -> eq A a a,
 subst : (A : type) -> (a b : A) -> (P : A -> prop) -> (q : eq A a b) -> (h : P a) -> P b,
-valid by check
-
-assume 
-thing : type, 
-boo : thing
-valid by check
-
-construct 
-sub (A B C : type) : thing, 
-sub-eq : (A B C : type) -> eq thing (sub A B C) boo
-by
-witness ((A B C : type) => boo)
+by 
+witness ((A : type) => (a : A) => (b : A) => (P : A -> prop) -> (h : P a) -> P b)
 direct (
     givenall 
-    refl @ thing @ boo
+    h
 )
+direct (
+    given A : type, 
+    given a : A, 
+    given b : A, 
+    given P : A -> prop, 
+    given q : (P : A -> prop) -> (h : P a) -> P b, 
+    q @ P
+)
+
+construct 
+sub (A B : type) : prop, 
+sub-eq : (A B : type) -> eq prop (sub A B) ((x : A) -> x :: B)
+by
+definition

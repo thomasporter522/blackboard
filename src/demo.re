@@ -521,7 +521,6 @@ let better_direct(s : t) : result(t, error) = {
 
 // if the goal is (M : prop) -> ((x : A) -> SIG -> M) -> M, refines to goals a : A and (M : prop) -> (SIG[a/x] -> M) -> M.
 let witness(s : t, a : tm) : result(t, error) = {
-    print_endline("begu...");
     let* (tyA, rest) = switch(goal_type(s)) {
         | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyA, rest), Var(1))) => Ok((tyA, rest))
         | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
@@ -530,11 +529,7 @@ let witness(s : t, a : tm) : result(t, error) = {
     let* s = cut(s, "premise2", newgoal);
     let* s = swap(s);
     let a = wk(a);
-    probes(s);
-    print_endline(">>>>>" ++ string_of_term(goal_ctx(s), tyA));
-    let* strA = invert_wk(tyA);
     let* s = cut(s, "premise1", In(a, tyA));
-    probes(s);
     let* s = weaken_goal(s);
     let* s = swap(s);
     let a = wk(a);
@@ -555,17 +550,12 @@ let witness(s : t, a : tm) : result(t, error) = {
     let* s = hyp_prop(s, premise2);
     let* s = check(s);
     let portal = 0;
-    print_endline("asdf");
     let* portal_ty = lookup_index(goal_ctx(s), portal);
     let* s = at_ty(s, portal_ty, a);
     let* s = hyp_prop(s, portal);
-    print_endline("c1");
     let* s = check(s);
-    print_endline("c23");
     let* s = check(s);
-    print_endline("c3");
     let* s = check(s);
-    print_endline("all done");
     Ok(s)
 }
 
@@ -581,41 +571,43 @@ let rec find_refl(c : ctx, eq : int, current : int) : result(int, error) = {
     } { | _ => Error("couldn't find refl") }
 }
 
-// let cooler_definition(s : t) : result(t, error) = {
-//     let rec dissect_eq_ty(eq_ty : tm) : result((list((name, tm)), (int, tm, tm)), error) = switch(eq_ty) {
-//         | Ap(Ap(Ap(Var(eq), ty'), _), body) => Ok(([], (eq, ty', body)))
-//         | Arrow(_, x, ty1, eq_ty') => {
-//             let* (args, (eq, ty', body)) = dissect_eq_ty(eq_ty');
-//             // let* body' = invert_wk(body);
-//             Ok(([(x, ty1), ... args], (eq-1, ty', body)))
-//         }
-//         | _ => Error("wrong eq_ty")
-//     };
-//     let rec build_witness(args : list((name, tm)), body : tm) = switch(args) {
-//         | [] => body 
-//         | [(x, ty), ...args'] => Lam(x, ty, build_witness(args', body))
-//     }
-//     let (c, ty, _) = goal_tuple(s);
-//     switch(ty) {
-//     | Arrow(_, _, Prop, Arrow(_, _, Arrow(Weak, xname, ty, Arrow(Weak, xeq, eq_ty, Var(2))), Var(1))) => {
-//         let* eq_ty = invert_wkn(1, eq_ty);
-//         let* eq_ty = invert_wkn(1, eq_ty);
-//         let* (args, (eq, ty', body)) = dissect_eq_ty(eq_ty);
-//         let* refl = find_refl(goal_ctx(s), eq-2, eq-2);
-//         let xwitness = build_witness(args, body);
-//         let* s = witness(s, xwitness);
-//         let* s = better_direct(s);
-//         let* s = givenall(s);
-//         let refl = refl + List.length(args);
-//         print_endline(string_of_term(goal_ctx(s), Var(refl)));
-//         let* refl_ty = lookup_index(goal_ctx(s), refl);
-//         print_endline("hy" ++ string_of_term(goal_ctx(s), ty'));
-//         // let* s = unfurl_assumption(s, refl_ty, [Forall(ty)])
-//         failwith("todo")
-//     }
-//     | _ => Error("wrong shape for definition")
-//     }
-// }
+let cooler_definition(s : t) : result(t, error) = {
+    let rec dissect_eq_ty(eq_ty : tm) : result((list((name, tm)), (int, tm)), error) = switch(eq_ty) {
+        | Ap(Ap(Ap(Var(eq), _), _), body) => Ok(([], (eq, body)))
+        | Arrow(_, x, ty1, eq_ty') => {
+            let* (args, (eq, body)) = dissect_eq_ty(eq_ty');
+            Ok(([(x, ty1), ... args], (eq-1, body)))
+        }
+        | _ => Error("wrong eq_ty")
+    };
+    let rec build_witness(args : list((name, tm)), body : tm) = switch(args) {
+        | [] => body 
+        | [(x, ty), ...args'] => Lam(x, ty, build_witness(args', body))
+    }
+    switch(goal_type(s)) {
+    | Arrow(_, _, Prop, Arrow(_, _, Arrow(Weak, _, _, Arrow(Weak, _, eq_ty, Var(2))), Var(1))) => {
+        let* (args, (eq, body)) = dissect_eq_ty(eq_ty);
+        let* body = invert_wkn(List.length(args), body);
+        let* body = invert_wkn(List.length(args), body);
+        let* refl = find_refl(goal_ctx(s), eq-2, eq-2);
+        let xwitness = build_witness(args, body);
+        let* s = witness(s, xwitness);
+        let* s = better_direct(s);
+        let* s = givenall(s);
+        let refl = refl + List.length(args);
+        let* refl_ty = lookup_index(goal_ctx(s), refl);
+        let* (ty, body) = switch(goal_type(s)) {
+            | Ap(Ap(Ap(_, ty), _), body) => Ok((ty, body))
+            | _ => Error("error in definition")
+        };
+        let* s = unfurl_assumption(s, refl_ty, [Forall(ty, obvious), Forall(body, obvious)]);
+        let* s = hyp_prop(s, refl);
+        let* s = check(s);
+        empty_direct(s)
+    }
+    | _ => Error("wrong shape for definition")
+    }
+}
 
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
@@ -731,7 +723,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         if (ds != []) {
             skip_and_error(s, "side conditions not supported yet")
         } else {
-            pure(s, definition(s));
+            pure(s, cooler_definition(s));
         }
     }
     | Tactic(Direct, ds) => switch(ds) {
