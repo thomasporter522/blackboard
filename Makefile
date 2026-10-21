@@ -9,7 +9,7 @@ run:
 	make build
 	dune exec bin/main.exe $(file)
 
-runweb:
+web:
 	make build
 	cd blackboard-web && npm run dev
 	

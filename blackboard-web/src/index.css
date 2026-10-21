@@ -1,16 +1,1 @@
-@font-face {
-  font-family: 'FiraCode';
-  src: url('/fonts/FiraCode/static/FiraCode-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
 
-:root {
-  --text: #dbdac2;
-  --bg: #282828;
-
-  color-scheme: dark;
-  color: var(--text);
-  background: var(--bg);
-  font-family: 'FiraCode', monospace;
-}
