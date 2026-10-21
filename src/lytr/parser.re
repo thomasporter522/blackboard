@@ -162,7 +162,7 @@ module Parser = (G : Grammar) => {
         | Empty 
         | Snoc(associate_stack, concrete_left_child, meld, list(shard))
 
-    // completed, stack, reduct
+    // completed, stack
     type associate_state = (list(concrete_term), associate_stack)
 
     let initial_associate_state : associate_state = ([], Empty)
@@ -238,7 +238,6 @@ module Parser = (G : Grammar) => {
         Whitespace(terms)
     }
 
-
     let associate(ms : list(indivisible)) : concrete_term = {
         let final_associate_state = List.fold_left(full_associate_step, initial_associate_state, ms);
         finalize_associate_state(final_associate_state)
@@ -303,10 +302,15 @@ module Parser = (G : Grammar) => {
         }
     }
 
-    let rec abstract(ctx : G.context, c : concrete_term) : abstract_term = switch(c){
+    let match(tokens : list(token)) = {
+        let final_matching_state = List.fold_left(matching_step, initial_matching_state, tokens);
+        finalize_matching_state(final_matching_state);
+    }
+
+    let rec abstract_context(ctx : G.context, c : concrete_term) : abstract_term = switch(c){
         | Whitespace(cts) => {
             let ctx' : G.context = G.propagate_context_whitespace(ctx);
-            let ats : list(abstract_term) = List.map(abstract(ctx'), cts);
+            let ats : list(abstract_term) = List.map(abstract_context(ctx'), cts);
             G.abstract_whitespace(ctx, ats)
         }
         | Shard(sh) => G.abstract_shard(ctx, sh)
@@ -316,27 +320,27 @@ module Parser = (G : Grammar) => {
             let lc' = abstract_left_child(lctx, lc);
             let rc' = abstract_right_child(rctx, rc);
             let ctxs : list(G.context) = G.propagate_context_inner(ctx, f);
-            let ats' : list(abstract_term) = List.map2(abstract, ctxs, cts);
+            let ats' : list(abstract_term) = List.map2(abstract_context, ctxs, cts);
             G.abstract_term(ctx, f, lc', ats', rc');
         }   
     }
 
     and abstract_left_child(ctx : G.context, lc : concrete_left_child) : abstract_left_child = switch(lc){
         | None => None
-        | Some((ct, shards)) => Some((abstract(ctx, ct), shards))
+        | Some((ct, shards)) => Some((abstract_context(ctx, ct), shards))
     }
 
     and abstract_right_child(ctx : G.context, lc : concrete_right_child) : abstract_right_child = switch(lc){
         | None => None
-        | Some((shards, ct)) => Some((shards, abstract(ctx, ct)))
+        | Some((shards, ct)) => Some((shards, abstract_context(ctx, ct)))
     }
 
-    
+    let abstract(t : concrete_term) : abstract_term = abstract_context(G.initial_context(), t)
 
     let parse(tokens : list(token)) : abstract_term = {
-        let final_matching_state = List.fold_left(matching_step, initial_matching_state, tokens);
-        let indivisibles = finalize_matching_state(final_matching_state);
-        let concrete_term = associate(indivisibles);
-        abstract(G.initial_context(), concrete_term)
+        let indivisibles = match(tokens);
+        let concrete_t = associate(indivisibles);
+        let abstract_t = abstract(concrete_t);
+        abstract_t
     }
 }
