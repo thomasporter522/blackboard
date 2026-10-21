@@ -76,7 +76,7 @@ direct (
     )
 )
 
-construct 
+construct
 sub (A B : type) : prop, 
 sub-eq : (A B : type) -> eq prop (sub A B) ((x : A) -> x :: B)
 by
@@ -108,5 +108,4 @@ construct
 addtwo : nat -> nat, 
 addtwo-eq : (n : nat) -> eq nat (addtwo n) (suc (suc n))
 by
-witness (abs-ap nat nat nat . . . (abs-k nat (nat -> nat) . . suc) suc) valid by ?,
 ?
