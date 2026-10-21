@@ -6,5 +6,12 @@ build:
 file ?= "examples/ex.bb"
 
 run: 
-	dune build
+	make build
 	dune exec bin/main.exe $(file)
+
+runweb:
+	make build
+	cd blackboard-web && npm run dev
+	
+init:
+	cd blackboard-web && npm install
