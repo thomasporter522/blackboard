@@ -2,17 +2,19 @@
 
 type token = Token(string);
 
-type shard = Shard(token)
+type secondary = 
+    | Other
+    | Shard(token)
 
 type abstract_term =
     | Hole
-    | Shard(shard)
+    | Secondary(secondary)
 
-and abstract_left_child = Option.t((abstract_term, list(shard)))
-and abstract_right_child = Option.t((list(shard), abstract_term))
+and abstract_left_child = Option.t((abstract_term, list(secondary)))
+and abstract_right_child = Option.t((list(secondary), abstract_term))
 
-// type concrete_left_child = Option.t((abstract_term, list(shard)))
-// type concrete_right_child = Option.t((list(shard), abstract_term))
+// type concrete_left_child = Option.t((abstract_term, list(secondary)))
+// type concrete_right_child = Option.t((list(secondary), abstract_term))
 
 type precedence = Precedence(int); 
 
@@ -57,7 +59,7 @@ module type Grammar = {
     let propagate_context_right_child : (context, form) => context;
     let propagate_context_inner : (context, form) => list(context);
     let abstract_whitespace : (context, list(abstract_term)) => abstract_term;
-    let abstract_shard : (context, shard) => abstract_term;
+    let abstract_secondary : (context, secondary) => abstract_term;
     let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => abstract_term ;
 }
 
@@ -124,7 +126,7 @@ module GammarOfSpec = (Spec : GrammarSpec) : Grammar => {
     let propagate_context_inner : (context, form) => list(context) = failwith("todo");
 
     let abstract_whitespace : (context, list(abstract_term)) => abstract_term = failwith("todo");
-    let abstract_shard : (context, shard) => abstract_term = failwith("todo");
+    let abstract_secondary : (context, secondary) => abstract_term = failwith("todo");
 
     let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => abstract_term = failwith("todo");
 }
@@ -133,11 +135,11 @@ module Parser = (G : Grammar) => {
 
     type concrete_term = 
         | Whitespace(list(concrete_term))
-        | Shard(shard)
+        | Secondary(secondary)
         | Term(G.form, concrete_left_child, list(concrete_term), concrete_right_child)
 
-    and concrete_left_child = Option.t((concrete_term, list(shard)))
-    and concrete_right_child = Option.t((list(shard), concrete_term))
+    and concrete_left_child = Option.t((concrete_term, list(secondary)))
+    and concrete_right_child = Option.t((list(secondary), concrete_term))
 
     type final_match = 
         | Head(token)
@@ -147,7 +149,7 @@ module Parser = (G : Grammar) => {
 
     and indivisible = 
         | Meld(meld)
-        | Shard(shard)
+        | Secondary(secondary)
 
     type partial_match = 
         | Head(token, G.form_state)
@@ -160,20 +162,20 @@ module Parser = (G : Grammar) => {
 
     type associate_stack = 
         | Empty 
-        | Snoc(associate_stack, concrete_left_child, meld, list(shard))
+        | Snoc(associate_stack, concrete_left_child, meld, list(secondary))
 
     // completed, stack
     type associate_state = (list(concrete_term), associate_stack)
 
     let initial_associate_state : associate_state = ([], Empty)
 
-    let finalize_shard(sh : shard) : concrete_term = Shard(sh);
+    let finalize_secondary(sh : secondary) : concrete_term = Secondary(sh);
 
-    let finalize_shards = List.map(finalize_shard)
+    let finalize_secondarys = List.map(finalize_secondary)
 
     let rec unmatch(pm : partial_match) : list(indivisible) = switch(pm) {
-        | Head(t, _) => [Shard(Shard(t))]
-        | Match(pm', cts, t, _) => unmatch(pm') @ cts @ [Shard(Shard(t))]
+        | Head(t, _) => [Secondary(Shard(t))]
+        | Match(pm', cts, t, _) => unmatch(pm') @ cts @ [Secondary(Shard(t))]
     }
 
     let rec children_of_final_match(m : final_match) : list(concrete_term) = switch(m) {
@@ -189,14 +191,14 @@ module Parser = (G : Grammar) => {
 
     let rec roll_stack_term(stack : associate_stack, t : concrete_term) : concrete_term = switch(stack) {
         | Empty => t
-        | Snoc(stack', lc, m, shards) => 
-            let t' = build_meld(lc, m, Some((shards, t)));
+        | Snoc(stack', lc, m, secondarys) => 
+            let t' = build_meld(lc, m, Some((secondarys, t)));
             roll_stack_term(stack', t')
     } 
 
     let roll_stack(stack : associate_stack) : list(concrete_term) = switch(stack) {
         | Empty => []
-        | Snoc(stack', lc, m, shards) => [roll_stack_term(stack', build_meld(lc, m, None))] @ finalize_shards(shards)
+        | Snoc(stack', lc, m, secondarys) => [roll_stack_term(stack', build_meld(lc, m, None))] @ finalize_secondarys(secondarys)
     }
 
     // precondition: reduct is Some => Prec vs Prec
@@ -204,20 +206,20 @@ module Parser = (G : Grammar) => {
     let rec associate_step(rs : associate_state, reduct : concrete_left_child, m : indivisible) : associate_state = {
         let (_, stack) = rs; 
         switch(rs, reduct, m) {
-        | ((c, Empty), None, Shard(sh)) => (c @ [Shard(sh)], Empty)
-        | ((c, Snoc(stack', lc, m, shards)), None, Shard(sh)) => (c, Snoc(stack', lc, m, shards @ [sh]))
-        | ((_, _), Some(_), Shard(_)) => failwith("precondition violated")
+        | ((c, Empty), None, Secondary(sh)) => (c @ [Secondary(sh)], Empty)
+        | ((c, Snoc(stack', lc, m, secondarys)), None, Secondary(sh)) => (c, Snoc(stack', lc, m, secondarys @ [sh]))
+        | ((_, _), Some(_), Secondary(_)) => failwith("precondition violated")
         | ((_, Empty), Some(_), Meld(_)) => failwith("precondition violated")
         | ((c, Empty), None, Meld(m)) => (c, Snoc(Empty, None, m, []))
-        | ((c, Snoc(stack', lc, m1, shards)), reduct, Meld(m2)) => 
+        | ((c, Snoc(stack', lc, m1, secondarys)), reduct, Meld(m2)) => 
             let stack_tip = G.right_tip(snd(m1));
             let meld_tip = G.left_tip(snd(m2));
 
             let roll() = associate_step((c @ roll_stack(stack), Empty), reduct, m);
             let shift() = (c, Snoc(stack, reduct, m2, []));
             let reduce() = switch(reduct) {
-                | Some((reduct', shards')) => associate_step((c, stack'), Some((build_meld(lc, m1, Some((shards, reduct'))), shards')), Meld(m2));
-                | None => associate_step((c, stack'), Some((build_meld(lc, m1, None), shards)), m);
+                | Some((reduct', secondarys')) => associate_step((c, stack'), Some((build_meld(lc, m1, Some((secondarys, reduct'))), secondarys')), Meld(m2));
+                | None => associate_step((c, stack'), Some((build_meld(lc, m1, None), secondarys)), m);
             }
 
             switch(stack_tip, meld_tip) {
@@ -245,7 +247,7 @@ module Parser = (G : Grammar) => {
 
     type partial_meld = 
         | PartialMatch(partial_match)
-        | Shard(shard)
+        | Secondary(secondary)
 
     type matching_state =
         | Empty 
@@ -264,7 +266,7 @@ module Parser = (G : Grammar) => {
                 | None => unmatch(pm)
                 | Some(ts) => [Meld((finalize_match(pm), ts))]
             }
-        | Shard(sh) => [Shard(sh)]
+        | Secondary(sh) => [Secondary(sh)]
     }
 
     let finalize_partial_melds(pms : list(partial_meld)) : list(indivisible) =
@@ -289,7 +291,7 @@ module Parser = (G : Grammar) => {
             | Some(pm') => Some(Snoc(s', PartialMatch(pm')))
             | None => scan_for_match(s', [PartialMatch(pm), ...middle], t)
         }
-        | Snoc(s', Shard(sh)) => scan_for_match(s', [Shard(sh), ...middle], t)
+        | Snoc(s', Secondary(sh)) => scan_for_match(s', [Secondary(sh), ...middle], t)
     }
 
     let matching_step(s : matching_state, t : token) : matching_state = {
@@ -297,7 +299,7 @@ module Parser = (G : Grammar) => {
             | Some(s') => s'
             | None => switch(G.initial_form_state(t)) {
                 | Some(ms) => Snoc(s, PartialMatch(Head(t, ms)))
-                | None => Snoc(s, Shard(Shard(t)))
+                | None => Snoc(s, Secondary(Shard(t)))
             }
         }
     }
@@ -313,7 +315,7 @@ module Parser = (G : Grammar) => {
             let ats : list(abstract_term) = List.map(abstract_context(ctx'), cts);
             G.abstract_whitespace(ctx, ats)
         }
-        | Shard(sh) => G.abstract_shard(ctx, sh)
+        | Secondary(sh) => G.abstract_secondary(ctx, sh)
         | Term(f, lc, cts, rc) => {
             let lctx : G.context = G.propagate_context_left_child(ctx, f);
             let rctx : G.context = G.propagate_context_right_child(ctx, f);
@@ -327,12 +329,12 @@ module Parser = (G : Grammar) => {
 
     and abstract_left_child(ctx : G.context, lc : concrete_left_child) : abstract_left_child = switch(lc){
         | None => None
-        | Some((ct, shards)) => Some((abstract_context(ctx, ct), shards))
+        | Some((ct, secondarys)) => Some((abstract_context(ctx, ct), secondarys))
     }
 
     and abstract_right_child(ctx : G.context, lc : concrete_right_child) : abstract_right_child = switch(lc){
         | None => None
-        | Some((shards, ct)) => Some((shards, abstract_context(ctx, ct)))
+        | Some((secondarys, ct)) => Some((secondarys, abstract_context(ctx, ct)))
     }
 
     let abstract(t : concrete_term) : abstract_term = abstract_context(G.initial_context(), t)
