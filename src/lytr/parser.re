@@ -1,11 +1,20 @@
 
+
+type token = Token(string);
+
+type shard = Shard(token)
+
+type abstract_term =
+    | Shard(shard);
+
+type left_child = Option.t((abstract_term, list(shard)))
+type right_child = Option.t((list(shard), abstract_term))
+
 type precedence = Precedence(int); 
 
 let precedence_less_than(p1 : precedence, p2 : precedence) : bool = switch(p1, p2) {
     | (Precedence(p1), Precedence(p2)) => p1 < p2
 }
-
-type token = Token(string);
 
 type mixfix_interior = list(token)
 
@@ -17,38 +26,44 @@ type mixfix_form = {
     left_tip : tip,
     interior : mixfix_interior,
     right_tip : tip,
+    builder : (left_child, list(abstract_term), right_child) => abstract_term,
 }
 
 module Grammar : {
     type t; 
-    type tip_state;
-    type final_state;
-    let initial_tip_state : (t, token) => Option.t(tip_state);
-    let match_tip_state : (t, tip_state, token) => Option.t(tip_state);
-    let finalize_tip_state : (t, tip_state) => Option.t(final_state);
-    let left_tip : (t, final_state) => tip;
-    let right_tip : (t, final_state) => tip;
+    type matching_state;
+    type form;
+    type context; 
+    let initial_matching_state : (t, token) => Option.t(matching_state);
+    let match_matching_state : (t, matching_state, token) => Option.t(matching_state);
+    let finalize_matching_state : (t, matching_state) => Option.t(form);
+    let left_tip : (t, form) => tip;
+    let right_tip : (t, form) => tip;
+    let build_whitespace : (t, list(abstract_term)) => abstract_term;
+    let build : (t, form, left_child, list(abstract_term), right_child) => abstract_term
 } = {
     type t = {
-        forms: list(mixfix_form)
+        forms: list(mixfix_form),
+        whitespace_builder : list(abstract_term) => abstract_term,
     };
     type possible_state = {
         form_index : int, 
         delimiter_index : int
     }
-    type tip_state = list(possible_state)
+    type context = unit;
+    type matching_state = list(possible_state)
 
-    type final_state = int // form index
+    type form = int // form index
     
     // could be made more performant with a dictionary
-    let initial_tip_state(g : t, t : token) : Option.t(tip_state) = {
+    let initial_matching_state(g : t, t : token) : Option.t(matching_state) = {
         let correct_head(form_index, form) = {
             if(List.hd(form.interior) == t) { Some({form_index, delimiter_index: 0}) } else { None}
         };
         let possibilities = List.filter_map(o => o, List.mapi(correct_head, g.forms));
         if (possibilities == []) { None } else { Some(possibilities) }
     }
-    let match_tip_state(g : t, ms : tip_state, t : token) : Option.t(tip_state) = {
+    let match_matching_state(g : t, ms : matching_state, t : token) : Option.t(matching_state) = {
         let match_possibility(p : possible_state) : Option.t(possible_state) = {
             let form = List.nth(g.forms, p.form_index);
             let next_index = p.delimiter_index + 1; 
@@ -61,7 +76,7 @@ module Grammar : {
         let possibilities = List.filter_map(match_possibility, ms);
         if (possibilities == []) { None } else { Some(possibilities) }
     }
-    let finalize_tip_state(g : t, ms : tip_state) : Option.t(final_state) = {
+    let finalize_matching_state(g : t, ms : matching_state) : Option.t(form) = {
         let match_possibility(p : possible_state) : Option.t(possible_state) = {
             let form = List.nth(g.forms, p.form_index);
             let next_index = p.delimiter_index + 1; 
@@ -77,139 +92,95 @@ module Grammar : {
             | [p, ..._] => Some(p.form_index) // picks the first one, if ambiguous
         }
     }
-    let left_tip(g : t, ms : final_state) : tip = List.nth(g.forms, ms).left_tip
-    let right_tip(g : t, ms : final_state) : tip = List.nth(g.forms, ms).right_tip
+    let left_tip(g : t, ms : form) : tip = List.nth(g.forms, ms).left_tip
+    let right_tip(g : t, ms : form) : tip = List.nth(g.forms, ms).right_tip
+
+    let build_whitespace(g : t) = g.whitespace_builder
+    let build(g : t, fs : form, lc : left_child, inner : list(abstract_term), rc : right_child) : abstract_term = {
+        let form = List.nth(g.forms, fs);
+        form.builder(lc, inner, rc)
+    }
 }
 
-type shard = Shard(token)
+type final_match = 
+    | Head(token)
+    | Match(final_match, abstract_term, token) 
 
-type match = 
-    | Head(token, Grammar.tip_state)
-    | Match(match, list(meldor), token, Grammar.tip_state) 
+type meld = (final_match, Grammar.form)
 
-and meld = (match, Grammar.final_state)
-
-and meldor = 
-    | Match(meld)
+and indivisible = 
+    | Meld(meld)
     | Shard(shard)
 
-type concrete_term =
-    | Term(left_child, meld, right_child)
-    | Shard(shard)
+type partial_match = 
+    | Head(token, Grammar.matching_state)
+    | Match(partial_match, list(indivisible), token, Grammar.matching_state) 
 
-and left_child = Option.t((concrete_term, list(shard)))
-and right_child = Option.t((list(shard), concrete_term))
 
-let tip_state_of_match(pm : match) = switch(pm) {
+let matching_state_of_match(pm : partial_match) = switch(pm) {
     | Head(_t, ms) => ms
     | Match(_pm', _child, _t, ms) => ms
 }
-
-let update_tip_state_of_match(pm : match, ms) = switch(pm) {
-    | Head(t, _) => Head(t, ms)
-    | Match(pm', child, t, _) => Match(pm', child, t, ms)
-}
-
-type parse_meld = 
-    | PartialMatch(match)
-    | Shard(shard)
-
-type parse_state =
-    | Empty 
-    | Snoc(parse_state, parse_meld)
-
-let initial_parse_state : parse_state = Empty
-
-let rec unmatch(pm : match) : list(meldor) = switch(pm) {
-    | Head(t, _ms) => [Shard(Shard(t))]
-    | Match(pm', cts, t, _ms) => unmatch(pm') @ cts @ [Shard(Shard(t))]
-}
-
-let unmatch_parse_meld(g : Grammar.t, po : parse_meld) : list(meldor) = switch(po) {
-    | PartialMatch(pm) => 
-        switch(Grammar.finalize_tip_state(g, tip_state_of_match(pm))) {
-            | None => unmatch(pm)
-            | Some(ts) => [Match((pm, ts))]
-        }
-    | Shard(sh) => [Shard(sh)]
-}
-
-let rec unmatch_parse_melds(g : Grammar.t, pms : list(parse_meld)) : list(meldor) =
-    List.concat_map(unmatch_parse_meld(g), pms)
-
-let rec unmatch_parse_state(g : Grammar.t, ps : parse_state) : list(meldor) = switch(ps) {
-    | Empty => [] 
-    | Snoc(ps', po) => unmatch_parse_state(g, ps') @ unmatch_parse_meld(g, po)
-}
-
-let match_matches(g : Grammar.t, pm : match, middle : list(parse_meld), t : token) : Option.t(match) = {
-    let ms = tip_state_of_match(pm);
-    switch(Grammar.match_tip_state(g, ms, t)) {
-        | Some(ms') => Some(Match(pm, unmatch_parse_melds(g, middle), t, ms'))
-        | None => None
-    }
-}
-
-let rec scan_for_match(g : Grammar.t, s : parse_state, middle : list(parse_meld), t : token) : Option.t(parse_state) = switch(s) {
-    | Empty => None
-    | Snoc(s', PartialMatch(pm)) => switch(match_matches(g, pm, middle, t)) {
-        | Some(pm') => Some(Snoc(s', PartialMatch(pm')))
-        | None => scan_for_match(g, s', [PartialMatch(pm), ...middle], t)
-    }
-    | Snoc(s', Shard(sh)) => scan_for_match(g, s', [Shard(sh), ...middle], t)
-}
-
-let parse_step(g : Grammar.t, s : parse_state, t : token) : parse_state = {
-    switch(scan_for_match(g, s, [], t)) {
-        | Some(s') => s'
-        | None => switch(Grammar.initial_tip_state(g, t)) {
-            | Some(ms) => Snoc(s, PartialMatch(Head(t, ms)))
-            | None => Snoc(s, Shard(Shard(t)))
-        }
-    }
-}
-
 
 type operate_stack = 
     | Empty 
     | Snoc(operate_stack, left_child, meld, list(shard))
 
 // completed, stack, reduct
-type operate_state = (list(concrete_term), operate_stack, left_child)
+type operate_state = (list(abstract_term), operate_stack, left_child)
 
 let initial_operate_state : operate_state = ([], Empty, None)
 
-let finalize_shard(sh : shard) : concrete_term = Shard(sh);
+let finalize_shard(sh : shard) : abstract_term = Shard(sh);
 
 let finalize_shards = List.map(finalize_shard)
 
-let rec roll_stack_term(stack : operate_stack, t : concrete_term) : list(concrete_term) = switch(stack) {
-    | Empty => [t] 
-    | Snoc(stack', lc, m, shards) => roll_stack_term(stack', Term(lc, m, Some((shards, t))))
+let rec unmatch(pm : partial_match) : list(indivisible) = switch(pm) {
+    | Head(t, _) => [Shard(Shard(t))]
+    | Match(pm', cts, t, _) => unmatch(pm') @ cts @ [Shard(Shard(t))]
+}
+
+let rec children_of_final_match(m : final_match) : list(abstract_term) = switch(m) {
+    | Head(_) => [] 
+    | Match(m', t, _) => children_of_final_match(m') @ [t]
+}
+
+let build_meld(g : Grammar.t, lc : left_child, m : meld, rc : right_child) : abstract_term = {
+    let (match, gs) = m;
+    let inner_children = children_of_final_match(match);
+    Grammar.build(g, gs, lc, inner_children, rc)
+}
+
+let rec roll_stack_term(g : Grammar.t, stack : operate_stack, t : abstract_term) : abstract_term = switch(stack) {
+    | Empty => t
+    | Snoc(stack', lc, m, shards) => 
+        let t' = build_meld(g, lc, m, Some((shards, t)));
+        roll_stack_term(g, stack', t')
 } 
 
-let roll_stack(stack : operate_stack) : list(concrete_term) = switch(stack) {
-    | Empty => [] 
-    | Snoc(stack', lc, m, shards) => roll_stack_term(stack', Term(lc, m, None)) @ finalize_shards(shards)
+let roll_stack(g : Grammar.t, stack : operate_stack) : list(abstract_term) = switch(stack) {
+    | Empty => []
+    | Snoc(stack', lc, m, shards) => [roll_stack_term(g, stack', build_meld(g, lc, m, None))] @ finalize_shards(shards)
 }
 
 // precondition: reduct is Some => Prec vs Prec
-let rec operate_step(g : Grammar.t, rs : operate_state, m : meldor) : operate_state = {
+// postcondition: reduct is none
+let rec operate_step(g : Grammar.t, rs : operate_state, m : indivisible) : operate_state = {
     let (_, stack, _) = rs; 
     switch(rs, m) {
     | ((c, Empty, None), Shard(sh)) => (c @ [Shard(sh)], Empty, None)
     | ((c, Snoc(stack', lc, m, shards), None), Shard(sh)) => (c, Snoc(stack', lc, m, shards @ [sh]), None)
     | ((_, _, Some(_)), Shard(_)) => failwith("precondition violated")
-    | ((c, Empty, reduct), Match(m)) => (c, Snoc(Empty, None, m, []), reduct)
-    | ((c, Snoc(stack', lc, m1, shards), reduct), Match(m2)) => {
+    | ((c, Empty, reduct), Meld(m)) => (c, Snoc(Empty, None, m, []), reduct)
+    | ((c, Snoc(stack', lc, m1, shards), reduct), Meld(m2)) => {
         let stack_tip = Grammar.right_tip(g, snd(m1));
         let meld_tip = Grammar.left_tip(g, snd(m2));
 
-        let roll() = operate_step(g, (c @ roll_stack(stack), Empty, reduct), m);
+        let roll() = operate_step(g, (c @ roll_stack(g, stack), Empty, reduct), m);
         let shift() = (c, Snoc(stack, reduct, m2, []), None);
         let reduce() = switch(reduct) {
-            | Some((reduct', shards')) => operate_step(g, (c, stack', Some((Term(lc, m1, Some((shards, reduct'))), shards'))), Match(m2));
-            | None => operate_step(g, (c, stack', Some((Term(lc, m1, None), shards))), m);
+            | Some((reduct', shards')) => operate_step(g, (c, stack', Some((build_meld(g, lc, m1, Some((shards, reduct'))), shards'))), Meld(m2));
+            | None => operate_step(g, (c, stack', Some((build_meld(g, lc, m1, None), shards))), m);
         }
 
         switch(stack_tip, meld_tip) {
@@ -223,26 +194,84 @@ let rec operate_step(g : Grammar.t, rs : operate_state, m : meldor) : operate_st
     }
 }
 
-let finalize_operate_state(rs : operate_state) : list(concrete_term) = {
+let finalize_operate_state(g : Grammar.t, rs : operate_state) : abstract_term = {
     let (c, s, lc) = rs; 
-    let finalize_left_child(lc : left_child) : list(concrete_term) = switch(lc) {
-        | None => [] 
-        | Some((t, shards)) => [t, ...finalize_shards(shards)]
-    }
-    c @ roll_stack(s) @ finalize_left_child(lc)
+    assert(lc == None);
+    let terms : list(abstract_term) = c @ roll_stack(g, s);
+    Grammar.build_whitespace(g, terms)
 }
 
-let operate(g : Grammar.t, ms : list(meldor)) : list(concrete_term) = {
+
+let operate(g : Grammar.t, ms : list(indivisible)) : abstract_term = {
     let final_operate_state = List.fold_left(operate_step(g), initial_operate_state, ms);
-    finalize_operate_state(final_operate_state)
+    finalize_operate_state(g, final_operate_state)
 }
 
-let operate_parse_state(g : Grammar.t, s : parse_state) : list(concrete_term) = {
+type partial_meld = 
+    | PartialMatch(partial_match)
+    | Shard(shard)
+
+type parse_state =
+    | Empty 
+    | Snoc(parse_state, partial_meld)
+
+let initial_parse_state : parse_state = Empty
+
+let rec finalize_match(g : Grammar.t, m : partial_match) : final_match = switch(m) {
+    | Head(t, _) => Head(t)
+    | Match(m', cts, t, _) => Match(finalize_match(g, m'), operate(g, cts), t)
+}
+
+let unmatch_partial_meld(g : Grammar.t, po : partial_meld) : list(indivisible) = switch(po) {
+    | PartialMatch(pm) => 
+        switch(Grammar.finalize_matching_state(g, matching_state_of_match(pm))) {
+            | None => unmatch(pm)
+            | Some(ts) => [Meld((finalize_match(g, pm), ts))]
+        }
+    | Shard(sh) => [Shard(sh)]
+}
+
+let unmatch_partial_melds(g : Grammar.t, pms : list(partial_meld)) : list(indivisible) =
+    List.concat_map(unmatch_partial_meld(g), pms)
+
+let rec unmatch_parse_state(g : Grammar.t, ps : parse_state) : list(indivisible) = switch(ps) {
+    | Empty => [] 
+    | Snoc(ps', po) => unmatch_parse_state(g, ps') @ unmatch_partial_meld(g, po)
+}
+
+let match_matches(g : Grammar.t, pm : partial_match, middle : list(partial_meld), t : token) : Option.t(partial_match) = {
+    let ms = matching_state_of_match(pm);
+    switch(Grammar.match_matching_state(g, ms, t)) {
+        | Some(ms') => Some(Match(pm, unmatch_partial_melds(g, middle), t, ms'))
+        | None => None
+    }
+}
+
+let rec scan_for_match(g : Grammar.t, s : parse_state, middle : list(partial_meld), t : token) : Option.t(parse_state) = switch(s) {
+    | Empty => None
+    | Snoc(s', PartialMatch(pm)) => switch(match_matches(g, pm, middle, t)) {
+        | Some(pm') => Some(Snoc(s', PartialMatch(pm')))
+        | None => scan_for_match(g, s', [PartialMatch(pm), ...middle], t)
+    }
+    | Snoc(s', Shard(sh)) => scan_for_match(g, s', [Shard(sh), ...middle], t)
+}
+
+let parse_step(g : Grammar.t, s : parse_state, t : token) : parse_state = {
+    switch(scan_for_match(g, s, [], t)) {
+        | Some(s') => s'
+        | None => switch(Grammar.initial_matching_state(g, t)) {
+            | Some(ms) => Snoc(s, PartialMatch(Head(t, ms)))
+            | None => Snoc(s, Shard(Shard(t)))
+        }
+    }
+}
+
+let operate_parse_state(g : Grammar.t, s : parse_state) : abstract_term = {
     let ms = unmatch_parse_state(g, s);
     operate(g, ms)
 }
 
-let concrete_parse(g : Grammar.t, tokens : list(token)) : list(concrete_term) = {
+let parse(g : Grammar.t, tokens : list(token)) : abstract_term = {
     let final_parse_state = List.fold_left(parse_step(g), initial_parse_state, tokens);
     operate_parse_state(g, final_parse_state)
 }
