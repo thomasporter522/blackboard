@@ -12,13 +12,15 @@ module BlackboardLanguage : Language = {
     let is_alpha(c : char) = Str.string_match(Str.regexp("[a-z]\|[A-Z]"), String.make(1, c), 0)
 
     let is_identifier_char (is_start : bool, c : char) : bool = {
+        // print_endline(String.make(1, c));
+        // print_endline(string_of_bool(c == '1'));
         is_start ? is_alpha(c) : (is_alpha(c) || c == '-')
     }
 
     let form_of_string(s : string) : Option.t(mixfix_form) = {
         let split = String.split_on_char('_', s);
         let (left_tip : tip, rest : list(string)) = switch(int_of_string_opt(List.hd(split))) {
-            | Some(p1) => (Precedence(Precedence(p1)), split)
+            | Some(p1) => (Precedence(Precedence(p1)), List.tl(split))
             | None => (Uninterested, split)
         };
         let rec middle_and_end(strings : list(string)) : Option.t((mixfix_interior, tip)) = switch(strings) {
@@ -46,4 +48,10 @@ module BlackboardGrammar = GrammarOfLanguage(BlackboardLanguage);
 
 module BlackboardLexer = Lexer(BlackboardGrammar);
 
-let lex_test(s : string) : string = String.concat("===", List.map(string_of_token, BlackboardLexer.lex(s)))
+let lex_test(s : string) : list((int, int, string)) = {
+    let (_, es) = BlackboardLexer.lex(s);
+    let process_error(e : BlackboardLexer.lex_error) = switch(e) {
+        | Rune(i, j) => (i, j, "unrecognized character")
+    }
+    List.map(process_error, es);
+}

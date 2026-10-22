@@ -5,16 +5,41 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { EditorView, Decoration } from '@codemirror/view'
 import { EditorState } from "@codemirror/state";
+import type {Diagnostic} from "@codemirror/lint";
+import { linter } from "@codemirror/lint";
 import './App.css'
 import { blackboardTheme } from "./CodeTheme.tsx"
+
+var errors : number[][] = [];
+
+type errors_type = number[][];
 
 function print(s) {
   console.log(s)
 }
 
-function process(s) {
+function clean_errors(es : any) : errors_type {
+  if(es == 0) {
+    return [];
+  } else {
+    var re : any[][] = [];
+    for(var i = 0; i < es.length; i ++) {
+      re = re.concat([es[i]])
+    }
+    return re
+  }
+}
+
+function process(s : string) {
   // call the reasonml lexer and parser
-  print(globalThis.lex_test(s))
+  const lex_result = globalThis.lex_test(s);
+  errors = clean_errors(lex_result);
+}
+
+function render_errors(_view : EditorView) : readonly Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  errors.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "lex-error"}));
+  return diagnostics
 }
 
 function MainCodeblock() {
@@ -39,18 +64,17 @@ function MainCodeblock() {
           '.cm-line': {
             whiteSpace: 'pre'  // Prevent line wrapping
           }
-        })]}
-      //   EditorView.decorations.of(Decoration.set(
-      //     semanticErrors
-      //       .filter(error => (error.type !== "hole"))
-      //       .filter(error => (error.from < error.to))
-      //       .sort((a, b) => a.from - b.from)
-      //       .map(error => 
-      //         Decoration.mark({
-      //           class: "semantic-error"
-      //         }).range(error.from, error.to)
-      //       )
-      //   )),
+        }),
+        linter(render_errors)
+        // EditorView.decorations.of(Decoration.set(
+        //   errors
+        //     .map(error => 
+        //       Decoration.mark({
+        //         class: "semantic-error"
+        //       }).range(error[1], error[2])
+        //     )
+        // )),
+        ]}
       //   EditorView.decorations.of(Decoration.set(
       //     holes
       //       .sort((a, b) => (a[0].valueOf() - b[0].valueOf()))

@@ -11,6 +11,7 @@
   --beam: #999988;
   --orang: #b922ff;
   --select: #c4c4b0;
+  --mark-color: #d96048;
 
   color-scheme: dark;
   color: var(--text);
@@ -29,4 +30,20 @@
 
 .cm-editor.cm-focused {
   outline: none;
+}
+.cm-lintRange-error { 
+  background-image: none !important;
+}
+.cm-lintRange-info { 
+  background-image: none !important;
+}
+.cm-lintRange-warning { 
+  background-image: none !important;
+}
+.cm-lintRange-hint { 
+  background-image: none !important;
+}
+
+.lex-error {
+  color: var(--mark-color) !important;
 }

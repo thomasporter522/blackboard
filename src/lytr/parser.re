@@ -142,24 +142,33 @@ module Lexer (G : Grammar) = {
         } else None
     }
 
-    let rec lex(s : string) : list(token) = {
-        if(s == "") { [] } else {
+    type lex_error = Rune(int, int)
+
+    let rec lex_index(i : int, s : string) : (list(token), list(lex_error)) = {
+        let munch((s1 : string, s2 : string)) : (list(token), list(lex_error)) = {
+            let (ts, es) = lex_index(i + String.length(s1), s2);
+            ([Token(s1), ...ts], es)
+        };
+        if(s == "") { ([], []) } else
         if(G.is_whitespace_character(s.[0])) {
-            let (s1, s2) = split(s, 1);
-            [Token(s1), ... lex(s2)]
+            munch(split(s, 1))
         } else {
+            // bug: munches "construct" delimiter out of "construction" identifier
             switch(lex_delimiter(s)) {
-            | Some((s1, s2)) => [Token(s1), ... lex(s2)]
+            | Some((s1, s2)) => munch((s1, s2));
             | None => switch(lex_identifier(true, s)) {
-                | Some((s1, s2)) => [Token(s1), ... lex(s2)]
+                | Some((s1, s2)) => munch((s1, s2))
                 | None => 
                     let (s1, s2) = split(s, 1);
-                    [Token(s1), ... lex(s2)]
+                    let (ts, es) = lex_index(i+1, s2);
+                    ([Token(s1), ...ts], [Rune(i, i+1), ...es])
                 }
             }
         }
-        }
     }
+
+    let lex(s : string) : (list(token), list(lex_error)) = lex_index(0, s);
+    
 }
 
 module Parser = (G : Grammar) => {
