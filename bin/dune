@@ -1,4 +1,13 @@
 (executable
- (public_name blackboard)
  (name main)
+ (public_name blackboard)
+ (modes exe)
+ (modules main)
  (libraries blackboard))
+
+(executable
+ (name reason_to_js)
+ (modes js)
+ (modules reason_to_js)
+ (libraries blackboard js_of_ocaml)
+ (preprocess (pps js_of_ocaml-ppx)))

@@ -8,43 +8,14 @@ import { EditorState } from "@codemirror/state";
 import './App.css'
 import { blackboardTheme } from "./CodeTheme.tsx"
 
-
 function print(s) {
   console.log(s)
 }
 
-// function DisplayCodeBlock({ code, height = "auto" }: { code: string, height?: string }) {
-//     const lineCount = code.split('\n').length + 1
-//     const calculatedHeight = `${(lineCount) * 20}px` // 20px per line + 1 extra line
-    
-//     return (
-//       <CodeMirror
-//         value={code}
-//         height={height === "auto" ? calculatedHeight : height}
-//         // theme={}
-//         extensions={[
-//           EditorView.theme({
-//             '.cm-content': {
-//               padding: '3px !important',
-//               margin: '0px !important',
-//               minHeight: '0px !important'
-//             },
-//           })
-//         ]}
-//         basicSetup={{
-//           lineNumbers: false,
-//           foldGutter: false,
-//           dropCursor: false,
-//           allowMultipleSelections: false,
-//           searchKeymap: false,
-//           autocompletion: false,
-//           closeBrackets: false,
-//           history: false
-//         }}
-//         editable={false}
-//       />
-//     )
-//   }
+function process(s) {
+  // call the reasonml lexer and parser
+  print(globalThis.identity(s))
+}
 
 function MainCodeblock() {
   return <CodeMirror
@@ -97,15 +68,11 @@ function MainCodeblock() {
         dropCursor: false,
         allowMultipleSelections: false,
       }}
-      onChange={(val, viewUpdate) => {
-        print("change")
+      onChange={(val, _viewUpdate) => {
+        process(val)
       }}
-      onCreateEditor={(view) => {
-        print("create")
-      }}
-      onUpdate={(viewUpdate) => {
-        print("update")
-      }}
+      onCreateEditor={(_view) => { }}
+      onUpdate={(_viewUpdate) => { }}
     />;
 }
 

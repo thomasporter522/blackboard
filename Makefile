@@ -11,6 +11,7 @@ run:
 
 web:
 	make build
+	cp _build/default/bin/reason_to_js.bc.js blackboard-web/public/
 	cd blackboard-web && npm run dev
 	
 init:
