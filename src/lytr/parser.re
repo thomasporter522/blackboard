@@ -1,51 +1,15 @@
 
-
-type token = Token(string);
-
-type secondary = 
-    | Other
-    | Shard(token)
-
-type abstract_term =
-    | Hole
-    | Secondary(secondary)
-
-and abstract_left_child = Option.t((abstract_term, list(secondary)))
-and abstract_right_child = Option.t((list(secondary), abstract_term))
-
-// type concrete_left_child = Option.t((abstract_term, list(secondary)))
-// type concrete_right_child = Option.t((list(secondary), abstract_term))
-
-type precedence = Precedence(int); 
-
-let precedence_less_than(p1 : precedence, p2 : precedence) : bool = switch(p1, p2) {
-    | (Precedence(p1), Precedence(p2)) => p1 < p2
-}
-
-type mixfix_interior = list(token)
-
-type tip = 
-    | Precedence(precedence)
-    | Uninterested
-
-type mixfix_form = {
-    left_tip : tip,
-    interior : mixfix_interior,
-    right_tip : tip,
-    // builder : (concrete_left_child, list(abstract_term), concrete_right_child) => abstract_term,
-}
-
-module type GrammarSpec = {
-    type context;
-    let forms: list(mixfix_form);
-    let initial_context : unit => context;
-    // let whitespace_builder : list(abstract_term) => abstract_term;
-}
+open Language
 
 module type Grammar = {
     type form_state;
     type form;
     type context;
+
+    let is_whitespace_character : char => bool;
+    let max_delimiter_length : int;
+    let is_delimiter : string => bool;
+    let is_identifier_char : (bool, char) => bool;
 
     let initial_form_state : token => Option.t(form_state);
     let match_form_state : (form_state, token) => Option.t(form_state);
@@ -63,7 +27,28 @@ module type Grammar = {
     let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => abstract_term ;
 }
 
-module GammarOfSpec = (Spec : GrammarSpec) : Grammar => {
+module GrammarOfLanguage = (L : Language) : Grammar => {
+    let is_whitespace_character(c : char) : bool = L.is_whitespace_character(c);
+
+    module StringSet = Set.Make(String)
+    let delimiters_of_form(s : StringSet.t, f : mixfix_form) : StringSet.t = {
+        List.fold_left((ss, s) => StringSet.add(s, ss), s, f.interior)
+    }
+
+    let delimiters_of_forms(forms : list(mixfix_form)) : StringSet.t = 
+        List.fold_left(delimiters_of_form, StringSet.empty, forms)
+
+    let delimiters = delimiters_of_forms(L.forms);
+
+    let max_delimiter_length = {
+        let update_max(s : string, max_so_far : int) = max(String.length(s), max_so_far);
+        StringSet.fold(update_max, delimiters, -1);
+    }
+
+    let is_delimiter(s : string) = StringSet.mem(s, delimiters)
+
+    let is_identifier_char(is_start : bool, c : char) : bool = L.is_identifier_char(is_start, c);
+
     type possible_state = {
         form_index : int, 
         delimiter_index : int
@@ -73,23 +58,23 @@ module GammarOfSpec = (Spec : GrammarSpec) : Grammar => {
 
     type form = int; // form index
 
-    type context = Spec.context;
+    type context = L.context;
     
     // could be made more performant with a dictionary
     let initial_form_state(t : token) : Option.t(form_state) = {
         let correct_head(form_index, form) = {
-            if(List.hd(form.interior) == t) { Some({form_index, delimiter_index: 0}) } else { None}
+            if(t == Token(List.hd(form.interior))) { Some({form_index, delimiter_index: 0}) } else { None}
         };
-        let possibilities = List.filter_map(o => o, List.mapi(correct_head, Spec.forms));
+        let possibilities = List.filter_map(o => o, List.mapi(correct_head, L.forms));
         if (possibilities == []) { None } else { Some(possibilities) }
     }
     let match_form_state(ms : form_state, t : token) : Option.t(form_state) = {
         let match_possibility(p : possible_state) : Option.t(possible_state) = {
-            let form = List.nth(Spec.forms, p.form_index);
+            let form = List.nth(L.forms, p.form_index);
             let next_index = p.delimiter_index + 1; 
             switch(List.nth_opt(form.interior, next_index)) {
                 | None => None 
-                | Some(t') when t != t' => None
+                | Some(t') when t != Token(t') => None
                 | Some(_) => Some({form_index: p.form_index, delimiter_index: next_index})
             }
         };
@@ -98,7 +83,7 @@ module GammarOfSpec = (Spec : GrammarSpec) : Grammar => {
     }
     let finalize_form_state(ms : form_state) : Option.t(form) = {
         let match_possibility(p : possible_state) : Option.t(possible_state) = {
-            let form = List.nth(Spec.forms, p.form_index);
+            let form = List.nth(L.forms, p.form_index);
             let next_index = p.delimiter_index + 1; 
             // keep only those possibilities which *don't* have a next delimiter
             switch(List.nth_opt(form.interior, next_index)) {
@@ -112,23 +97,69 @@ module GammarOfSpec = (Spec : GrammarSpec) : Grammar => {
             | [p, ..._] => Some(p.form_index) // picks the first one, if ambiguous
         }
     }
-    let left_tip(ms : form) : tip = List.nth(Spec.forms, ms).left_tip
-    let right_tip(ms : form) : tip = List.nth(Spec.forms, ms).right_tip
+    let left_tip(ms : form) : tip = List.nth(L.forms, ms).left_tip
+    let right_tip(ms : form) : tip = List.nth(L.forms, ms).right_tip
 
     // let initial_context(g : t) = 
 
-    let initial_context() = Spec.initial_context();
+    let initial_context() = L.initial_context();
+    let propagate_context_whitespace(c : context) : context = failwith("todo")
 
-    let propagate_context_whitespace = failwith("todo")
+    let propagate_context_left_child(c : context, f : form) : context = failwith("todo");
+    let propagate_context_right_child(c : context, f : form) : context = failwith("todo");
+    let propagate_context_inner(c : context, f : form) : list(context) = failwith("todo");
 
-    let propagate_context_left_child : (context, form) => context = failwith("todo");
-    let propagate_context_right_child : (context, form) => context = failwith("todo");
-    let propagate_context_inner : (context, form) => list(context) = failwith("todo");
+    let abstract_whitespace(c : context, ats : list(abstract_term)) : abstract_term = failwith("todo");
+    let abstract_secondary(c : context, s : secondary) : abstract_term = failwith("todo");
 
-    let abstract_whitespace : (context, list(abstract_term)) => abstract_term = failwith("todo");
-    let abstract_secondary : (context, secondary) => abstract_term = failwith("todo");
+    let abstract_term(c : context, f : form, ls : abstract_left_child, ats : list(abstract_term), rc : abstract_right_child) : abstract_term = failwith("todo");
+}
 
-    let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => abstract_term = failwith("todo");
+module Lexer (G : Grammar) = {
+    let split(s : string, n : int) : (string, string) = 
+        (String.sub(s, 0, n), String.sub(s, n, String.length(s) - n));
+
+    let rec lex_delimiter_length(l : int, s : string) : Option.t((string, string)) = {
+        if (l <= 0) { None } else 
+        if (G.is_delimiter(String.sub(s, 0, l))) { 
+            Some(split(s, l)) 
+        } else { lex_delimiter_length(l-1, s) }
+    }
+
+    let lex_delimiter(s : string) : Option.t((string, string)) = {
+        let l = G.max_delimiter_length; 
+        lex_delimiter_length(l, s)
+    }
+
+    let rec lex_identifier(is_start : bool, s : string) : Option.t((string, string)) = {
+        if(s == "") { None } else
+        if(G.is_identifier_char(is_start, s.[0])) {
+            let (s1, s2) = split(s, 1);
+            switch(lex_identifier(false, s2)) {
+            | Some((s21, s22)) => Some((s1 ++ s21, s22))
+            | None => Some((s1, s2))
+            }
+        } else None
+    }
+
+    let rec lex(s : string) : list(token) = {
+        if(s == "") { [] } else {
+        if(G.is_whitespace_character(s.[0])) {
+            let (s1, s2) = split(s, 1);
+            [Token(s1), ... lex(s2)]
+        } else {
+            switch(lex_delimiter(s)) {
+            | Some((s1, s2)) => [Token(s1), ... lex(s2)]
+            | None => switch(lex_identifier(true, s)) {
+                | Some((s1, s2)) => [Token(s1), ... lex(s2)]
+                | None => 
+                    let (s1, s2) = split(s, 1);
+                    [Token(s1), ... lex(s2)]
+                }
+            }
+        }
+        }
+    }
 }
 
 module Parser = (G : Grammar) => {

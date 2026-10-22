@@ -14,7 +14,7 @@ function print(s) {
 
 function process(s) {
   // call the reasonml lexer and parser
-  print(globalThis.identity(s))
+  print(globalThis.lex_test(s))
 }
 
 function MainCodeblock() {

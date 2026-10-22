@@ -5,4 +5,5 @@
  (modules lexer))
 
 (library
- (name blackboard))
+ (name blackboard)
+ (libraries lytr))

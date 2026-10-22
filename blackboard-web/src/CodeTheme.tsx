@@ -38,14 +38,10 @@ const blackboardEditorTheme = EditorView.theme({
   },
   // gutters
   '.cm-gutters': {
-    backgroundColor: 'var(--bg)', // Background of the gutter area
-    color: 'var(--beam)', // Line number text color
+    backgroundColor: 'var(--bg)',
+    color: 'var(--beam)',
     border: 'none',
     borderRight: '2px solid var(--beam)',
-  },
-  '.cm-activeLineGutter': {
-    backgroundColor: 'inherit', // Active line number background
-    color: 'inherit' // Active line number text color
   },
 }, { dark: true })
 
