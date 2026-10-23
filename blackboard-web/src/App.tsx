@@ -4,58 +4,134 @@
 // import viteLogo from './assets/vite.svg'
 import CodeMirror from '@uiw/react-codemirror'
 import { EditorView, Decoration } from '@codemirror/view'
-import { EditorState } from "@codemirror/state";
+import { EditorState, StateField, StateEffect, Range } from "@codemirror/state";
+import type {Tooltip} from "@codemirror/view"
+import { showTooltip} from "@codemirror/view"
 import type {Diagnostic} from "@codemirror/lint";
 import { linter } from "@codemirror/lint";
 import './App.css'
 import { blackboardTheme } from "./CodeTheme.tsx"
 
-function lex_test(s) {
-  return globalThis.lex_test(s);
-}
-
-function parse_test(s) {
-  return globalThis.parse_test(s);
+function parse_test(s, cursor_position) {
+  return globalThis.parse_test(s, cursor_position);
 }
 
 // const my_obj = globalThis.my_obj;
 
-var runes : number[][] = [];
-var delimiters : number[][] = [];
-var shards : number[][] = [];
+type error = {
+    message: string, 
+    range: number[],
+};
 
-type errors_type = number[][];
+// var block_contexts : string = "";
+// var cursor_position : number = 0;
+// var runes : number[][] = [];
+// var delimiters : number[][] = [];
+// var parseerrors : error[] = [];
+// var completions : string[] = [];
 
 function print(s) {
   console.log(s)
 }
 
-function clean_errors(es : any) : errors_type {
-  if(es == 0) {
-    return [];
-  } else {
-    var re : any[][] = [];
-    for(var i = 0; i < es.length; i ++) {
-      re = re.concat([es[i]])
-    }
-    return re
+type parse_info = {
+  cursor_position : number;
+  runes : number[][];
+  delimiters : number[][];
+  parseerrors : error[];
+  completions : string[];
+}
+
+function process(state : EditorState) : parse_info {
+  let cursor_position = state.selection.ranges[0].from;
+  let parse_result = parse_test(state.doc.toString(), cursor_position);
+  return {
+    cursor_position : cursor_position,
+    runes : parse_result.runes,
+    delimiters : parse_result.delimiters,
+    parseerrors : parse_result.parseerrors,
+    completions : parse_result.completions,
   }
 }
 
-function process(s : string) {
-  let parse_result = parse_test(s);
-  runes = parse_result.runes;
-  delimiters = parse_result.delimiters;
-  shards = parse_result.shards;
+const parseInfoField =  StateField.define<parse_info>({
+  create(state) {
+    return process(state)
+  },
+
+  update(_pi, tr) {
+    return process(tr.state)
+  },
+})
+
+function decorateDelims(state : EditorState) {
+  function decorateDelim(x : number[]) {
+    return Decoration.mark({class: "delimiter"}).range(x[0], x[1])
+  };
+  return Decoration.set(state.field(parseInfoField).delimiters.map(decorateDelim))
 }
 
-function render_diagnostics(_view : EditorView) : readonly Diagnostic[] {
+const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
+
+
+function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
+  const info = view.state.field(parseInfoField);
   const diagnostics: Diagnostic[] = [];
-  runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "rune"}));
-  delimiters.map(e => diagnostics.push({from: e[0], to: e[1], severity: "hint", message: "", markClass: "delimiter"}));
-  shards.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unmatched delimiter", markClass: "shard"}));
+  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "rune"}));
+  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: e.message, markClass: "shard"}));
   return diagnostics
 }
+
+const linterExtension = linter(render_diagnostics, {delay: 0});
+
+function getCursorTooltips(state): readonly Tooltip[] {
+  const info = state.field(parseInfoField);
+  if(info.completions.length == 0) return [];
+  return [{
+        pos: info.cursor_position,
+        above: true,
+        strictSide: true,
+        arrow: true,
+        create: () => {
+          let dom = document.createElement("div")
+          dom.className = "cm-tooltip-cursor"
+          dom.textContent = info.completions.join(" ")
+          return {dom}
+        }
+      }]
+}
+
+const completionExtension = showTooltip.computeN([parseInfoField], state => getCursorTooltips(state))
+
+// function getCursorTooltips(): readonly Tooltip[] {
+//   if(completions.length == 0) return [];
+//   return [{
+//         pos: cursor_position,
+//         above: true,
+//         strictSide: true,
+//         arrow: true,
+//         create: () => {
+//           let dom = document.createElement("div")
+//           dom.className = "cm-tooltip-cursor"
+//           dom.textContent = completions.join(" ")
+//           return {dom}
+//         }
+//       }]
+// }
+
+// const cursorTooltipField = StateField.define<readonly Tooltip[]>({
+//   create() {
+//     return getCursorTooltips()
+//   },
+
+//   update(_tooltips, _tr) {
+//     return getCursorTooltips()
+//   },
+
+//   provide: f => showTooltip.computeN([f], _state => getCursorTooltips())
+
+//   // provide: f => showTooltip.computeN([f], state => state.field(f))
+// })
 
 function MainCodeblock() {
   return <CodeMirror
@@ -80,7 +156,11 @@ function MainCodeblock() {
             whiteSpace: 'pre'  // Prevent line wrapping
           }
         }),
-        linter(render_diagnostics),
+        parseInfoField,
+        linterExtension,
+        delimiterExtension,
+        completionExtension,
+        // cursorTooltipField,
         // EditorView.decorations.of(Decoration.set(
         //   errors
         //     .map(error => 
@@ -107,11 +187,14 @@ function MainCodeblock() {
         dropCursor: false,
         allowMultipleSelections: false,
       }}
-      onChange={(val, _viewUpdate) => {
-        process(val)
+      onChange={(_val, _viewUpdate) => {
+        // block_contexts = val;
       }}
       onCreateEditor={(_view) => { }}
-      onUpdate={(_viewUpdate) => { }}
+      onUpdate={(_viewUpdate) => { 
+        // cursor_position = viewUpdate.view.state.selection.ranges[0].from; 
+        // process(block_contexts, cursor_position);
+      }}
     />;
 }
 

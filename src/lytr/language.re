@@ -4,22 +4,22 @@ type token_kind =
     | Delimiter
     | Whitespace
     | Rune
+    | Cursor
 
 type token = {
     kind : token_kind,
     s : string,
-    start : int, 
-    terminus : int 
+    range : (int, int)
 }
-
-let token_range(t : token) : (int, int) = (t.start, t.terminus)
 
 type secondary = 
     | Whitespace(token)
     | Rune(token)
     | Shard(token)
+    | Cursor
 
 type term_head = 
+    | Interaction
     | Parens
     | In 
     | Colon
@@ -27,6 +27,7 @@ type term_head =
     | Lambda
     | Ap
     | Construct
+    | ITE
 
 type abstract_term =
     | Hole

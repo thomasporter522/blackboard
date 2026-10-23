@@ -58,10 +58,12 @@ module BlackboardLanguage : Language = {
 
     let form_summaries = 
         [("(_)", (c => (Default, [c], Default), _c => Parens)),
+        ("?", (_c => (Default, [], Default), _c => Interaction)),
         ("100_:_0", (_c => (Ident, [], Term), _c => Colon)),
         ("11_->_10", (_c => (Domain, [], Term), _c => Arrow)),
         ("11_=>_10", (_c => (Domain, [], Term), _c => Lambda)),
         ("20_::_21", (_c => (Term, [], Term), _c => In)),
+        ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
         ("construct_by_0", (_c => (Default, [Sig], Demo), _c => Construct)),];
     let ap_precs = (31, 30);
 
@@ -83,12 +85,12 @@ module BlackboardLexer = Lexer(BlackboardGrammar);
 module BlackboardParser = Parser(BlackboardGrammar);
 
 let lex_test(s : string) : BlackboardLexer.lex_info = {
-    let (_, es) = BlackboardLexer.lex(s);
+    let (_, es) = BlackboardLexer.lex(s, 0);
     es
 }
 
-let parse(s : string) = {
-    let (tokens, li) = BlackboardLexer.lex(s);
+let parse(s : string, cursor_position : int) = {
+    let (tokens, li) = BlackboardLexer.lex(s, cursor_position);
     let (_, pi) = BlackboardParser.parse(tokens);
     (li, pi)
 }

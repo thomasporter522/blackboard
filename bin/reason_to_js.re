@@ -19,23 +19,40 @@ let js_lexer(s : string) : lex_result = {
     result
 }
 
+type error = Js.t({.
+    message: Js.readonly_prop(string), 
+    range: Js.readonly_prop(range),
+});
+
 type parse_result = Js.t({. 
     runes: Js.readonly_prop(jsarray(range)), 
     delimiters : Js.readonly_prop(jsarray(range)),
-    shards : Js.readonly_prop(jsarray(range))
-    });
+    parseerrors : Js.readonly_prop(jsarray(error)),
+    completions : Js.readonly_prop(jsarray(Js.t(Js.js_string))),
+});
 
-let js_parser(s : string) : parse_result = {
-    let (li, pi) = Lytr.Blackboard.parse(s);
-    let f(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
+let js_parser(s : string, cursor_position : int) : parse_result = {
+    let (li, pi) = Lytr.Blackboard.parse(s, cursor_position);
+    let f1(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
         let(a, b) = x;
         let l = [Js.int32(Int32.of_int(a)), Js.int32(Int32.of_int(b))];
         jsarray_of(l)
     };
+    let message_f(k: Lytr.Blackboard.BlackboardParser.error_kind) = switch(k) {
+        | UnmatchedDelimiter => "unmatched delimiter"
+        | MissingLeftChild => "missing left argument"
+        | MissingRightChild => "missing right argument"
+    }
+    let f2(x : Lytr.Blackboard.BlackboardParser.error) : error = [%js {as _; 
+        val message = message_f(x.kind);
+        val range = f1(x.range);
+    }];
+    let f3(x : list(string)) : list(Js.t(Js.js_string)) = List.map(s => Js.string(s), x);
     let result = [%js {as _; 
-        val runes = Js.array(Array.of_list(List.map(f, li.lex_errors))); 
-        val delimiters = Js.array(Array.of_list(List.map(f, li.delimiters)));
-        val shards = Js.array(Array.of_list(List.map(f, pi.match_errors)));
+        val runes = Js.array(Array.of_list(List.map(f1, li.lex_errors))); 
+        val delimiters = Js.array(Array.of_list(List.map(f1, li.delimiters)));
+        val parseerrors = Js.array(Array.of_list(List.map(f2, pi.errors)));
+        val completions = Js.array(Array.of_list(f3(pi.completions)));
     }];
     result
 }

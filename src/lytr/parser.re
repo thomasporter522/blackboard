@@ -6,6 +6,9 @@ module type Grammar = {
     type form;
     type context;
 
+    type abstraction_error = 
+        | MissingLeftChild
+        | MissingRightChild
 
     let is_whitespace_character : char => bool;
     let max_delimiter_length : int;
@@ -14,17 +17,24 @@ module type Grammar = {
 
     let initial_form_state : token => Option.t(form_state);
     let match_form_state : (form_state, token) => Option.t(form_state);
-    let finalize_form_state : form_state => Option.t(form);
+    type finalize_result = 
+        | Success(form)
+        | Failure(unit => list(string))
+    let finalize_form_state : form_state => finalize_result;
     let white_form : Option.t(form);
     let left_tip : form => tip;
     let right_tip : form => tip;
     let initial_context : unit => context;
 
     let propagate_context: (context, form) => (context, list(context), context);
-    let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => abstract_term ;
+    let abstract_term : (context, form, abstract_left_child, list(abstract_term), abstract_right_child) => (abstract_term, list(abstraction_error)) ;
 }
 
 module GrammarOfLanguage = (L : Language) : Grammar => {
+
+    type abstraction_error = 
+        | MissingLeftChild
+        | MissingRightChild
 
     let is_whitespace_character(c : char) : bool = L.is_whitespace_character(c);
 
@@ -90,7 +100,12 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
             if (possibilities == []) { None } else { Some(Delim(possibilities)) }
         }
     }
-    let finalize_form_state(ms : form_state) : Option.t(form) = {
+
+    type finalize_result = 
+        | Success(form)
+        | Failure(unit => list(string))
+
+    let finalize_form_state(ms : form_state) : finalize_result = {
         let match_possibility(p : possible_state) : Option.t(possible_state) = {
             let form = List.nth(L.forms, p.form_index);
             let next_index = p.delimiter_index + 1; 
@@ -100,13 +115,25 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
                 | Some(_) => None
             }
         };
+        let rec ntail(n : int, l : list('a)) : list('a) = {
+            if(l == []) { [] } else 
+            if(n <= 0) { l } else ntail(n-1, List.tl(l)) 
+        };
+        let get_completions(ps : list(possible_state), _ : unit) : list(string) = {
+            if(ps == []) { failwith("impossible get_completions") } else {
+                let p = List.hd(ps);
+                let form = List.nth(L.forms, p.form_index);
+                let delims = ntail(p.delimiter_index+1, form.interior);
+                delims
+            }
+        };
         switch(ms) {
-        | Ident(s) => Some(Ident(s)) 
+        | Ident(s) => Success(Ident(s)) 
         | Delim(ps) => 
             let possibilities = List.filter_map(match_possibility, ps);
             switch(possibilities) {
-            | [] => None 
-            | [p, ..._] => Some(Form(p.form_index)) // picks the first one, if ambiguous
+            | [] => Failure(get_completions(ps))
+            | [p, ..._] => Success(Form(p.form_index)) // picks the first one, if ambiguous
             }
         }
     }
@@ -148,26 +175,25 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
         }
     }
 
-    let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_term), rc : abstract_right_child) : abstract_term = {
-        
+    let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_term), rc : abstract_right_child) : (abstract_term, list(abstraction_error)) = {
         switch(f) {
-            | Ident(s) => Ident(s)
-            | _ => {
-                let (b1, b2) = needs_children(f);
-                let (c1, ss1) = switch(lc) {
-                    | None => (b1 ? [Hole] : [], [])
-                    | Some((c, ss)) => ([c], ss)
-                };
-                let (c2, ss2) = switch(rc) {
-                    | None => (b2 ? [Hole] : [], [])
-                    | Some((ss, c)) => ([c], ss)
-                };
-                let head = switch(f) {
-                    | Ident(_) => failwith("impossible")
-                    | White => L.white_head(c)
-                    | Form(i) => List.nth(L.forms, i).head(c)
-                }
-                Term(head, c1 @ ats @ c2, ss1, ss2);
+        | Ident(s) => (Ident(s), [])
+        | _ => {
+            let (b1, b2) = needs_children(f);
+            let (c1, ss1, rs1) = switch(lc) {
+                | None => b1 ? ([Hole], [], [MissingLeftChild]) : ([], [], [])
+                | Some((c, ss)) => ([c], ss, [])
+            };
+            let (c2, ss2, rs2) = switch(rc) {
+                | None => b2 ? ([Hole], [], [MissingRightChild]) : ([], [], [])
+                | Some((ss, c)) => ([c], ss, [])
+            };
+            let head = switch(f) {
+                | Ident(_) => failwith("impossible")
+                | White => L.white_head(c)
+                | Form(i) => List.nth(L.forms, i).head(c)
+            };
+            (Term(head, c1 @ ats @ c2, ss1, ss2), rs1 @ rs2);
             }
         }
     }
@@ -219,50 +245,64 @@ module Lexer (G : Grammar) = {
         delimiters: []
     }
 
-    let rec lex_index(i : int, s : string) : (list(token), lex_info) = {
+    let rec lex_index(i : int, s : string, cursor_position : int) : (list(token), lex_info) = {
         let munch(k : token_kind, (s1 : string, s2 : string)) : (token, list(token), lex_info) = {
             let j = i + String.length(s1);
-            let (ts, es) = lex_index(j, s2);
-            ({kind: k, s : s1, start : i, terminus : j}, ts, es)
+            let (ts, es) = lex_index(j, s2, cursor_position);
+            ({kind: k, s : s1, range : (i, j)}, ts, es)
         };
-        if(s == "") { ([], empty_lex_info) } else
-        if(G.is_whitespace_character(s.[0])) {
-            let (t, ts, li) = munch(Whitespace, split(s, 1));
-            ([t,...ts], li)
-        } else {
-            // bug: munches "construct" delimiter out of "construction" identifier
-            // bug: x-> is lexed as "x-" ">"
-            switch(lex_delimiter(s)) {
-            | Some((s1, s2)) => {
-                let (t, ts, li) = munch(Delimiter, (s1, s2));
-                let li' = {lex_errors: li.lex_errors, delimiters: [(i, i+ String.length(s1)), ...li.delimiters]};
-                ([t, ...ts], li')
-            };
-            | None => switch(lex_identifier(true, s)) {
-                | Some((s1, s2)) => 
-                    let (t, ts, li) = munch(Identifier, (s1, s2));
-                    ([t,...ts], li)
-                | None => 
-                    let (s1, s2) = split(s, 1);
-                    let (t, ts, li) = munch(Rune, (s1, s2));
-                    let li' = {lex_errors: [(i, i+1), ...li.lex_errors], delimiters: li.delimiters};
+        let prefix = if(i == cursor_position) { [{kind:Cursor, s:"", range:(i, i)}] } else { [] };
+        let (suffix, li) = {
+            if(s == "") { ([], empty_lex_info) } else
+            if(G.is_whitespace_character(s.[0])) {
+                let (t, ts, li) = munch(Whitespace, split(s, 1));
+                ([t,...ts], li)
+            } else {
+                // bug: munches "construct" delimiter out of "construction" identifier
+                // bug: x-> is lexed as "x-" ">"
+                switch(lex_delimiter(s)) {
+                | Some((s1, s2)) => {
+                    let (t, ts, li) = munch(Delimiter, (s1, s2));
+                    let li' = {lex_errors: li.lex_errors, delimiters: [(i, i+ String.length(s1)), ...li.delimiters]};
                     ([t, ...ts], li')
+                };
+                | None => switch(lex_identifier(true, s)) {
+                    | Some((s1, s2)) => 
+                        let (t, ts, li) = munch(Identifier, (s1, s2));
+                        ([t,...ts], li)
+                    | None => 
+                        let (s1, s2) = split(s, 1);
+                        let (t, ts, li) = munch(Rune, (s1, s2));
+                        let li' = {lex_errors: [(i, i+1), ...li.lex_errors], delimiters: li.delimiters};
+                        ([t, ...ts], li')
+                    }
                 }
             }
-        }
+        };
+        (prefix @ suffix, li)
     }
 
-    let lex(s : string) : (list(token), lex_info) = lex_index(0, s);
+    let lex(s : string, cursor_position : int) : (list(token), lex_info) = lex_index(0, s, cursor_position);
     
 }
 
 module Parser = (G : Grammar) => {
 
+    type error_kind =
+        | UnmatchedDelimiter
+        | MissingLeftChild 
+        | MissingRightChild
+
+    type error = {
+        range : (int, int),
+        kind : error_kind
+    }
+
     type concrete_term = 
         | Empty
         | Multiple(list(concrete_term))
         | Secondary(secondary)
-        | Term(G.form, concrete_left_child, list(concrete_term), concrete_right_child)
+        | Term(G.form, ((int, int), (int, int)), concrete_left_child, list(concrete_term), concrete_right_child)
 
     and concrete_left_child = Option.t((concrete_term, list(secondary)))
     and concrete_right_child = Option.t((list(secondary), concrete_term))
@@ -299,13 +339,23 @@ module Parser = (G : Grammar) => {
 
     let finalize_secondarys = List.map(finalize_secondary)
 
-    type match_result = (list(indivisible), list((int, int)));
+    type match_result = {
+        indivisibles: list(indivisible), 
+        errors: list(error),
+        completions: list(string)
+    };
 
-    let rec unmatch(pm : partial_match) : match_result = switch(pm) {
-        | Head(t, _) => ([Secondary(Shard(t))], [token_range(t)])
+    let empty_match_result = {
+        indivisibles: [], 
+        errors: [],
+        completions: []
+    };
+
+    let rec unmatch(pm : partial_match) : (list(indivisible), list(error)) = switch(pm) {
+        | Head(t, _) => ([Secondary(Shard(t))], [{range: t.range, kind: UnmatchedDelimiter}])
         | Match(pm', cts, t, _) => 
-            let (is, rs) = unmatch(pm');
-            (is @ cts @ [Secondary(Shard(t))], rs @ [token_range(t)])
+            let (is, es) = unmatch(pm');
+            (is @ cts @ [Secondary(Shard(t))], es @ [{range: t.range, kind: UnmatchedDelimiter}])
     }
 
     let rec children_of_final_match(m : final_match) : list(concrete_term) = switch(m) {
@@ -313,10 +363,18 @@ module Parser = (G : Grammar) => {
         | Match(m', t, _) => children_of_final_match(m') @ [t]
     }
 
+    let rec ranges_of_final_match(m : final_match) = switch(m) {
+        | Head(t) => (t.range, t.range)
+        | Match(m', _, t) => 
+            let (r, _) = ranges_of_final_match(m');
+            (r, t.range)
+    }
+
     let build_meld(lc : concrete_left_child, m : meld, rc : concrete_right_child) : concrete_term = {
         let (match, gs) = m;
         let inner_children = children_of_final_match(match);
-        Term(gs, lc, inner_children, rc)
+        let ranges = ranges_of_final_match(fst(m));
+        Term(gs, ranges, lc, inner_children, rc)
     }
 
     let rec roll_stack_term(stack : associate_stack, t : concrete_term) : concrete_term = switch(stack) {
@@ -353,7 +411,8 @@ module Parser = (G : Grammar) => {
             let meld_tip = G.left_tip(snd(m2));
 
             let insert_white(wf : G.form) = {
-                let white_token = {kind: Delimiter, s : "", start: -1, terminus : -1};
+                // bug: better range
+                let white_token = {kind: Delimiter, s : "", range: (-1, -1)};
                 let white : indivisible = Meld((Head(white_token), wf));
                 associate_step(associate_step(rs, None, white), None, m);
             }
@@ -402,62 +461,92 @@ module Parser = (G : Grammar) => {
 
     type matching_state = {
         stack : matching_stack, 
-        shards : list((int, int))
+        errors : list(error),
+        completions : list(string),
     }
 
-    let initial_matching_state : matching_state = {stack : Empty, shards : []}
+    let initial_matching_state : matching_state = {stack : Empty, errors : [], completions : []}
 
     let rec finalize_match(m : partial_match) : final_match = switch(m) {
         | Head(t, _) => Head(t)
         | Match(m', cts, t, _) => Match(finalize_match(m'), associate(cts), t)
     }
 
-    let finalize_partial_meld(po : partial_meld) : match_result = switch(po) {
+    let finalize_partial_meld(po : partial_meld, checking_completions: bool) : match_result = switch(po) {
         | PartialMatch(pm) => 
             switch(G.finalize_form_state(form_state_of_match(pm))) {
-                | None => unmatch(pm)
-                | Some(ts) => ([Meld((finalize_match(pm), ts))], [])
+                | Failure(completions) => 
+                    let (is, es) = unmatch(pm);
+                    {
+                        indivisibles: is, 
+                        errors: es,
+                        completions : checking_completions ? completions() : []
+                    }
+                | Success(ts) => {
+                    indivisibles: [Meld((finalize_match(pm), ts))], 
+                    errors: [],
+                    completions : []
+                }
             }
-        | Secondary(sh) => ([Secondary(sh)], [])
+        | Secondary(sh) => {
+            indivisibles: [Secondary(sh)], 
+            errors: [],
+            completions : []
+        }
     }
 
     let combine_match_results(m1 : match_result, m2 : match_result) : match_result = {
-        let (l1, l2) = m1;
-        let (l3, l4) = m2; 
-        (l1 @ l3, l2 @ l4)
+        {
+            indivisibles: m1.indivisibles @ m2.indivisibles, 
+            errors: m1.errors @ m2.errors,
+            completions : m2.completions @ m1.completions // the completions grow to the right
+        }
     }
 
-    let concat_map2(f : 'a => (list('b), list('c)), l : list('a)) : (list('b), list('c)) =
-        List.fold_left((mr, a) => combine_match_results(mr, f(a)), ([], []), l)
+    let concat_map2(f : 'a => match_result, l : list('a)) : match_result =
+        List.fold_left((mr, a) => combine_match_results(mr, f(a)), empty_match_result, l)
 
-    let finalize_partial_melds(pms : list(partial_meld)) : match_result =
-        concat_map2(finalize_partial_meld, pms)
+    let rec finalize_partial_melds_reversed(pms : list(partial_meld), checking_completions: bool) : match_result = switch(pms) {
+        | [] => empty_match_result
+        | [pm,...pms'] =>
+            let checking_completions' = switch(pm) {
+                | Secondary(Cursor) => true 
+                | _ => checking_completions
+            };
+            combine_match_results(finalize_partial_melds_reversed(pms', checking_completions'), finalize_partial_meld(pm, checking_completions'));
+        }
+        
+    let finalize_partial_melds(pms : list(partial_meld)) : match_result = finalize_partial_melds_reversed(List.rev(pms), false)
 
-    let rec finalize_matching_stack(ps : matching_stack) : match_result = switch(ps) {
-        | Empty => ([], [])
+    let rec finalize_matching_stack(ps : matching_stack, checking_completions: bool) : match_result = switch(ps) {
+        | Empty => empty_match_result
         | Snoc(ps', po) => 
-            combine_match_results(finalize_matching_stack(ps'), finalize_partial_meld(po))
+            let checking_completions' = switch(po) {
+                | Secondary(Cursor) => true 
+                | _ => checking_completions
+            };
+            combine_match_results(finalize_matching_stack(ps', checking_completions'), finalize_partial_meld(po, checking_completions))
     }
 
     let finalize_matching_state(ps : matching_state) : match_result = {
-        let (is, rs) = finalize_matching_stack(ps.stack);
-        (is, ps.shards @ rs)
+        let mr = finalize_matching_stack(ps.stack, false);
+        {...mr, errors: ps.errors @ mr.errors}
     }
 
-    let attempt_match(pm : partial_match, middle : list(partial_meld), t : token) : Option.t((partial_match, list((int, int)))) = {
+    let attempt_match(pm : partial_match, middle : list(partial_meld), t : token) : Option.t((partial_match, list(error), list(string))) = {
         let ms = form_state_of_match(pm);
         switch(G.match_form_state(ms, t)) {
             | Some(ms') => 
-                let (is, rs) = finalize_partial_melds(middle);
-                Some((Match(pm, is, t, ms'), rs))
+                let mr = finalize_partial_melds(middle);
+                Some((Match(pm, mr.indivisibles, t, ms'), mr.errors, mr.completions))
             | None => None
         }
     }
 
-    let rec scan_for_match(s : matching_stack, middle : list(partial_meld), t : token) : Option.t((matching_stack, list((int, int)))) = switch(s) {
+    let rec scan_for_match(s : matching_stack, middle : list(partial_meld), t : token) : Option.t((matching_stack, list(error), list(string))) = switch(s) {
         | Empty => None
         | Snoc(s', PartialMatch(pm)) => switch(attempt_match(pm, middle, t)) {
-            | Some((pm', rs)) => Some((Snoc(s', PartialMatch(pm')), rs))
+            | Some((pm', es, cs)) => Some((Snoc(s', PartialMatch(pm')), es, cs))
             | None => scan_for_match(s', [PartialMatch(pm), ...middle], t)
         }
         | Snoc(s', Secondary(sh)) => scan_for_match(s', [Secondary(sh), ...middle], t)
@@ -465,15 +554,16 @@ module Parser = (G : Grammar) => {
 
     let matching_step(s : matching_state, t : token) : matching_state = {
         switch(t.kind) {
-        | Whitespace => {stack: Snoc(s.stack, Secondary(Whitespace(t))), shards: s.shards}
-        | Rune => {stack: Snoc(s.stack, Secondary(Rune(t))), shards: s.shards}
+        | Cursor => {...s, stack: Snoc(s.stack, Secondary(Cursor))}
+        | Whitespace => {...s, stack: Snoc(s.stack, Secondary(Whitespace(t)))}
+        | Rune => {...s, stack: Snoc(s.stack, Secondary(Rune(t)))}
         | Identifier 
         | Delimiter => 
             switch(scan_for_match(s.stack, [], t)) {
-            | Some((s', rs)) => {stack: s', shards: s.shards @ rs}
+            | Some((s', rs, cs)) => {stack: s', errors: s.errors @ rs, completions : s.completions @ cs}
             | None => switch(G.initial_form_state(t)) {
-                | Some(ms) => {stack: Snoc(s.stack, PartialMatch(Head(t, ms))), shards: s.shards}
-                | None => {stack: Snoc(s.stack, Secondary(Shard(t))), shards: [(t.start, t.terminus), ...s.shards]}
+                | Some(ms) => {...s, stack: Snoc(s.stack, PartialMatch(Head(t, ms)))}
+                | None => {...s, stack: Snoc(s.stack, Secondary(Shard(t))), errors: [{range: t.range, kind:UnmatchedDelimiter}, ...s.errors]}
                 }
             }
         }
@@ -485,43 +575,62 @@ module Parser = (G : Grammar) => {
         result
     }
 
-    let rec abstract_context(ctx : G.context, c : concrete_term) : abstract_term = switch(c){
-        | Empty => Empty
-        | Multiple(cts) => Multiple(List.map(abstract_context(ctx), cts))
-        | Secondary(sh) => Secondary(sh)
-        | Term(f, lc, cts, rc) => {
+
+    let rec abstract_context(ctx : G.context, c : concrete_term) : (abstract_term, list(error))  = switch(c){
+        | Empty => (Empty, [])
+        | Multiple(cts) => 
+            let recursive_call = List.map(abstract_context(ctx), cts);
+            let (ats, rs) = (List.map(fst, recursive_call), List.map(snd, recursive_call));
+            (Multiple(ats), List.concat(rs))
+        | Secondary(sh) => (Secondary(sh), [])
+        | Term(f, ranges, lc, cts, rc) => {
             let (lctx, ctxs, rctx) : (G.context, list(G.context), G.context) = G.propagate_context(ctx, f);
-            let lc' = abstract_left_child(lctx, lc);
-            let rc' = abstract_right_child(rctx, rc);
-            let ats' : list(abstract_term) = List.map2(abstract_context, ctxs, cts);
-            G.abstract_term(ctx, f, lc', ats', rc');
+            let (lc', eslc) = abstract_left_child(lctx, lc);
+            let (rc', esrc) = abstract_right_child(rctx, rc);
+            let recursive_call = List.map2(abstract_context, ctxs, cts);
+            let (ats', esm) = (List.map(fst, recursive_call), List.map(snd, recursive_call));
+            let (at, aesa) = G.abstract_term(ctx, f, lc', ats', rc');
+            let error_of_abstraction_error(ae : G.abstraction_error): error = {
+                switch(ae) {
+                | MissingLeftChild => {range: fst(ranges), kind: MissingLeftChild}
+                | MissingRightChild => {range: snd(ranges), kind: MissingRightChild}
+                }
+            };
+            let esa = List.map(error_of_abstraction_error, aesa);
+            (at, eslc @ List.concat(esm) @ esrc @ esa);
         }   
     }
 
-    and abstract_left_child(ctx : G.context, lc : concrete_left_child) : abstract_left_child = switch(lc){
-        | None => None
-        | Some((ct, secondarys)) => Some((abstract_context(ctx, ct), secondarys))
+    and abstract_left_child(ctx : G.context, lc : concrete_left_child) : (abstract_left_child, list(error)) = switch(lc){
+        | None => (None, [])
+        | Some((ct, secondarys)) => 
+            let (a, es) = abstract_context(ctx, ct);
+            (Some((a, secondarys)), es)
     }
 
-    and abstract_right_child(ctx : G.context, lc : concrete_right_child) : abstract_right_child = switch(lc){
-        | None => None
-        | Some((secondarys, ct)) => Some((secondarys, abstract_context(ctx, ct)))
+    and abstract_right_child(ctx : G.context, lc : concrete_right_child) : (abstract_right_child, list(error)) = switch(lc){
+        | None => (None, [])
+        | Some((secondarys, ct)) => 
+            let (a, es) = abstract_context(ctx, ct);
+            (Some((secondarys, a)), es)
     }
 
-    let abstract(t : concrete_term) : abstract_term = abstract_context(G.initial_context(), t)
+    let abstract(t : concrete_term) : (abstract_term, list(error)) = abstract_context(G.initial_context(), t)
 
     type parse_info = {
-        match_errors : list((int, int)),
+        errors : list(error),
+        completions : list(string)
     }
 
     let empty_parse_info : parse_info = {
-        match_errors: [], 
+        errors: [], 
+        completions: [], 
     }
 
     let parse(tokens : list(token)) : (abstract_term, parse_info) = {
-        let (indivisibles, match_errors) = match(tokens);
-        let concrete_t = associate(indivisibles);
-        let abstract_t = abstract(concrete_t);
-        (abstract_t, {match_errors: match_errors})
+        let match_result = match(tokens);
+        let concrete_t = associate(match_result.indivisibles);
+        let (abstract_t, abstract_errors) = abstract(concrete_t);
+        (abstract_t, {errors: match_result.errors @ abstract_errors, completions : match_result.completions})
     }
 }
