@@ -14,10 +14,15 @@ function lex_test(s) {
   return globalThis.lex_test(s);
 }
 
+function parse_test(s) {
+  return globalThis.parse_test(s);
+}
+
 // const my_obj = globalThis.my_obj;
 
-var errors : number[][] = [];
+var runes : number[][] = [];
 var delimiters : number[][] = [];
+var shards : number[][] = [];
 
 type errors_type = number[][];
 
@@ -38,20 +43,17 @@ function clean_errors(es : any) : errors_type {
 }
 
 function process(s : string) {
-  errors = clean_errors(lex_test(s).errors);
-  delimiters = lex_test(s).delimiters;
+  let parse_result = parse_test(s);
+  runes = parse_result.runes;
+  delimiters = parse_result.delimiters;
+  shards = parse_result.shards;
 }
 
-function render_errors(_view : EditorView) : readonly Diagnostic[] {
+function render_diagnostics(_view : EditorView) : readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  errors.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "lex-error"}));
-  return diagnostics
-}
-
-function render_delimiters(_view : EditorView) : readonly Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  print(delimiters);
+  runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "rune"}));
   delimiters.map(e => diagnostics.push({from: e[0], to: e[1], severity: "hint", message: "", markClass: "delimiter"}));
+  shards.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unmatched delimiter", markClass: "shard"}));
   return diagnostics
 }
 
@@ -78,8 +80,7 @@ function MainCodeblock() {
             whiteSpace: 'pre'  // Prevent line wrapping
           }
         }),
-        linter(render_errors),
-        linter(render_delimiters),
+        linter(render_diagnostics),
         // EditorView.decorations.of(Decoration.set(
         //   errors
         //     .map(error => 

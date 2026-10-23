@@ -1,17 +1,40 @@
 
-type token = Token(string);
+type token_kind = 
+    | Identifier
+    | Delimiter
+    | Whitespace
+    | Rune
 
-let string_of_token(t) = switch(t) {
-    | Token(s) => s
-};
+type token = {
+    kind : token_kind,
+    s : string,
+    start : int, 
+    terminus : int 
+}
+
+let token_range(t : token) : (int, int) = (t.start, t.terminus)
 
 type secondary = 
-    | Other
+    | Whitespace(token)
+    | Rune(token)
     | Shard(token)
+
+type term_head = 
+    | Parens
+    | In 
+    | Colon
+    | Arrow 
+    | Lambda
+    | Ap
+    | Construct
 
 type abstract_term =
     | Hole
     | Secondary(secondary)
+    | Empty
+    | Multiple(list(abstract_term))
+    | Ident(string)
+    | Term(term_head, list(abstract_term), list(secondary), list(secondary))
 
 and abstract_left_child = Option.t((abstract_term, list(secondary)))
 and abstract_right_child = Option.t((list(secondary), abstract_term))
@@ -27,21 +50,33 @@ let precedence_less_than(p1 : precedence, p2 : precedence) : bool = switch(p1, p
 
 type mixfix_interior = list(string)
 
+type requirement = 
+    | Need 
+    | Want 
+
 type tip = 
-    | Precedence(precedence)
+    | Precedence(requirement, precedence)
     | Uninterested
 
-type mixfix_form = {
+type mixfix_form_of('context) = {
     left_tip : tip,
     interior : mixfix_interior,
     right_tip : tip,
+    arity : 'context => ('context, list('context), 'context),
+    head : 'context => term_head,
     // builder : (concrete_left_child, list(abstract_term), concrete_right_child) => abstract_term,
 }
 
 module type Language = {
     type context;
+
+    type mixfix_form = mixfix_form_of(context);
+
     let is_whitespace_character : char => bool;
     let is_identifier_char : (bool, char) => bool;
     let forms: list(mixfix_form);
+    let white_precs : Option.t((precedence, precedence));
+    let white_arity : context => (context, context);
+    let white_head : context => term_head;
     let initial_context : unit => context;
 }

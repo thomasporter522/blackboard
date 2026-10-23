@@ -52,10 +52,14 @@
   background-image: none !important;
 }
 
-.lex-error {
+.rune {
+  color: var(--mark-color) !important;
+}
+
+.shard {
   color: var(--mark-color) !important;
 }
 
 .delimiter {
-  color: var(--delim-color) !important;
+  color: var(--delim-color);
 }
