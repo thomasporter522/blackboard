@@ -3,8 +3,8 @@
 // import reactLogo from './assets/react.svg'
 // import viteLogo from './assets/vite.svg'
 import CodeMirror from '@uiw/react-codemirror'
-import { EditorView, Decoration } from '@codemirror/view'
-import { EditorState, StateField, StateEffect, Range } from "@codemirror/state";
+import { EditorView, Decoration, keymap } from '@codemirror/view'
+import { EditorState, StateField, Prec } from "@codemirror/state";
 import type {Tooltip} from "@codemirror/view"
 import { showTooltip} from "@codemirror/view"
 import type {Diagnostic} from "@codemirror/lint";
@@ -103,35 +103,21 @@ function getCursorTooltips(state): readonly Tooltip[] {
 
 const completionExtension = showTooltip.computeN([parseInfoField], state => getCursorTooltips(state))
 
-// function getCursorTooltips(): readonly Tooltip[] {
-//   if(completions.length == 0) return [];
-//   return [{
-//         pos: cursor_position,
-//         above: true,
-//         strictSide: true,
-//         arrow: true,
-//         create: () => {
-//           let dom = document.createElement("div")
-//           dom.className = "cm-tooltip-cursor"
-//           dom.textContent = completions.join(" ")
-//           return {dom}
-//         }
-//       }]
-// }
+function insertCompletion(view : EditorView) {
+  const info = view.state.field(parseInfoField);
+  if(info.completions.length == 0) { return false } 
+  view.dispatch({
+    changes: {
+        from: info.cursor_position,
+        to: info.cursor_position,
+        insert: info.completions[0]
+    },
+    selection: {anchor: info.cursor_position + info.completions[0].length}
+  });
+  return true
+}
 
-// const cursorTooltipField = StateField.define<readonly Tooltip[]>({
-//   create() {
-//     return getCursorTooltips()
-//   },
-
-//   update(_tooltips, _tr) {
-//     return getCursorTooltips()
-//   },
-
-//   provide: f => showTooltip.computeN([f], _state => getCursorTooltips())
-
-//   // provide: f => showTooltip.computeN([f], state => state.field(f))
-// })
+const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}])
 
 function MainCodeblock() {
   return <CodeMirror
@@ -160,6 +146,7 @@ function MainCodeblock() {
         linterExtension,
         delimiterExtension,
         completionExtension,
+        Prec.highest(insertCompletionExtension),
         // cursorTooltipField,
         // EditorView.decorations.of(Decoration.set(
         //   errors
@@ -192,6 +179,7 @@ function MainCodeblock() {
       }}
       onCreateEditor={(_view) => { }}
       onUpdate={(_viewUpdate) => { 
+        // insertCompletion(_viewUpdate.view)
         // cursor_position = viewUpdate.view.state.selection.ranges[0].from; 
         // process(block_contexts, cursor_position);
       }}
