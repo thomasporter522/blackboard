@@ -103,9 +103,8 @@ module Parser = (G : Grammar) => {
         | Color
 
     let format_of_error_kind(k) = switch(k) {
-        | MissingInnerChild 
-        | Multiple => Underline
-        | _ => Color
+        | UnmatchedDelimiter => Color
+        | _ => Underline
     }
 
     type error = {
@@ -239,7 +238,6 @@ module Parser = (G : Grammar) => {
     let rec associate_step(rs : associate_state, reduct : concrete_left_child, m : indivisible) : associate_state = {
         let (_, stack) = rs; 
         switch(rs, reduct, m) {
-        // bug: mustn't create multiples if whitespace is an operator
         | ((c, Empty), None, Secondary(sh)) => (c @ [Secondary(sh)], Empty)
         | ((c, Snoc(stack', lc, m, secondarys)), None, Secondary(sh)) => (c, Snoc(stack', lc, m, secondarys @ [sh]))
         | ((_, _), Some(_), Secondary(_)) => failwith("precondition violated (reduct with secondary)")
@@ -254,7 +252,7 @@ module Parser = (G : Grammar) => {
                 | Match(m, _, _) => left_token_of_match(m)
                 };
                 let m2_range = left_token_of_match(fst(m2)).range;
-                let range = (fst(m2_range), snd(m2_range));
+                let range = (fst(m2_range), fst(m2_range));
                 let white_token = {kind: Delimiter, s : "", range};
                 let white : indivisible = Meld((Head(white_token), wf));
                 associate_step(associate_step(rs, None, white), None, m);

@@ -142,7 +142,7 @@ module BlackboardLanguage : Language = {
         ];
     let repeater_form_summaries = 
         [("5_,_5", (_c => Domain, _c => Commas)),];
-    let ap_precs = (31, 30);
+    let ap_precs = (30, 31);
 
     let forms : list(form) = 
         List.map(s => Option.get(mixfix_form_of_string(fst(s), snd(s))), mixfix_form_summaries)
