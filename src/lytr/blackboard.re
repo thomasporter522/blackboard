@@ -62,7 +62,8 @@ module BlackboardLanguage : Language = {
         | Some(_) => 
             let (s1, s2) = munch_int(String.sub(s, 1, String.length(s)-1));
             (s0 ++ s1, s2)
-        | None => ("", s)
+        | None => 
+            ("", s)
         }
     }
 
@@ -101,8 +102,8 @@ module BlackboardLanguage : Language = {
                 | Some(i) => (Some(sep == "_" ? Child(s1, i) : sep == "$" ? Secondary(s1, i) : failwith("ill formed language spec")), t)
                 }
             | None => {
-                let (q, s) = String.sub(s, 0, 1) == "?" ? ("?", tail(s)) : ("", s);
-                let thing = switch(int_of_string_opt(s)) {
+                let (q, s') = String.sub(s, 0, 1) == "?" ? ("?", tail(s)) : ("", s);
+                let thing = switch(int_of_string_opt(s')) {
                 | Some(p2) => q == "?" ? (None, Precedence(Want, Precedence(p2))) : (None, Precedence(Need, Precedence(p2)));
                 | None => (Some(Just(s)), Uninterested)
                 };
