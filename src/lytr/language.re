@@ -27,6 +27,7 @@ type term_head =
     | Lambda
     | Ap
     | Construct
+    | Commas
     | ITE
 
 type abstract_term =
@@ -67,17 +68,27 @@ type mixfix_form_of('context) = {
     right_tip : tip,
     arity : 'context => ('context, list('context), 'context),
     head : 'context => term_head,
-    // builder : (concrete_left_child, list(abstract_term), concrete_right_child) => abstract_term,
 }
+
+type repeater_form_of('context) = {
+    left_tip : tip,
+    delim : string,
+    right_tip : tip,
+    arity : 'context => 'context,
+    head : 'context => term_head,
+}
+
+type form_of('context) = 
+    | Mixfix(mixfix_form_of('context))
+    | Repeater(repeater_form_of('context))
 
 module type Language = {
     type context;
 
-    type mixfix_form = mixfix_form_of(context);
-
+    type form = form_of(context);
     let is_whitespace_character : char => bool;
     let is_identifier_char : (bool, char) => bool;
-    let forms: list(mixfix_form);
+    let forms: list(form);
     let white_precs : Option.t((precedence, precedence));
     let white_arity : context => (context, context);
     let white_head : context => term_head;

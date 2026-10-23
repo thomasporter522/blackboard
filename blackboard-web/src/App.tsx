@@ -107,7 +107,14 @@ const completionExtension = showTooltip.computeN([parseInfoField], state => getC
 function insertCompletion(view : EditorView) {
   const info = view.state.field(parseInfoField);
   if(info.completions.length == 0) { return false } 
-  const inserted = " " + info.completions[0];
+  const body = view.state.doc.toString();
+  const prefix = 
+    info.cursor_position-1 >= body.length ? "" : 
+    info.cursor_position-1 < 0 ? "" : 
+    (body[info.cursor_position-1] == "\n" 
+      || body[info.cursor_position-1] == " "
+      || body[info.cursor_position-1] == "\t") ? "" : " "
+  const inserted = prefix + info.completions[0];
   view.dispatch({
     changes: {
         from: info.cursor_position,
