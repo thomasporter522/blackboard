@@ -5,9 +5,16 @@ module type Grammar = {
     type form;
     type context;
 
-    type abstraction_error = 
+    type abstraction_error_kind = 
         | MissingLeftChild
         | MissingRightChild
+        | MissingInnerChild
+        | ExtraneousChild
+
+    type abstraction_error = {
+        kind : abstraction_error_kind, 
+        range : (int, int)
+    }
 
     let is_whitespace_character : char => bool;
     let max_delimiter_length : int;
@@ -26,21 +33,34 @@ module type Grammar = {
     let initial_context : unit => context;
 
     let propagate_context: (context, form) => (context, list(context), context);
-    let abstract_term : (context, form, abstract_left_child, list(abstract_span), abstract_right_child) => (abstract_term, list(abstraction_error)) ;
+    let abstract_term : (context, form, abstract_left_child, list(abstract_span), abstract_right_child, (int, int)) => (abstract_term, list(abstraction_error)) ;
 }
 
 module GrammarOfLanguage = (L : Language) : Grammar => {
 
-    type abstraction_error = 
+    type abstraction_error_kind = 
         | MissingLeftChild
         | MissingRightChild
+        | MissingInnerChild
+        | ExtraneousChild
+
+    type abstraction_error = {
+        kind : abstraction_error_kind, 
+        range : (int, int)
+    }
 
     let is_whitespace_character(c : char) : bool = L.is_whitespace_character(c);
+
+    let rec list_of_interior(i) = switch(i) {
+        | Just(s) => [s]
+        | Child(s, i) 
+        | Secondary(s, i) => [s] @ list_of_interior(i)
+    }
 
     module StringSet = Set.Make(String)
     let delimiters_of_form(s : StringSet.t, f : L.form) : StringSet.t = {
         switch(f) {
-            | Mixfix(mf) => List.fold_left((ss, s) => StringSet.add(s, ss), s, mf.interior)
+            | Mixfix(mf) => List.fold_left((ss, s) => StringSet.add(s, ss), s, list_of_interior(mf.interior))
             | Repeater(rf) => StringSet.add(rf.delim, s)
         }
         
@@ -81,7 +101,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
     let initial_form_state(t : token) : Option.t(form_state) = {
         let correct_head(form : L.form) = {
             switch(form) {
-            | Mixfix(mf) when t.s == List.hd(mf.interior) => Some({form, delimiter_index: 0})
+            | Mixfix(mf) when t.s == List.hd(list_of_interior(mf.interior)) => Some({form, delimiter_index: 0})
             | Repeater(rf) when t.s == rf.delim => Some({form, delimiter_index: 0})
             | _ => None
             }
@@ -96,7 +116,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
             switch(p.form) {
             | Mixfix(mf) => 
                 let next_index = p.delimiter_index + 1; 
-                switch(List.nth_opt(mf.interior, next_index)) {
+                switch(List.nth_opt(list_of_interior(mf.interior), next_index)) {
                     | None => None 
                     | Some(t') when t.s != t' => None
                     | Some(_) => Some({form: p.form, delimiter_index: next_index})
@@ -124,7 +144,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
             | Mixfix(mf) => 
                 let next_index = p.delimiter_index + 1; 
                 // keep only those possibilities which *don't* have a next delimiter
-                switch(List.nth_opt(mf.interior, next_index)) {
+                switch(List.nth_opt(list_of_interior(mf.interior), next_index)) {
                     | None => Some(Mixfix(mf))
                     | Some(_) => None
                 }
@@ -139,7 +159,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
             if(ps == []) { failwith("impossible get_completions") } else {
                 let p = List.hd(ps);
                 switch(p.form) {
-                | Mixfix(mf) => ntail(p.delimiter_index+1, mf.interior)
+                | Mixfix(mf) => ntail(p.delimiter_index+1, list_of_interior(mf.interior))
                 | Repeater(_) => []
                 }
             }
@@ -184,7 +204,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
             (c1, [], c2)
     }
 
-    let needs_children(f : form) : (bool, bool) = {
+    let needs_outer_children(f : form) : (bool, bool) = {
         let h(t : tip) : bool = switch(t) {
             | Precedence(Need, _) => true 
             | _ => false 
@@ -197,17 +217,31 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
         }
     }
 
-    let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_span), rc : abstract_right_child) : (abstract_term, list(abstraction_error)) = {
+    let rec needs_inner_children_mixfix(n : mixfix_interior, i : int) : bool = switch(n) {
+        | Child(_) when i == 0 => true 
+        | Secondary(_) when i == 0 => false
+        | Child(_, n)
+        | Secondary(_, n) => needs_inner_children_mixfix(n, i-1) 
+        | Just(_) => failwith("impossible: needs_inner_children_mixfix")
+    }
+
+    let needs_inner_children(f : form, i : int) : bool = switch(f) {
+        | Mixfix(mf) => needs_inner_children_mixfix(mf.interior, i)
+        | Repeater(_) => true
+        | Ident(_) | White => failwith("impossible: needs_inner_children")
+    }
+
+    let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_span), rc : abstract_right_child, range: (int, int)) : (abstract_term, list(abstraction_error)) = {
         switch(f) {
         | Ident(s) => (Ident(s), [])
         | _ => {
-            let (b1, b2) = needs_children(f);
+            let (b1, b2) = needs_outer_children(f);
             let (lc', rs1) = switch(lc) {
-                | None => b1 ? (Some((Hole, [])), [MissingLeftChild]) : (None, [])
+                | None => b1 ? (Some((Hole, [])), [{kind: MissingLeftChild, range: (fst(range), fst(range))}]) : (None, [])
                 | Some(_) => (lc, [])
             };
             let (rc', rs2) = switch(rc) {
-                | None => b2 ? (Some(([], Hole)), [MissingRightChild]) : (None, [])
+                | None => b2 ? (Some(([], Hole)), [{kind: MissingRightChild, range: (snd(range), snd(range))}]) : (None, [])
                 | Some(_) => (rc, [])
             };
             let head = switch(f) {
@@ -216,7 +250,17 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
                 | Mixfix(mf) => mf.head(c)
                 | Repeater(rf, _) => rf.head(c)
             };
-            (Term(head, lc', ats, rc'), rs1 @ rs2);
+            let (ats', rs3, _) = List.fold_left({
+                ((acc_ats, acc_rs, i), at) => {
+                    switch(at, needs_inner_children(f, i)) {
+                    | (Empty(ss, r), true) => (acc_ats @ [Single(ss, Hole, [], r)], [{kind: MissingInnerChild, range: r}] @ acc_rs, i+1)
+                    | (Single(_, _, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
+                    | (Multiple(_, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
+                    | _ => (acc_ats @ [at], acc_rs, i+1)
+                    }
+                }
+            }, ([], [], 0), ats);
+            (Term(head, lc', ats', rc'), rs1 @ rs2 @ rs3);
             }
         }
     }

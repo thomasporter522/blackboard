@@ -36,9 +36,9 @@ type abstract_term =
     | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
 
 and abstract_span = 
-    | Empty(list(secondary))
-    | Single(list(secondary), abstract_term, list(secondary))
-    | Multiple(list(abstract_term), list(list(secondary)))
+    | Empty(list(secondary), (int, int)) // entire range
+    | Single(list(secondary), abstract_term, list(secondary), (int, int)) // range of term
+    | Multiple(list(abstract_term), list(list(secondary)), (int, int)) // range of terms
 
 and abstract_left_child = Option.t((abstract_term, list(secondary)))
 and abstract_right_child = Option.t((list(secondary), abstract_term))
@@ -52,7 +52,10 @@ let precedence_less_than(p1 : precedence, p2 : precedence) : bool = switch(p1, p
     | (Precedence(p1), Precedence(p2)) => p1 < p2
 }
 
-type mixfix_interior = list(string)
+type mixfix_interior =
+    | Just(string)
+    | Child(string, mixfix_interior)
+    | Secondary(string, mixfix_interior)
 
 type requirement = 
     | Need 

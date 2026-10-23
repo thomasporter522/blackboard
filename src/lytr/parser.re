@@ -95,6 +95,7 @@ module Parser = (G : Grammar) => {
         | MissingLeftChild 
         | MissingRightChild
         | MissingInnerChild
+        | ExtraneousChild
         | Multiple
     
     type error_format = 
@@ -116,7 +117,7 @@ module Parser = (G : Grammar) => {
         | Term(G.form, ((int, int), (int, int)), concrete_left_child, list(concrete_span), concrete_right_child)
 
     and concrete_span = 
-        | Empty(list(secondary))
+        | Empty(list(secondary), (int, int))
         | Multiple(list(concrete_term), list(list(secondary)))
         | Single(list(secondary), concrete_term, list(secondary))
 
@@ -169,6 +170,24 @@ module Parser = (G : Grammar) => {
         indivisibles: [], 
         errors: [],
         completions: []
+    };
+
+
+    let rec range_of_multiple_opt(cts : list(concrete_term)) : Option.t((int, int)) = {
+        switch(cts) {
+        | [] => None
+        | [Term(_, ((a, _), (_, b)), _, _, _), ...cts'] => switch(range_of_multiple_opt(cts')){
+            | Some((_, b')) => Some((a, b'))
+            | None => Some((a, b))
+            }
+        }
+    };
+
+    let range_of_multiple(cts : list(concrete_term)) : (int, int) = {
+        switch(range_of_multiple_opt(cts)) {
+        | None => failwith("impossible: range_of_multiple")
+        | Some(r) => r
+        }
     };
 
     let rec unmatch(pm : partial_match) : (list(indivisible), list(error)) = switch(pm) {
@@ -229,10 +248,14 @@ module Parser = (G : Grammar) => {
         | ((c, Snoc(stack', lc, m1, secondarys)), reduct, Meld(m2)) => 
             let stack_tip = G.right_tip(snd(m1));
             let meld_tip = G.left_tip(snd(m2));
-
             let insert_white(wf : G.form) = {
-                // bug: better range
-                let white_token = {kind: Delimiter, s : "", range: (-1, -1)};
+                let rec left_token_of_match(m : final_match) = switch(m) {
+                | Head(t) => t 
+                | Match(m, _, _) => left_token_of_match(m)
+                };
+                let m2_range = left_token_of_match(fst(m2)).range;
+                let range = (fst(m2_range), snd(m2_range));
+                let white_token = {kind: Delimiter, s : "", range};
                 let white : indivisible = Meld((Head(white_token), wf));
                 associate_step(associate_step(rs, None, white), None, m);
             }
@@ -259,27 +282,35 @@ module Parser = (G : Grammar) => {
     let full_associate_step(rs : associate_state, m : indivisible) : associate_state = associate_step(rs, None, m)
 
 
-    let rec finalize_shelf_entries(ss : list(secondary), es : list(associate_shelf_entry)) : concrete_span = {
+    let rec finalize_shelf_entries(ss : list(secondary), ssr : (int, int), es : list(associate_shelf_entry)) : concrete_span = {
         switch(es) {
-        | [] => Empty(ss)
-        | [Secondary(s), ... es'] => finalize_shelf_entries(ss @ [s], es')
-        | [Term(t), ... es'] => switch(finalize_shelf_entries([], es')) {
-            | Empty(ss2) => Single(ss, t, ss2)
-            | Multiple(ts, ss2) => Multiple([t] @ ts, [ss] @ ss2)
-            | Single(ss1, t2, ss2) => Multiple([t, t2], [ss, ss1, ss2])
-        }
+        | [] => 
+            Empty(ss, ssr)
+        | [Secondary(s), ... es'] => 
+            let b = switch(s) {
+            | Cursor => snd(ssr)
+            | Shard(t) | Whitespace(t) | Rune(t) => snd(t.range)
+            };
+            finalize_shelf_entries(ss @ [s], (fst(ssr), b), es')
+        | [Term(t), ... es'] => 
+            let a = snd(range_of_multiple([t]));
+            switch(finalize_shelf_entries([], (a, a), es')) {
+                | Empty(ss2, _) => Single(ss, t, ss2)
+                | Multiple(ts, ss2) => Multiple([t] @ ts, [ss] @ ss2)
+                | Single(ss1, t2, ss2) => Multiple([t, t2], [ss, ss1, ss2])
+            }
         }
     }
 
-    let finalize_associate_state(rs : associate_state) : concrete_span = {
+    let finalize_associate_state(rs : associate_state, r : (int, int)) : concrete_span = {
         let (c, s) = rs; 
         let entries : list(associate_shelf_entry) = c @ roll_stack(s); 
-        finalize_shelf_entries([], entries)
+        finalize_shelf_entries([], r, entries)
     }
 
-    let associate(ms : list(indivisible)) : concrete_span = {
+    let associate(ms : list(indivisible), r : (int, int)) : concrete_span = {
         let final_associate_state = List.fold_left(full_associate_step, initial_associate_state, ms);
-        finalize_associate_state(final_associate_state)
+        finalize_associate_state(final_associate_state, r)
     }
 
     type partial_meld = 
@@ -306,16 +337,24 @@ module Parser = (G : Grammar) => {
     let rec finalize_match(m : partial_match) : (final_match, list(error)) = switch(m) {
         | Head(t, _) => (Head(t), [])
         | Match(m', cts, t, _) => 
-            let inner = associate(cts);
-            let es1 = switch(inner) {
-            | Empty(_) => [{
-                kind: MissingInnerChild,
-                range: (snd(right_face_of_partial_match(m').range), fst(t.range))
-            }]
-            | _ => []
-            };
+            let inner = associate(cts, (snd(right_face_of_partial_match(m').range), fst(t.range)));
+            // let es1 = switch(inner, G.accepts_child(fs)) {
+            // | (Empty(_), true) => [{
+            //     kind: MissingInnerChild,
+            //     range: (snd(right_face_of_partial_match(m').range), fst(t.range))
+            // }]
+            // | (Single(_,Term(_, ((a, _), (_, b)), _, _, _),_), false) => [{
+            //     kind: ExtraneousChild,
+            //     range: (a, b)
+            // }]
+            // | (Multiple(cts, _), false) => [{
+            //     kind: ExtraneousChild,
+            //     range: range_of_multiple(cts)
+            // }]
+            // | _ => []
+            // };
             let (fm, es2) = finalize_match(m'); 
-            (Match(fm, inner, t), es1 @ es2)
+            (Match(fm, inner, t), es2)
     }
 
     let finalize_partial_meld(po : partial_meld, checking_completions: bool) : match_result = switch(po) {
@@ -424,36 +463,20 @@ module Parser = (G : Grammar) => {
         result
     }
 
-    let rec range_of_multiple_opt(cts : list(concrete_term)) : Option.t((int, int)) = {
-        switch(cts) {
-        | [] => None
-        | [Term(_, ((a, _), (_, b)), _, _, _), ...cts'] => switch(range_of_multiple_opt(cts')){
-            | Some((_, b')) => Some((a, b'))
-            | None => Some((a, b))
-            }
-        }
-    };
-
-    let range_of_multiple(cts : list(concrete_term)) : (int, int) = {
-        switch(range_of_multiple_opt(cts)) {
-        | None => failwith("impossible: range_of_multiple")
-        | Some(r) => r
-        }
-    };
-
     let rec abstract_span(ctx : G.context, c : concrete_span) : (abstract_span, list(error))  = switch(c){
-        | Empty(ss) => (Empty(ss), [])
+        | Empty(ss, r) => (Empty(ss, r), [])
         | Multiple(cts, sss) => 
             let recursive_call = List.map(abstract_term(ctx), cts);
             let (ats, rs) = (List.map(fst, recursive_call), List.map(snd, recursive_call));
+            let range = range_of_multiple(cts);
             let e : error = {
                 kind: Multiple, 
-                range: range_of_multiple(cts),
+                range,
             };
-            (Multiple(ats, sss), List.concat(rs) @ [e])
+            (Multiple(ats, sss, range), List.concat(rs) @ [e])
         | Single(ss1, ct, ss2) => 
             let (at, es) =  abstract_term(ctx, ct);
-            (Single(ss1, at, ss2), es)
+            (Single(ss1, at, ss2, range_of_multiple([ct])), es)
     }
     
     and abstract_term(ctx : G.context, c : concrete_term) : (abstract_term, list(error)) = switch(c) {
@@ -463,11 +486,13 @@ module Parser = (G : Grammar) => {
             let (rc', esrc) = abstract_right_child(rctx, rc);
             let recursive_call = List.map2(abstract_span, ctxs, cts);
             let (ats', esm) = (List.map(fst, recursive_call), List.map(snd, recursive_call));
-            let (at, aesa) = G.abstract_term(ctx, f, lc', ats', rc');
+            let (at, aesa) = G.abstract_term(ctx, f, lc', ats', rc', (fst(fst(ranges)), snd(snd(ranges))));
             let error_of_abstraction_error(ae : G.abstraction_error): error = {
-                switch(ae) {
-                | MissingLeftChild => {range: fst(ranges), kind: MissingLeftChild}
-                | MissingRightChild => {range: snd(ranges), kind: MissingRightChild}
+                switch(ae.kind) {
+                | MissingLeftChild => {range: ae.range, kind: MissingLeftChild}
+                | MissingRightChild => {range: ae.range, kind: MissingRightChild}
+                | MissingInnerChild => {range: ae.range, kind: MissingInnerChild}
+                | ExtraneousChild => {range: ae.range, kind: ExtraneousChild}
                 }
             };
             let esa = List.map(error_of_abstraction_error, aesa);
@@ -502,7 +527,11 @@ module Parser = (G : Grammar) => {
 
     let parse(tokens : list(token)) : (abstract_span, parse_info) = {
         let match_result = match(tokens);
-        let concrete_t = associate(match_result.indivisibles);
+        let range = switch(List.rev(tokens)) {
+            | [] => (0, 0)
+            | [last, ..._] => (fst(List.hd(tokens).range), snd(last.range))
+        };
+        let concrete_t = associate(match_result.indivisibles, range);
         let (abstract_t, abstract_errors) = abstract(concrete_t);
         (abstract_t, {errors: match_result.errors @ abstract_errors, completions : match_result.completions})
     }

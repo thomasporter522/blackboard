@@ -44,6 +44,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         | MissingLeftChild => "missing left constituent"
         | MissingRightChild => "missing right constituent"
         | MissingInnerChild => "missing constituent"
+        | ExtraneousChild => "this is no place for text"
         | Multiple => "multiple terms"
     }
     let f2(x : Lytr.Blackboard.BlackboardParser.error) : error = [%js {as _; 

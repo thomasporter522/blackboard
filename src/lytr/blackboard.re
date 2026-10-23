@@ -22,40 +22,97 @@ module BlackboardLanguage : Language = {
     let is_alpha(c : char) = Str.string_match(Str.regexp("[a-z]\|[A-Z]"), String.make(1, c), 0)
 
     let is_identifier_char (is_start : bool, c : char) : bool = {
-        // print_endline(String.make(1, c));
-        // print_endline(string_of_bool(c == '1'));
         is_start ? is_alpha(c) : (is_alpha(c) || c == '-')
     }
 
-    let mixfix_form_of_string(s : string, (arity, head)) : Option.t(form) = {
-        let split = String.split_on_char('_', s);
-        let (left_tip : tip, rest : list(string)) = switch(int_of_string_opt(List.hd(split))) {
-            | Some(p1) => (Precedence(Need, Precedence(p1)), List.tl(split))
-            | None => (Uninterested, split)
-        };
-        let check(h : string) = if(h == "") { failwith("bad language specification syntax: " ++ s) } else ();
-        let rec middle_and_end(strings : list(string)) : Option.t((mixfix_interior, tip)) = switch(strings) {
-            | [] => None
-            | [h] => switch(int_of_string_opt(h)) {
-                | Some(p2) => Some(([], Precedence(Need, Precedence(p2))))
-                | None => {
-                    check(h);
-                    Some(([h], Uninterested))
-                }
-            }
-            | [h,...rest] => switch(middle_and_end(rest)) {
-                | Some((interior, tip)) => {
-                    check(h);
-                    Some(([h,...interior], tip))
-                }
-                | None => None
-            }
-        }
-        switch(middle_and_end(rest)) {
-            | Some((interior, right_tip)) => Some(Mixfix({left_tip, interior, right_tip, arity, head}))
-            | None => None
+    // let old_mixfix_form_of_string(s : string, (arity, head)) : Option.t(form) = {
+    //     let split = String.split_on_char('_', s);
+    //     let (left_tip : tip, rest : list(string)) = switch(int_of_string_opt(List.hd(split))) {
+    //         | Some(p1) => (Precedence(Need, Precedence(p1)), List.tl(split))
+    //         | None => (Uninterested, split)
+    //     };
+    //     let check(h : string) = if(h == "") { failwith("bad language specification syntax: " ++ s) } else ();
+    //     let rec middle_and_end(strings : list(string)) : (mixfix_interior, tip) = switch(strings) {
+    //         | [] => failwith("bad language specification syntax")
+    //         | [h] => 
+    //             check(h);
+    //             (Just(h), Uninterested)
+    //         | [t1, t2] => switch(int_of_string_opt(t2)) {
+    //             | Some(p2) => 
+    //                 check(t1);
+    //                 (Just(t1), Precedence(Need, Precedence(p2)))
+    //             | None => {
+    //                 check(t1);
+    //                 check(t2);
+    //                 (Child(t1, Just(t2)), Uninterested)
+    //             }
+    //         }
+    //         | [h,...rest] => 
+    //             let (form, right_tip) = middle_and_end(rest);
+    //             check(h);
+    //             (Child(h, form), right_tip)
+    //     }
+    //     let (interior, right_tip) = middle_and_end(rest);
+    //     Some(Mixfix({left_tip, interior, right_tip, arity, head}))
+    // }
+
+    let rec munch_int(s : string) : (string, string) = {
+        let s0 = String.sub(s, 0, 1);
+        switch(int_of_string_opt(s0)) {
+        | Some(_) => 
+            let (s1, s2) = munch_int(String.sub(s, 1, String.length(s)-1));
+            (s0 ++ s1, s2)
+        | None => ("", s)
         }
     }
+
+    let tail = s => String.sub(s, 1, String.length(s)-1);
+
+    let rec munch_delim(s : string) : Option.t((string, string, string)) = {
+        if (s == "") None else {
+            let s0 = String.sub(s, 0, 1);
+            let s1 = tail(s);
+            switch(s0) {
+            | "" => None
+            | "_" => Some(("", "_", s1))
+            | "$" => Some(("", "$", s1))
+            | _ => switch(munch_delim(s1)) {
+                | Some((s1, s2, s3)) => Some((s0 ++ s1, s2, s3))
+                | None => None
+                }
+            }
+        }
+    }
+
+    let mixfix_form_of_string(s : string, (arity, head)) : Option.t(form) = {
+        let (p1, s) = munch_int(s);
+        let (left_tip, s) = 
+            if(p1 == "") { (Uninterested, s) } 
+            else if (String.sub(s, 0, 2) == "?_") {
+                (Precedence(Want, Precedence(int_of_string(p1))), String.sub(s, 2, String.length(s)-2))
+            } else if (String.sub(s, 0, 1) == "_") {
+                (Precedence(Need, Precedence(int_of_string(p1))), tail(s))
+            } else failwith("ill formed language spec");
+        let rec build_middle(s : string) : (Option.t(mixfix_interior), tip) = switch(munch_delim(s)) {
+            | Some((s1, sep, s2)) => 
+                let (i, t) = build_middle(s2);
+                switch(i) {
+                | None => (Some(Just(s1)), t)
+                | Some(i) => (Some(sep == "_" ? Child(s1, i) : sep == "$" ? Secondary(s1, i) : failwith("ill formed language spec")), t)
+                }
+            | None => {
+                let (q, s) = String.sub(s, 0, 1) == "?" ? ("?", tail(s)) : ("", s);
+                let thing = switch(int_of_string_opt(s)) {
+                | Some(p2) => q == "?" ? (None, Precedence(Want, Precedence(p2))) : (None, Precedence(Need, Precedence(p2)));
+                | None => (Some(Just(s)), Uninterested)
+                };
+                thing
+            }
+        };
+        let (interior, right_tip) = build_middle(s);
+        Some(Mixfix({left_tip, interior: Option.get(interior), right_tip, arity, head}))
+    }
+
 
     let repeater_form_of_string(s : string, (arity, head)) : Option.t(form) = {
         let split = String.split_on_char('_', s);
@@ -75,11 +132,14 @@ module BlackboardLanguage : Language = {
         [("(_)", (c => (Default, [c], Default), _c => Parens)),
         ("?", (_c => (Default, [], Default), _c => Interaction)),
         ("100_:_0", (_c => (Ident, [], Term), _c => Colon)),
+        ("(_:_)$->_10", (_c => (Default, [Ident, Term, Default], Term), _c => Arrow)),
         ("11_->_10", (_c => (Domain, [], Term), _c => Arrow)),
         ("11_=>_10", (_c => (Domain, [], Term), _c => Lambda)),
         ("20_::_21", (_c => (Term, [], Term), _c => In)),
         ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
-        ("construct_by_0", (_c => (Default, [Sig], Demo), _c => Construct)),];
+        ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), _c => Construct)),
+        ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), _c => Construct)),
+        ];
     let repeater_form_summaries = 
         [("5_,_5", (_c => Domain, _c => Commas)),];
     let ap_precs = (31, 30);
