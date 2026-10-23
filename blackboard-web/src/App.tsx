@@ -10,7 +10,14 @@ import { linter } from "@codemirror/lint";
 import './App.css'
 import { blackboardTheme } from "./CodeTheme.tsx"
 
+function lex_test(s) {
+  return globalThis.lex_test(s);
+}
+
+// const my_obj = globalThis.my_obj;
+
 var errors : number[][] = [];
+var delimiters : number[][] = [];
 
 type errors_type = number[][];
 
@@ -31,14 +38,20 @@ function clean_errors(es : any) : errors_type {
 }
 
 function process(s : string) {
-  // call the reasonml lexer and parser
-  const lex_result = globalThis.lex_test(s);
-  errors = clean_errors(lex_result);
+  errors = clean_errors(lex_test(s).errors);
+  delimiters = lex_test(s).delimiters;
 }
 
 function render_errors(_view : EditorView) : readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   errors.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "lex-error"}));
+  return diagnostics
+}
+
+function render_delimiters(_view : EditorView) : readonly Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  print(delimiters);
+  delimiters.map(e => diagnostics.push({from: e[0], to: e[1], severity: "hint", message: "", markClass: "delimiter"}));
   return diagnostics
 }
 
@@ -65,7 +78,8 @@ function MainCodeblock() {
             whiteSpace: 'pre'  // Prevent line wrapping
           }
         }),
-        linter(render_errors)
+        linter(render_errors),
+        linter(render_delimiters),
         // EditorView.decorations.of(Decoration.set(
         //   errors
         //     .map(error => 

@@ -5,8 +5,16 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: 'FiraCode';
+  src: url('/fonts/FiraCode/static/FiraCode-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
 :root {
   --text: #dbdac2;
+  --delim-color: #9f9e7d;
   --bg: #282828;
   --beam: #999988;
   --orang: #b922ff;
@@ -46,4 +54,8 @@
 
 .lex-error {
   color: var(--mark-color) !important;
+}
+
+.delimiter {
+  color: var(--delim-color) !important;
 }

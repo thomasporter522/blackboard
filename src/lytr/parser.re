@@ -45,7 +45,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
         StringSet.fold(update_max, delimiters, -1);
     }
 
-    let is_delimiter(s : string) = StringSet.mem(s, delimiters)
+    let is_delimiter(s : string) = StringSet.mem(s, delimiters);
 
     let is_identifier_char(is_start : bool, c : char) : bool = L.is_identifier_char(is_start, c);
 
@@ -115,13 +115,22 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
     let abstract_term(c : context, f : form, ls : abstract_left_child, ats : list(abstract_term), rc : abstract_right_child) : abstract_term = failwith("todo");
 }
 
+let safe_sub(s : string, n1 : int, n2 : int) : string = {
+    if(n1 < 0) { failwith("n1 too low " ++ string_of_int(n1) ++ " vs " ++ s) } 
+    // else if (n1 >= String.length(s)) { failwith("n1 too high " ++ string_of_int(n1) ++ " vs " ++ s) } 
+    else if (n1 + n2 < 0){ failwith("n1 + n2 too low " ++ string_of_int(n1 + n2) ++ " vs " ++ s) } 
+    else if (n1 + n2 > String.length(s)) { failwith("n1 + n2 too high "  ++ string_of_int(n1 + n2) ++ " vs " ++ s) } 
+    else String.sub(s, n1, n2)
+}
+
 module Lexer (G : Grammar) = {
     let split(s : string, n : int) : (string, string) = 
-        (String.sub(s, 0, n), String.sub(s, n, String.length(s) - n));
+        (safe_sub(s, 0, n), safe_sub(s, n, String.length(s) - n));
 
     let rec lex_delimiter_length(l : int, s : string) : Option.t((string, string)) = {
-        if (l <= 0) { None } else 
-        if (G.is_delimiter(String.sub(s, 0, l))) { 
+        if (l <= 0) { None } 
+        else if (l > String.length(s)) { lex_delimiter_length(min(l, String.length(s)), s) }
+        else if (G.is_delimiter(safe_sub(s, 0, l))) { 
             Some(split(s, l)) 
         } else { lex_delimiter_length(l-1, s) }
     }
@@ -142,32 +151,46 @@ module Lexer (G : Grammar) = {
         } else None
     }
 
-    type lex_error = Rune(int, int)
+    type lex_info = {
+        lex_errors : list((int, int)),
+        delimiters : list((int, int))
+    }
 
-    let rec lex_index(i : int, s : string) : (list(token), list(lex_error)) = {
-        let munch((s1 : string, s2 : string)) : (list(token), list(lex_error)) = {
+    let empty_lex_info : lex_info = {
+        lex_errors: [], 
+        delimiters: []
+    }
+
+    let rec lex_index(i : int, s : string) : (list(token), lex_info) = {
+        let munch((s1 : string, s2 : string)) : (list(token), lex_info) = {
             let (ts, es) = lex_index(i + String.length(s1), s2);
             ([Token(s1), ...ts], es)
         };
-        if(s == "") { ([], []) } else
+        if(s == "") { ([], empty_lex_info) } else
         if(G.is_whitespace_character(s.[0])) {
             munch(split(s, 1))
         } else {
             // bug: munches "construct" delimiter out of "construction" identifier
+            // bug: x-> is lexed as "x-" ">"
             switch(lex_delimiter(s)) {
-            | Some((s1, s2)) => munch((s1, s2));
+            | Some((s1, s2)) => {
+                let (ts, li) = lex_index(i + String.length(s1), s2);
+                let li' = {lex_errors: li.lex_errors, delimiters: [(i, i+ String.length(s1)), ...li.delimiters]};
+                ([Token(s1), ...ts], li')
+            };
             | None => switch(lex_identifier(true, s)) {
                 | Some((s1, s2)) => munch((s1, s2))
                 | None => 
                     let (s1, s2) = split(s, 1);
-                    let (ts, es) = lex_index(i+1, s2);
-                    ([Token(s1), ...ts], [Rune(i, i+1), ...es])
+                    let (ts, li) = lex_index(i+1, s2);
+                    let li' = {lex_errors: [(i, i+1), ...li.lex_errors], delimiters: li.delimiters};
+                    ([Token(s1), ...ts], li')
                 }
             }
         }
     }
 
-    let lex(s : string) : (list(token), list(lex_error)) = lex_index(0, s);
+    let lex(s : string) : (list(token), lex_info) = lex_index(0, s);
     
 }
 

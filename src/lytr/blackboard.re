@@ -27,7 +27,7 @@ module BlackboardLanguage : Language = {
             | [] => None
             | [h] => switch(int_of_string_opt(h)) {
                 | Some(p2) => Some(([], Precedence(Precedence(p2))))
-                | None => Some(([h], Uninterested))
+                | None =>  Some(([h], Uninterested))
             }
             | [h,...rest] => switch(middle_and_end(rest)) {
                 | Some((interior, tip)) => Some(([h,...interior], tip))
@@ -40,7 +40,15 @@ module BlackboardLanguage : Language = {
         }
     }
 
-    let forms : list(mixfix_form) = List.map(s => Option.get(form_of_string(s)), ["1_+_2"]);
+    let form_strings = 
+        ["(_)",
+        "100_:_0",
+        "11_->_10", 
+        "11_=>_10", 
+        "20_::_21",
+        "construct_by_"];
+
+    let forms : list(mixfix_form) = List.map(s => Option.get(form_of_string(s)), form_strings);
     let initial_context(): context = Exp;
 }
 
@@ -48,10 +56,7 @@ module BlackboardGrammar = GrammarOfLanguage(BlackboardLanguage);
 
 module BlackboardLexer = Lexer(BlackboardGrammar);
 
-let lex_test(s : string) : list((int, int, string)) = {
+let lex_test(s : string) : BlackboardLexer.lex_info = {
     let (_, es) = BlackboardLexer.lex(s);
-    let process_error(e : BlackboardLexer.lex_error) = switch(e) {
-        | Rune(i, j) => (i, j, "unrecognized character")
-    }
-    List.map(process_error, es);
+    es
 }
