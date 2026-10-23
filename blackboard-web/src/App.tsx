@@ -21,6 +21,7 @@ function parse_test(s, cursor_position) {
 type error = {
     message: string, 
     range: number[],
+    underline : Boolean,
 };
 
 // var block_contexts : string = "";
@@ -78,7 +79,7 @@ function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
   const info = view.state.field(parseInfoField);
   const diagnostics: Diagnostic[] = [];
   info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "rune"}));
-  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: e.message, markClass: "shard"}));
+  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: e.message, markClass: e.underline ? "line-error" : "color-error"}));
   return diagnostics
 }
 
@@ -106,13 +107,14 @@ const completionExtension = showTooltip.computeN([parseInfoField], state => getC
 function insertCompletion(view : EditorView) {
   const info = view.state.field(parseInfoField);
   if(info.completions.length == 0) { return false } 
+  const inserted = " " + info.completions[0];
   view.dispatch({
     changes: {
         from: info.cursor_position,
         to: info.cursor_position,
-        insert: info.completions[0]
+        insert: inserted
     },
-    selection: {anchor: info.cursor_position + info.completions[0].length}
+    selection: {anchor: info.cursor_position + inserted.length}
   });
   return true
 }
@@ -173,6 +175,7 @@ function MainCodeblock() {
         foldGutter: false,
         dropCursor: false,
         allowMultipleSelections: false,
+        closeBrackets: false,
       }}
       onChange={(_val, _viewUpdate) => {
         // block_contexts = val;

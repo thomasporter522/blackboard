@@ -56,7 +56,12 @@
   color: var(--mark-color) !important;
 }
 
-.shard {
+.line-error {
+  text-decoration: underline !important;
+  text-decoration-color: var(--mark-color) !important;
+}
+
+.color-error {
   color: var(--mark-color) !important;
 }
 

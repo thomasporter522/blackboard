@@ -22,6 +22,7 @@ let js_lexer(s : string) : lex_result = {
 type error = Js.t({.
     message: Js.readonly_prop(string), 
     range: Js.readonly_prop(range),
+    underline : Js.readonly_prop(Js.t(bool)),
 });
 
 type parse_result = Js.t({. 
@@ -40,12 +41,15 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
     };
     let message_f(k: Lytr.Blackboard.BlackboardParser.error_kind) = switch(k) {
         | UnmatchedDelimiter => "unmatched delimiter"
-        | MissingLeftChild => "missing left argument"
-        | MissingRightChild => "missing right argument"
+        | MissingLeftChild => "missing left constituent"
+        | MissingRightChild => "missing right constituent"
+        | MissingInnerChild => "missing constituent"
+        | Multiple => "multiple terms"
     }
     let f2(x : Lytr.Blackboard.BlackboardParser.error) : error = [%js {as _; 
         val message = message_f(x.kind);
         val range = f1(x.range);
+        val underline = if (Lytr.Blackboard.BlackboardParser.format_of_error_kind(x.kind) == Underline) {Js.bool(true)} else {Js.bool(false)};
     }];
     let f3(x : list(string)) : list(Js.t(Js.js_string)) = List.map(s => Js.string(s), x);
     let result = [%js {as _; 

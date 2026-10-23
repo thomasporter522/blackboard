@@ -31,11 +31,13 @@ type term_head =
 
 type abstract_term =
     | Hole
-    | Secondary(secondary)
-    | Empty
-    | Multiple(list(abstract_term))
     | Ident(string)
-    | Term(term_head, list(abstract_term), list(secondary), list(secondary))
+    | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
+
+and abstract_span = 
+    | Empty(list(secondary))
+    | Single(list(secondary), abstract_term, list(secondary))
+    | Multiple(list(abstract_term), list(list(secondary)))
 
 and abstract_left_child = Option.t((abstract_term, list(secondary)))
 and abstract_right_child = Option.t((list(secondary), abstract_term))
