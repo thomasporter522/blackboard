@@ -32,14 +32,21 @@ module BlackboardLanguage : Language = {
             | Some(p1) => (Precedence(Need, Precedence(p1)), List.tl(split))
             | None => (Uninterested, split)
         };
+        let check(h : string) = if(h == "") { failwith("bad language specification syntax: " ++ s) } else ();
         let rec middle_and_end(strings : list(string)) : Option.t((mixfix_interior, tip)) = switch(strings) {
             | [] => None
             | [h] => switch(int_of_string_opt(h)) {
                 | Some(p2) => Some(([], Precedence(Need, Precedence(p2))))
-                | None =>  Some(([h], Uninterested))
+                | None => {
+                    check(h);
+                    Some(([h], Uninterested))
+                }
             }
             | [h,...rest] => switch(middle_and_end(rest)) {
-                | Some((interior, tip)) => Some(([h,...interior], tip))
+                | Some((interior, tip)) => {
+                    check(h);
+                    Some(([h,...interior], tip))
+                }
                 | None => None
             }
         }
@@ -55,7 +62,7 @@ module BlackboardLanguage : Language = {
         ("11_->_10", (_c => (Domain, [], Term), _c => Arrow)),
         ("11_=>_10", (_c => (Domain, [], Term), _c => Lambda)),
         ("20_::_21", (_c => (Term, [], Term), _c => In)),
-        ("construct_by_", (_c => (Default, [Sig], Demo), _c => Construct)),];
+        ("construct_by_0", (_c => (Default, [Sig], Demo), _c => Construct)),];
     let ap_precs = (31, 30);
 
     let forms : list(mixfix_form) = 

@@ -467,7 +467,7 @@ module Parser = (G : Grammar) => {
         switch(t.kind) {
         | Whitespace => {stack: Snoc(s.stack, Secondary(Whitespace(t))), shards: s.shards}
         | Rune => {stack: Snoc(s.stack, Secondary(Rune(t))), shards: s.shards}
-        | Identifier
+        | Identifier 
         | Delimiter => 
             switch(scan_for_match(s.stack, [], t)) {
             | Some((s', rs)) => {stack: s', shards: s.shards @ rs}
@@ -481,7 +481,8 @@ module Parser = (G : Grammar) => {
 
     let match(tokens : list(token)) : match_result = {
         let final_matching_state = List.fold_left(matching_step, initial_matching_state, tokens);
-        finalize_matching_state(final_matching_state);
+        let result = finalize_matching_state(final_matching_state);
+        result
     }
 
     let rec abstract_context(ctx : G.context, c : concrete_term) : abstract_term = switch(c){
