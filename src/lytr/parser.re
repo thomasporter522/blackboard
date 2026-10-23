@@ -530,7 +530,7 @@ module Parser = (G : Grammar) => {
 
     let finalize_matching_state(ps : matching_state) : match_result = {
         let mr = finalize_matching_stack(ps.stack, false);
-        {...mr, errors: ps.errors @ mr.errors}
+        {...mr, errors: ps.errors @ mr.errors, completions : ps.completions @ mr.completions}
     }
 
     let attempt_match(pm : partial_match, middle : list(partial_meld), t : token) : Option.t((partial_match, list(error), list(string))) = {
@@ -560,7 +560,8 @@ module Parser = (G : Grammar) => {
         | Identifier 
         | Delimiter => 
             switch(scan_for_match(s.stack, [], t)) {
-            | Some((s', rs, cs)) => {stack: s', errors: s.errors @ rs, completions : s.completions @ cs}
+            | Some((s', rs, cs)) => 
+                {stack: s', errors: s.errors @ rs, completions : s.completions @ cs}
             | None => switch(G.initial_form_state(t)) {
                 | Some(ms) => {...s, stack: Snoc(s.stack, PartialMatch(Head(t, ms)))}
                 | None => {...s, stack: Snoc(s.stack, Secondary(Shard(t))), errors: [{range: t.range, kind:UnmatchedDelimiter}, ...s.errors]}
