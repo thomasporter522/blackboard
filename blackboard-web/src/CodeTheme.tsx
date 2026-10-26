@@ -27,7 +27,7 @@ const blackboardEditorTheme = EditorView.theme({
     lineHeight: '1.6'
   },
   '.cm-cursor': {
-    borderLeft: '2px var(--orang))'
+    border: '2px var(--orang))'
   },
   '.cm-selectionBackground': {
     backgroundColor: 'var(--select) !important',
@@ -43,6 +43,38 @@ const blackboardEditorTheme = EditorView.theme({
     border: 'none',
     borderRight: '2px solid var(--beam)',
   },
+  // tooltips
+  '.cm-tooltip-cursor': {
+    "font-size" : 'var(--completion-font-size)',
+    color: 'var(--delim-color)',
+    backgroundColor: 'var(--bg)',
+    borderRadius: "3px 3px 3px 0px",
+    // border: '0.5px solid var(--beam)',
+    border: '1px solid var(--beam)',
+    transform: "translateX(13px) translateY(14px)",
+    padding: '0px 5px 0px 5px',
+  },
+  '.cm-tooltip-above .cm-tooltip-arrow': {
+    transform: "translateX(-8px)",
+    '&:before': {
+      borderTopColor: "var(--beam)",
+      borderLeftWidth: "0",
+    },
+  },
+  // errors
+  '.cm-diagnostic-error': {
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--beam)',
+  },
+  '.cm-lintPoint-error': {
+    '&::after': {
+      width: '4px',
+      height: '3.5px',
+      border: 'none',
+      borderTop: '2.5px solid var(--mark-color)',
+    }
+  },
+  
 }, { dark: true })
 
 export const blackboardTheme = [

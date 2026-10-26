@@ -21,6 +21,8 @@
   --select: #c4c4b0;
   --mark-color: #d96048;
 
+  --completion-font-size: 15px;
+
   color-scheme: dark;
   color: var(--text);
   background: var(--bg);
@@ -52,13 +54,14 @@
   background-image: none !important;
 }
 
-.rune {
-  color: var(--mark-color) !important;
-}
-
 .line-error {
   text-decoration: underline !important;
   text-decoration-color: var(--mark-color) !important;
+}
+
+.error-sigil {
+  /* font-size: 30px; */
+  color: var(--mark-color) !important;
 }
 
 .color-error {

@@ -74,12 +74,23 @@ function decorateDelims(state : EditorState) {
 
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
 
+function render_message(_view : EditorView, messageText : string) : Node {
+  const node = document.createElement("div");
+  const sigil =  document.createElement("span");
+  sigil.textContent = "⚠ ";
+  sigil.className = "error-sigil";
+  node.appendChild(sigil);
+  const message = document.createElement("span");
+  message.textContent = messageText;
+  node.appendChild(message);
+  return node
+}
 
 function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
   const info = view.state.field(parseInfoField);
   const diagnostics: Diagnostic[] = [];
-  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "unrecognized character", markClass: "rune"}));
-  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: e.message, markClass: e.underline ? "line-error" : "color-error"}));
+  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, "unrecognized character"), markClass: "color-error"}));
+  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message), markClass: e.underline ? "line-error" : "color-error"}));
   return diagnostics
 }
 
