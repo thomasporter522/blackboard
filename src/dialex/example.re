@@ -9,6 +9,6 @@ let c2 : dia = Seq([you("What's your fav color?"), me("Blue? Idk."), you("Word u
 let monday_resp : dia = branch(i => i > 4, me("YOU ALREADY ASKED ME THAT A BUNCH OF TIMES"), me("Monday"));
 
 let c3 : dia = Seq([you("What day is it?"), Do(i => i + 1), monday_resp])
-let mydia : dia = Loop(Alt([c1, c2, c3]));
+let mydia : dia = Seq([me("Hello! _Italics!_"), Loop(Seq([Alt([c1, c2, c3]), me(":)")]))]);
 
 let myinit() : mystate = Next((0, mydia));

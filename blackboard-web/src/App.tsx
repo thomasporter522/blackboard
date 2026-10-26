@@ -11,33 +11,21 @@ import { showTooltip} from "@codemirror/view"
 import type {Diagnostic} from "@codemirror/lint";
 import { linter } from "@codemirror/lint";
 import './App.css'
+import Markdown from 'react-markdown'
+
 import { blackboardTheme } from "./CodeTheme.tsx"
 
-function dia_test_init() {
-  return globalThis.dia_test_init();
-}
+function dia_test_init() { return globalThis.dia_test_init() }
 
-function dia_test_case(s) {
-  return globalThis.dia_test_case(s);
-}
+function dia_test_case(s) { return globalThis.dia_test_case(s) }
 
-function dia_opt_player(s) {
-  return globalThis.dia_opt_player(s);
-}
+function dia_opt_player(s) { return globalThis.dia_opt_player(s) }
 
-function dia_opt_player_select(s, i) {
-  return globalThis.dia_opt_player_select({state: s, choice : i});
-}
+function dia_opt_player_select(s, i) { return globalThis.dia_opt_player_select({state: s, choice : i}) }
 
-function dia_opt_puter(s) {
-  return globalThis.dia_opt_puter(s);
-}
+function dia_opt_puter(s) { return globalThis.dia_opt_puter(s); }
 
-function parse_test(s, cursor_position) {
-  return globalThis.parse_test(s, cursor_position);
-}
-
-// const my_obj = globalThis.my_obj;
+function parse_test(s, cursor_position) { return globalThis.parse_test(s, cursor_position); }
 
 type error = {
     message: string, 
@@ -45,12 +33,6 @@ type error = {
     underline : Boolean,
 };
 
-// var block_contexts : string = "";
-// var cursor_position : number = 0;
-// var runes : number[][] = [];
-// var delimiters : number[][] = [];
-// var parseerrors : error[] = [];
-// var completions : string[] = [];
 
 function print(s) {
   console.log(s)
@@ -163,52 +145,25 @@ const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}]
 function MainCodeblock() {
   return <CodeMirror
       value={""}
-      height="800px"
+      height="600px"
       theme={blackboardTheme}
       extensions={[
         // mintlang(),
         EditorView.theme({
           '.cm-editor': {
-            // width: '100%',
             width: '600px',
             maxWidth: '600px'
           },
-          '.cm-scroller': {
-            overflow: 'false'  // Enable horizontal scrolling
-          },
-          '.cm-content': {
-            whiteSpace: 'pre'  // Prevent text wrapping
-          },
-          '.cm-line': {
-            whiteSpace: 'pre'  // Prevent line wrapping
-          }
+          '.cm-scroller': {  overflow: 'false' },
+          '.cm-content': { whiteSpace: 'pre' },
+          '.cm-line': { whiteSpace: 'pre' }
         }),
         parseInfoField,
         linterExtension,
         delimiterExtension,
         completionExtension,
         Prec.highest(insertCompletionExtension),
-        // cursorTooltipField,
-        // EditorView.decorations.of(Decoration.set(
-        //   errors
-        //     .map(error => 
-        //       Decoration.mark({
-        //         class: "semantic-error"
-        //       }).range(error[1], error[2])
-        //     )
-        // )),
         ]}
-      //   EditorView.decorations.of(Decoration.set(
-      //     holes
-      //       .sort((a, b) => (a[0].valueOf() - b[0].valueOf()))
-      //       .map(h => 
-      //         Decoration.mark({
-      //           class: "hole"
-      //         }).range(h[0].valueOf(), h[0].valueOf()+1)
-      //       )
-      //   )),
-      //   autoReplace,
-      // ]}
       basicSetup={{
         history: true,
         foldGutter: false,
@@ -228,12 +183,16 @@ function MainCodeblock() {
     />;
 }
 
+function DiaButton(key, setDiaState, next, text) {
+  return <button key={key} className="diaButton" onClick={_ => {setDiaState(next)}}>{text}</button>;
+}
+
 function NextOptionBox(nextDiaState, setDiaState) {
-  return <div> <button key={0} onClick={_ => {setDiaState(nextDiaState)}}>{">"}</button> </div>;
+  return DiaButton(0, setDiaState, nextDiaState, ">");
 }
 
 function OptionBox(diaState, setDiaState) {
-  return <div> {dia_opt_player(diaState).map((s, i) => <button key={i} onClick={_ => {print("selected: " + i); setDiaState(dia_opt_player_select(diaState, i))}}>{">" + s}</button>)} </div>;
+  return dia_opt_player(diaState).map((s, i) => DiaButton(i, setDiaState, dia_opt_player_select(diaState, i), "> " + s) );
 }
 
 function updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons) {
@@ -251,19 +210,7 @@ function updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons) {
 }
 
 function DialogueBox(puterMessage, diaButtons) {
-  // const diaCase = dia_test_case(diaState);
-  // var options = <></>;
-  // if(diaCase == 0) { if(puterMessage != "") options = <></>; }
-  // if(diaCase == 1) { options = OptionBox(diaState, setDiaState)};
-  // if(diaCase == 2) {
-  //   const [_, message, newDiaState] = dia_opt_puter(diaState);
-  //   if(puterMessage != message) setPuterMessage(message);
-  //   const newDiaCase = dia_test_case(newDiaState);
-  //   if(newDiaCase == 1) { options = OptionBox(newDiaState, setDiaState)}
-  //   else { options = NextOptionBox(newDiaState, setDiaState)};
-  // }
-  // if(diaCase > 2) throw new Error("IMPOSSIBLE DIA CASE");
-  return <div> {puterMessage} {diaButtons} </div>;
+  return <div className='diabox'> <div className='puterMessage'><Markdown>{puterMessage}</Markdown></div> <div className='diaButtons'> {diaButtons} </div> </div>;
 }
 
 function App() {

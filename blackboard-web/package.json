@@ -12,8 +12,10 @@
   "dependencies": {
     "@uiw/react-codemirror": "^4.25.12",
     "codemirror": "^6.0.2",
+    "marked": "^18.1.2",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

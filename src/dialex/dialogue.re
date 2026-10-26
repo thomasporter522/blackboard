@@ -57,6 +57,9 @@ let rec combine_alts(s1 :  state_option('state), s2 :  state_option('state)) :  
     | (PlayerTurn(l1), PlayerTurn(l2)) => PlayerTurn(l1 @ l2)
 }
 
+// should also track "other options"
+// par adds to other options
+// every construct adds the other options to the result of options, except chunk, which defers them
 let rec options_cont((s, d) : dialogue_state('state), rest : dialogue('state)) : state_option('state) = switch(d) {
     | S(m) => option_of_message(m, rest, s)
     | Check(pre) => pre(s) ? options_cont((s, rest), End) : End
@@ -66,7 +69,7 @@ let rec options_cont((s, d) : dialogue_state('state), rest : dialogue('state)) :
     | Alt(ds) => List.fold_left(combine_alts, End, List.map(d => options_cont((s, d), rest), ds))
     | Star(d) => combine_alts(options_cont((s, d), Star(d)), options_cont((s, Skip), rest))
     | Loop(d) => options_cont((s, d), Loop(d))
-    | Chunk(_d) =>failwith("Todo") // options(s, d)
+    | Chunk(_d) => failwith("Todo") // options(s, d)
     | Par(_ds) => failwith("Todo") //List.concat_map(options(s), ds)
     | End => End
 }

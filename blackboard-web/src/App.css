@@ -14,6 +14,7 @@
 
 :root {
   --text: #dbdac2;
+  --bright-text: #efeee1;
   --delim-color: #9f9e7d;
   --bg: #282828;
   --beam: #999988;
@@ -31,6 +32,7 @@
 
 .cm-editor {
   border: 2px solid var(--beam);
+  font-size:large;
   /* border-radius: 10px; */
 }
 
@@ -70,4 +72,46 @@
 
 .delimiter {
   color: var(--delim-color);
+}
+
+.puterMessage {
+  font-family: 'FiraCode', monospace;
+  size: var(--text);
+  color: var(--text);
+  background-color: var(--bg);
+  border: none;
+  font-size:large;
+  display: block;
+}
+
+.diabox {
+  margin-top: 30px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--beam);
+}
+
+.puterMessage {
+  padding: 10px;
+  height: 50px;
+}
+
+.diaButtons {
+  padding: 10px;
+  min-height: 90px;
+}
+
+
+.diaButton {
+  font-family: 'FiraCode', monospace;
+  size: var(--text);
+  color: var(--text);
+  background-color: var(--bg);
+  border: none;
+  font-size:large;
+  display: block;
+  &:hover {
+    color: var(--bright-text);
+    font-weight: bold;
+  }
 }
