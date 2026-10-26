@@ -2,7 +2,7 @@
 // import heroImg from './assets/hero.png'
 // import reactLogo from './assets/react.svg'
 // import viteLogo from './assets/vite.svg'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror'
 import { EditorView, Decoration, keymap } from '@codemirror/view'
 import { EditorState, StateField, Prec } from "@codemirror/state";
@@ -236,31 +236,48 @@ function OptionBox(diaState, setDiaState) {
   return <div> {dia_opt_player(diaState).map((s, i) => <button key={i} onClick={_ => {print("selected: " + i); setDiaState(dia_opt_player_select(diaState, i))}}>{">" + s}</button>)} </div>;
 }
 
-function DialogueBox(diaState, setDiaState) {
+function updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons) {
   const diaCase = dia_test_case(diaState);
-  var puter_message = "";
-  var options = <></>;
-  if(diaCase == 0) { puter_message = "DONE."; options = <></>; }
-  if(diaCase == 1) { options = OptionBox(diaState, setDiaState)};
+  if(diaCase == 0) { setPuterMessage("DONE."); setDiaButtons(<></>); }
+  if(diaCase == 1) { setDiaButtons(OptionBox(diaState, setDiaState))};
   if(diaCase == 2) {
     const [_, message, newDiaState] = dia_opt_puter(diaState);
-    puter_message = message;
+    setPuterMessage(message);
     const newDiaCase = dia_test_case(newDiaState);
-    if(newDiaCase == 1) { options = OptionBox(newDiaState, setDiaState)}
-    else { options = NextOptionBox(newDiaState, setDiaState)};
+    if(newDiaCase == 1) { setDiaButtons(OptionBox(newDiaState, setDiaState))}
+    else { setDiaButtons(NextOptionBox(newDiaState, setDiaState))};
   }
   if(diaCase > 2) throw new Error("IMPOSSIBLE DIA CASE");
-  return <div> {puter_message} {options} </div>;
+}
+
+function DialogueBox(puterMessage, diaButtons) {
+  // const diaCase = dia_test_case(diaState);
+  // var options = <></>;
+  // if(diaCase == 0) { if(puterMessage != "") options = <></>; }
+  // if(diaCase == 1) { options = OptionBox(diaState, setDiaState)};
+  // if(diaCase == 2) {
+  //   const [_, message, newDiaState] = dia_opt_puter(diaState);
+  //   if(puterMessage != message) setPuterMessage(message);
+  //   const newDiaCase = dia_test_case(newDiaState);
+  //   if(newDiaCase == 1) { options = OptionBox(newDiaState, setDiaState)}
+  //   else { options = NextOptionBox(newDiaState, setDiaState)};
+  // }
+  // if(diaCase > 2) throw new Error("IMPOSSIBLE DIA CASE");
+  return <div> {puterMessage} {diaButtons} </div>;
 }
 
 function App() {
-  const [diaState, setDiaState] = useState(dia_test_init())
+  const [diaState, setDiaState] = useState(dia_test_init)
+  const [puterMessage, setPuterMessage] = useState("")
+  const [diaButtons, setDiaButtons] = useState(<></>)
   const block = MainCodeblock();
-  // const dialogue = DialogueBox(diaState);
+  const dialogue = DialogueBox(puterMessage, diaButtons);
+  
+  useEffect(() => updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons), [diaState]);
   return (<>
     <h1>Blackboard</h1>
     {block}
-    {DialogueBox(diaState, setDiaState)}
+    {dialogue}
     </>
   )
 }
