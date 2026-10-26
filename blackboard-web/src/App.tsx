@@ -143,7 +143,7 @@ function insertCompletion(view : EditorView) {
 const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}])
 
 function MainCodeblock() {
-  return <CodeMirror
+  return <div className='mainBlock'><CodeMirror
       value={""}
       height="600px"
       theme={blackboardTheme}
@@ -180,7 +180,11 @@ function MainCodeblock() {
         // cursor_position = viewUpdate.view.state.selection.ranges[0].from; 
         // process(block_contexts, cursor_position);
       }}
-    />;
+    /></div>;
+}
+
+function InfoBar() {
+  return <div className='infobar'> <h3>Info</h3> </div>;
 }
 
 function DiaButton(key, setDiaState, next, text) {
@@ -219,12 +223,26 @@ function App() {
   const [diaButtons, setDiaButtons] = useState(<></>)
   const block = MainCodeblock();
   const dialogue = DialogueBox(puterMessage, diaButtons);
+  const infobar = InfoBar();
   
   useEffect(() => updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons), [diaState]);
   return (<>
-    <h1>Blackboard</h1>
-    {block}
-    {dialogue}
+    <div className='page'>
+      <div className='topSection'>
+        <h1>Blackboard</h1>
+      </div>
+      <div className='nontopSection'>
+        <div className='leftSection'>
+        </div>
+        <div className='middleSection'>
+          {block}
+          {dialogue}
+        </div>
+        <div className='rightSection'>
+          {infobar}
+        </div>
+      </div>
+    </div>
     </>
   )
 }

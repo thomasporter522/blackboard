@@ -74,6 +74,60 @@
   color: var(--delim-color);
 }
 
+body {
+  margin: 0px;
+}
+
+.page {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+.topSection {
+  padding-left: 20px;
+}
+.nontopSection{
+  display: flex;
+  flex: 1;
+}
+.leftSection {
+  padding: 10px;
+  flex: 1;
+}
+.middleSection {
+  padding: 10px;
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+}
+.rightSection {
+  padding: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.infobar {
+  padding: 20px;
+  flex: 1;
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--beam);
+}
+
+.mainBlock {
+  /* margin: 20px; */
+  /* flex: 4; */
+}
+
+
+.diabox {
+  flex: 1;
+  margin-top: 20px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--beam);
+}
+
 .puterMessage {
   font-family: 'FiraCode', monospace;
   size: var(--text);
@@ -82,31 +136,24 @@
   border: none;
   font-size:large;
   display: block;
-}
-
-.diabox {
-  margin-top: 30px;
-  border-style: solid;
-  border-width: 2px;
-  border-color: var(--beam);
-}
-
-.puterMessage {
-  padding: 10px;
-  height: 50px;
+  padding: 20px;
+  /* height: 50%; */
 }
 
 .diaButtons {
   padding: 10px;
-  min-height: 90px;
+  min-height: 40%;
 }
 
 
 .diaButton {
+  margin: 10px;
+  text-align: left;
   font-family: 'FiraCode', monospace;
+  min-width: 400px;
   size: var(--text);
   color: var(--text);
-  background-color: var(--bg);
+  background-color: rgba(255,255,255,0.05);
   border: none;
   font-size:large;
   display: block;

@@ -171,6 +171,6 @@ let lex_test(s : string) : BlackboardLexer.lex_info = {
 
 let parse(s : string, cursor_position : int) = {
     let (tokens, li) = BlackboardLexer.lex(s, cursor_position);
-    let (_, pi) = BlackboardParser.parse(tokens);
-    (li, pi)
+    let (a, pi) = BlackboardParser.parse(tokens);
+    (li, pi, a)
 }

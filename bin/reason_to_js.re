@@ -33,7 +33,8 @@ type parse_result = Js.t({.
 });
 
 let js_parser(s : string, cursor_position : int) : parse_result = {
-    let (li, pi) = Lytr.Blackboard.parse(s, cursor_position);
+    let (li, pi, a) = Lytr.Blackboard.parse(s, cursor_position);
+    let _ =  Lytr.Elab.elab(a);
     let f1(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
         let(a, b) = x;
         let l = [Js.int32(Int32.of_int(a)), Js.int32(Int32.of_int(b))];

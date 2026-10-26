@@ -27,6 +27,7 @@ type term_head =
     | Lambda
     | Ap
     | Construct
+    | Assume
     | Commas
     | ITE
 
