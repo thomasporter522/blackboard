@@ -1,0 +1,3 @@
+(library
+ (name dialex)
+ (public_name blackboard.dialex))

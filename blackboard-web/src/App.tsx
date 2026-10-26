@@ -2,6 +2,7 @@
 // import heroImg from './assets/hero.png'
 // import reactLogo from './assets/react.svg'
 // import viteLogo from './assets/vite.svg'
+import { useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror'
 import { EditorView, Decoration, keymap } from '@codemirror/view'
 import { EditorState, StateField, Prec } from "@codemirror/state";
@@ -11,6 +12,26 @@ import type {Diagnostic} from "@codemirror/lint";
 import { linter } from "@codemirror/lint";
 import './App.css'
 import { blackboardTheme } from "./CodeTheme.tsx"
+
+function dia_test_init() {
+  return globalThis.dia_test_init();
+}
+
+function dia_test_case(s) {
+  return globalThis.dia_test_case(s);
+}
+
+function dia_opt_player(s) {
+  return globalThis.dia_opt_player(s);
+}
+
+function dia_opt_player_select(s, i) {
+  return globalThis.dia_opt_player_select({state: s, choice : i});
+}
+
+function dia_opt_puter(s) {
+  return globalThis.dia_opt_puter(s);
+}
 
 function parse_test(s, cursor_position) {
   return globalThis.parse_test(s, cursor_position);
@@ -207,12 +228,39 @@ function MainCodeblock() {
     />;
 }
 
+function NextOptionBox(nextDiaState, setDiaState) {
+  return <div> <button key={0} onClick={_ => {setDiaState(nextDiaState)}}>{">"}</button> </div>;
+}
+
+function OptionBox(diaState, setDiaState) {
+  return <div> {dia_opt_player(diaState).map((s, i) => <button key={i} onClick={_ => {print("selected: " + i); setDiaState(dia_opt_player_select(diaState, i))}}>{">" + s}</button>)} </div>;
+}
+
+function DialogueBox(diaState, setDiaState) {
+  const diaCase = dia_test_case(diaState);
+  var puter_message = "";
+  var options = <></>;
+  if(diaCase == 0) { puter_message = "DONE."; options = <></>; }
+  if(diaCase == 1) { options = OptionBox(diaState, setDiaState)};
+  if(diaCase == 2) {
+    const [_, message, newDiaState] = dia_opt_puter(diaState);
+    puter_message = message;
+    const newDiaCase = dia_test_case(newDiaState);
+    if(newDiaCase == 1) { options = OptionBox(newDiaState, setDiaState)}
+    else { options = NextOptionBox(newDiaState, setDiaState)};
+  }
+  if(diaCase > 2) throw new Error("IMPOSSIBLE DIA CASE");
+  return <div> {puter_message} {options} </div>;
+}
+
 function App() {
-  // const [count, setCount] = useState(0)
+  const [diaState, setDiaState] = useState(dia_test_init())
   const block = MainCodeblock();
+  // const dialogue = DialogueBox(diaState);
   return (<>
     <h1>Blackboard</h1>
     {block}
+    {DialogueBox(diaState, setDiaState)}
     </>
   )
 }

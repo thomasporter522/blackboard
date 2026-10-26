@@ -9,5 +9,5 @@
  (name reason_to_js)
  (modes js)
  (modules reason_to_js)
- (libraries blackboard blackboard.lytr js_of_ocaml)
- (preprocess (pps js_of_ocaml-ppx)))
+ (libraries blackboard blackboard.lytr js_of_ocaml dialex)
+ (preprocess (pps ppx_deriving.enum js_of_ocaml-ppx)))

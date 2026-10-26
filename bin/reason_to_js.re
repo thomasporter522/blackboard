@@ -60,9 +60,64 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val completions = Js.array(Array.of_list(f3(pi.completions)));
     }];
     result
+};
+
+[@deriving enum]
+type dia_option_case = 
+    | Empty
+    | PlayerTurn 
+    | PuterTurn;
+
+let js_dia_init() = Dialex.Example.myinit(); 
+
+let js_dia_case(s : Dialex.Example.mystate) : int = {
+    switch(Dialex.Dialogue.options(s)) {
+    | Empty => dia_option_case_to_enum(Empty)
+    | PlayerTurn(_) => dia_option_case_to_enum(PlayerTurn)
+    | PuterTurn(_) => dia_option_case_to_enum(PuterTurn)
+    }
+}
+
+let js_dia_opt_player(s : Dialex.Example.mystate) : jsarray(Js.t(Js.js_string)) = {
+    let js_opt((o, _) : (Dialex.Dialogue.message_option, Dialex.Example.mystate)) : Js.t(Js.js_string) = switch(o) {
+        | Say(S(s)) => Js.string(s) 
+        | Skip => Js.string("")
+    };
+    switch( Dialex.Dialogue.options(s)) {
+    | PlayerTurn(options) => 
+        let js_options = List.map(js_opt, options);
+        Js.array(Array.of_list(js_options));
+    | _ => failwith("wrong dialogue case")
+    }
+}
+
+type select_type = Js.t({. 
+    state:  Js.readonly_prop(Dialex.Example.mystate), 
+    choice : Js.readonly_prop(int),
+});
+
+let js_dia_opt_player_select(s : select_type) : Dialex.Example.mystate = {
+    switch(Dialex.Dialogue.options(s##.state)) {
+    | PlayerTurn(options) => 
+        let (_, s') = List.nth(options, s##.choice);
+        s'
+    | _ => failwith("wrong dialogue case")
+    }
+}
+
+let js_dia_opt_puter(s : Dialex.Example.mystate) : (string, Dialex.Example.mystate) = {
+    switch( Dialex.Dialogue.options(s)) {
+    | PuterTurn(S(t), s') => (t, s')
+    | _ => failwith("wrong dialogue case")
+    }
 }
 
 let () = {
     Js.export("lex_test", js_lexer);
     Js.export("parse_test", js_parser);
+    Js.export("dia_test_init", js_dia_init);
+    Js.export("dia_test_case", js_dia_case);
+    Js.export("dia_opt_player", js_dia_opt_player);
+    Js.export("dia_opt_player_select", js_dia_opt_player_select);
+    Js.export("dia_opt_puter", js_dia_opt_puter);
 }
