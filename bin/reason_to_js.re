@@ -64,7 +64,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
 
 [@deriving enum]
 type dia_option_case = 
-    | Empty
+    | End
     | PlayerTurn 
     | PuterTurn;
 
@@ -72,7 +72,7 @@ let js_dia_init() = Dialex.Example.myinit();
 
 let js_dia_case(s : Dialex.Example.mystate) : int = {
     switch(Dialex.Dialogue.options(s)) {
-    | Empty => dia_option_case_to_enum(Empty)
+    | End => dia_option_case_to_enum(End)
     | PlayerTurn(_) => dia_option_case_to_enum(PlayerTurn)
     | PuterTurn(_) => dia_option_case_to_enum(PuterTurn)
     }
