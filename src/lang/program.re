@@ -1,4 +1,4 @@
-open Lang
+open Term
 open Demo
 
 type arg_chunk = (list(name), surface_tm)

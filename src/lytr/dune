@@ -1,4 +1,4 @@
 (library
- (libraries str)
+ (libraries str lang)
  (name lytr)
  (public_name blackboard.lytr))

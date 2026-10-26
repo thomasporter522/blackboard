@@ -1,7 +1,7 @@
 
-open Blackboard.Printing
-open Blackboard.Parse
-open Blackboard.Program
+open Lang.Printing
+open Menhir.Parse
+open Lang.Program
 
 
 // let my_root = J(Empty, Arrow("A", Typ, Arrow("x", Var(0), Var(1))))

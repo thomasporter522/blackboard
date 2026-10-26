@@ -1,4 +1,4 @@
-open Lang
+open Term
 
 let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
     | Cons(_, y, _) when x == 0 => y

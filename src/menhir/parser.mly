@@ -1,7 +1,7 @@
 %{
-open Lang
-open Demo
-open Program
+open Lang.Term
+open Lang.Demo
+open Lang.Program
 %}
 
 %token <string> ID
@@ -45,7 +45,7 @@ open Program
 %token WITNESS "witness"
 %token GIVENALL "givenall"
 
-%start <Program.surface_program> prog
+%start <Lang.Program.surface_program> prog
 %%
 
 let prog :=

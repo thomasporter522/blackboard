@@ -1,9 +1,3 @@
-(menhir
- (modules parser))
-
-(ocamllex
- (modules lexer))
-
 (library
  (name blackboard)
- (libraries lytr))
+ (libraries lang menhir lytr))

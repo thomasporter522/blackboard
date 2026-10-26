@@ -1,4 +1,4 @@
-open Lang
+open Term
 open Lang_printing
 open Deriv.PartialDerivation
 open Deriv
