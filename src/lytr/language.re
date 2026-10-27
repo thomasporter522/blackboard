@@ -1,3 +1,4 @@
+type range = (int, int)
 
 type token_kind = 
     | Identifier
@@ -18,23 +19,21 @@ type secondary =
     | Shard(token)
     | Cursor
 
-type term_head = 
-    | Interaction
-    | Parens
-    | In 
-    | Colon
-    | Arrow 
-    | Lambda
-    | Ap
-    | Construct
-    | Assume
-    | Commas
-    | ITE
-
 type abstract_term =
-    | Hole
+    | Hole(range)
     | Ident(string)
-    | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
+    | Interaction(range)
+    | Parens(abstract_span)
+    | Prop
+    | Type
+    | Colon(abstract_term, list(secondary), list(secondary), abstract_term)
+    | In(abstract_term, list(secondary), list(secondary), abstract_term)
+    | Arrow(abstract_term, list(secondary), list(secondary), abstract_term)
+    | Lambda(abstract_term, list(secondary), list(secondary), abstract_term)
+    | Assume(abstract_span, abstract_span, list(secondary), abstract_term)
+    | Commas(abstract_term, list(secondary), list(abstract_span), list(secondary), abstract_term)
+    | Ap(abstract_term, list(secondary), abstract_term)
+    // | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
 
 and abstract_span = 
     | Empty(list(secondary), (int, int)) // entire range
@@ -66,12 +65,15 @@ type tip =
     | Precedence(requirement, precedence)
     | Uninterested
 
+
+type builder_type('context) = ('context, abstract_left_child, list(abstract_span), abstract_right_child, range) => abstract_term;
+
 type mixfix_form_of('context) = {
     left_tip : tip,
     interior : mixfix_interior,
     right_tip : tip,
     arity : 'context => ('context, list('context), 'context),
-    head : 'context => term_head,
+    builder : builder_type('context) ,
 }
 
 type repeater_form_of('context) = {
@@ -79,7 +81,7 @@ type repeater_form_of('context) = {
     delim : string,
     right_tip : tip,
     arity : 'context => 'context,
-    head : 'context => term_head,
+    builder : builder_type('context) ,
 }
 
 type form_of('context) = 
@@ -95,6 +97,6 @@ module type Language = {
     let forms: list(form);
     let white_precs : Option.t((precedence, precedence));
     let white_arity : context => (context, context);
-    let white_head : context => term_head;
+    let white_builder : (context, abstract_term, list(secondary), abstract_term) => abstract_term;
     let initial_context : unit => context;
 }

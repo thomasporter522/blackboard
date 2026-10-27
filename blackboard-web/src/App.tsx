@@ -33,6 +33,11 @@ type error = {
     underline : Boolean,
 };
 
+type goal = {
+    statement: string, 
+    context: string[],
+    range: number[],
+};
 
 function print(s) {
   console.log(s)
@@ -44,6 +49,7 @@ type parse_info = {
   delimiters : number[][];
   parseerrors : error[];
   completions : string[];
+  goals : goal[];
 }
 
 function process(state : EditorState) : parse_info {
@@ -55,16 +61,17 @@ function process(state : EditorState) : parse_info {
     delimiters : parse_result.delimiters,
     parseerrors : parse_result.parseerrors,
     completions : parse_result.completions,
+    goals : parse_result.goals,
   }
 }
 
-const parseInfoField =  StateField.define<parse_info>({
+const parseInfoField = StateField.define<parse_info>({
   create(state) {
     return process(state)
   },
 
-  update(_pi, tr) {
-    return process(tr.state)
+  update(pi, tr) {
+    return (tr.docChanged || tr.selection) ? process(tr.state) : pi
   },
 })
 
@@ -75,7 +82,15 @@ function decorateDelims(state : EditorState) {
   return Decoration.set(state.field(parseInfoField).delimiters.map(decorateDelim))
 }
 
+function decorateInteractions(state : EditorState) {
+  function decorateInteraction(x : goal) {
+    return Decoration.mark({class: "interaction"}).range(x.range[0], x.range[1])
+  };
+  return Decoration.set(state.field(parseInfoField).goals.filter(x => x.range[0] < x.range[1]).map(decorateInteraction))
+}
+
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
+const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 
 function render_message(_view : EditorView, messageText : string) : Node {
   const node = document.createElement("div");
@@ -142,28 +157,31 @@ function insertCompletion(view : EditorView) {
 
 const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}])
 
-function MainCodeblock() {
+const extensions = [
+  // mintlang(),
+  EditorView.theme({
+    '.cm-editor': {
+      width: '600px',
+      maxWidth: '600px'
+    },
+    '.cm-scroller': {  overflow: 'false' },
+    '.cm-content': { whiteSpace: 'pre' },
+    '.cm-line': { whiteSpace: 'pre' }
+  }),
+  parseInfoField,
+  linterExtension,
+  interactionExtension,
+  delimiterExtension,
+  completionExtension,
+  Prec.highest(insertCompletionExtension),
+  ];
+
+function MainCodeblock(setInfo) {
   return <div className='mainBlock'><CodeMirror
-      value={""}
+      value={"assume\nx : type\nvalid by ? end\nassume\ny : type\nvalid by ? end\nassume\nz : type\nvalid by ? end\n?"}
       height="600px"
       theme={blackboardTheme}
-      extensions={[
-        // mintlang(),
-        EditorView.theme({
-          '.cm-editor': {
-            width: '600px',
-            maxWidth: '600px'
-          },
-          '.cm-scroller': {  overflow: 'false' },
-          '.cm-content': { whiteSpace: 'pre' },
-          '.cm-line': { whiteSpace: 'pre' }
-        }),
-        parseInfoField,
-        linterExtension,
-        delimiterExtension,
-        completionExtension,
-        Prec.highest(insertCompletionExtension),
-        ]}
+      extensions={extensions}
       basicSetup={{
         history: true,
         foldGutter: false,
@@ -174,17 +192,28 @@ function MainCodeblock() {
       onChange={(_val, _viewUpdate) => {
         // block_contexts = val;
       }}
-      onCreateEditor={(_view) => { }}
-      onUpdate={(_viewUpdate) => { 
-        // insertCompletion(_viewUpdate.view)
-        // cursor_position = viewUpdate.view.state.selection.ranges[0].from; 
-        // process(block_contexts, cursor_position);
+      onCreateEditor={(view) => { setInfo(view.state.field(parseInfoField)) }}
+      onUpdate={(viewUpdate) => { 
+        setInfo(viewUpdate.view.state.field(parseInfoField))
       }}
     /></div>;
 }
 
-function InfoBar() {
-  return <div className='infobar'> <h3>Info</h3> </div>;
+function displayGoal(g : goal) {
+  const contextEntries = g.context.toReversed().map((s, i) => <div key={i} className='contextEntry'>{s}</div>);
+  return <><h3>Goal</h3>{g.statement}<h3>Context</h3>{contextEntries}</>
+}
+
+function infoBarInfo(info : parse_info) {
+  if (info == null) return <></>;
+  const infolist = info.goals.filter(goal => goal.range[0] <= info.cursor_position && info.cursor_position <= goal.range[1]);
+  return infolist.length > 0 ? displayGoal(infolist[0]) : 
+    info.goals.length > 1 ? <><h3>{info.goals.length} goals remaining</h3></> :
+    info.goals.length == 1 ? <><h3>1 goal remaining</h3></> : <><h3>No goals remaining</h3></>
+}
+
+function InfoBar(info : parse_info) {
+  return <div className='infobar'> {infoBarInfo(info)} </div>;
 }
 
 function DiaButton(key, setDiaState, next, text) {
@@ -221,9 +250,10 @@ function App() {
   const [diaState, setDiaState] = useState(dia_test_init)
   const [puterMessage, setPuterMessage] = useState("")
   const [diaButtons, setDiaButtons] = useState(<></>)
-  const block = MainCodeblock();
+  const [info, setInfo] = useState<parse_info>(null);
+  const block = MainCodeblock(setInfo);
   const dialogue = DialogueBox(puterMessage, diaButtons);
-  const infobar = InfoBar();
+  const infobar = InfoBar(info);
   
   useEffect(() => updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons), [diaState]);
   return (<>

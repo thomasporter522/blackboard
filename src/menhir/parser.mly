@@ -91,7 +91,7 @@ let term :=
   | x = atom_list; { x }
 
 let demo_atom := 
-  | _ = HOLE; { Hole }
+  | _ = HOLE; { Hole((-1, -1)) }
   | x = ID; { HypProp (x, Obvious) }
   | LPAREN; x = ID; VALID; BY; d = demo; RPAREN; { HypProp (x, d) }
   | OBVIOUS; { Obvious }

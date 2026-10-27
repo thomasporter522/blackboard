@@ -4,7 +4,7 @@ open Program
 
 let string_of_demo_report(r : report) : string = {
     if (r.open_goals == [] && r.errors == []) "Proven!" else
-    (r.open_goals == [] ? "" : "Goals:\n\n" ++ String.concat("\n\n", List.map(string_of_judgment, r.open_goals)))
+    (r.open_goals == [] ? "" : "Goals:\n\n" ++ String.concat("\n\n", List.map(string_of_judgment, List.map(fst, r.open_goals))))
     ++ (r.errors == [] ? "" : "\n\nErrors:\n\n" ++ String.concat("\n\n", r.errors))
 }
 

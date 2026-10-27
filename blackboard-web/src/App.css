@@ -16,6 +16,8 @@
   --text: #dbdac2;
   --bright-text: #efeee1;
   --delim-color: #9f9e7d;
+  --interaction-color:rgb(199, 96, 228);
+  --mark-color: #d96048;
   --bg: #282828;
   --beam: #999988;
   --orang: #b922ff;
@@ -73,6 +75,9 @@
 .delimiter {
   color: var(--delim-color);
 }
+.interaction {
+  color: var(--interaction-color) !important;
+}
 
 body {
   margin: 0px;
@@ -92,17 +97,17 @@ body {
 }
 .leftSection {
   padding: 10px;
-  flex: 1;
+  flex: 2;
 }
 .middleSection {
   padding: 10px;
-  flex: 3;
+  flex: 4;
   display: flex;
   flex-direction: column;
 }
 .rightSection {
   padding: 10px;
-  flex: 1;
+  flex: 2;
   display: flex;
   flex-direction: column;
 }

@@ -237,30 +237,33 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
         | _ => {
             let (b1, b2) = needs_outer_children(f);
             let (lc', rs1) = switch(lc) {
-                | None => b1 ? (Some((Hole, [])), [{kind: MissingLeftChild, range: (fst(range), fst(range))}]) : (None, [])
+                | None => b1 ? (Some((Hole((fst(range), fst(range))), [])), [{kind: MissingLeftChild, range: (fst(range), fst(range))}]) : (None, [])
                 | Some(_) => (lc, [])
             };
             let (rc', rs2) = switch(rc) {
-                | None => b2 ? (Some(([], Hole)), [{kind: MissingRightChild, range: (snd(range), snd(range))}]) : (None, [])
+                | None => b2 ? (Some(([], Hole((snd(range), snd(range))))), [{kind: MissingRightChild, range: (snd(range), snd(range))}]) : (None, [])
                 | Some(_) => (rc, [])
-            };
-            let head = switch(f) {
-                | Ident(_) => failwith("impossible")
-                | White => L.white_head(c)
-                | Mixfix(mf) => mf.head(c)
-                | Repeater(rf, _) => rf.head(c)
             };
             let (ats', rs3, _) = List.fold_left({
                 ((acc_ats, acc_rs, i), at) => {
                     switch(at, needs_inner_children(f, i)) {
-                    | (Empty(ss, r), true) => (acc_ats @ [Single(ss, Hole, [], r)], [{kind: MissingInnerChild, range: r}] @ acc_rs, i+1)
+                    | (Empty(ss, r), true) => (acc_ats @ [Single(ss, Hole(r), [], r)], [{kind: MissingInnerChild, range: r}] @ acc_rs, i+1)
                     | (Single(_, _, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
                     | (Multiple(_, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
                     | _ => (acc_ats @ [at], acc_rs, i+1)
                     }
                 }
             }, ([], [], 0), ats);
-            (Term(head, lc', ats', rc'), rs1 @ rs2 @ rs3);
+            let term : abstract_term = switch(f) {
+                | Ident(_) => failwith("impossible")
+                | White => switch(lc', rc') {
+                    | (Some((lc'', ss)), Some(([], rc''))) => L.white_builder(c, lc'', ss, rc'')
+                    | _ => failwith("impossible")
+                }
+                | Mixfix(mf) => mf.builder(c, lc', ats', rc', range)
+                | Repeater(rf, _) => rf.builder(c, lc', ats', rc', range)
+            };
+            (term, rs1 @ rs2 @ rs3);
             }
         }
     }

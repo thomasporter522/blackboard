@@ -11,6 +11,18 @@ type strength =
     | Strong 
     | Weak
 
+type surface_tm = 
+    | SurfaceProp 
+    | SurfaceTyp 
+    | SurfaceIn(surface_tm, surface_tm)
+    | SurfaceArrow(strength, list(name), surface_tm, surface_tm)
+    | SurfaceLambda(list(name), surface_tm, surface_tm)
+    | SimpleArrow(surface_tm, surface_tm)
+    | SurfaceVar(name)
+    | SurfaceAp(surface_tm, surface_tm)
+    | SurfaceUnguard(surface_tm)
+    | SurfaceNonsense;
+
 type tm = 
     | Prop
     | Typ 
@@ -19,7 +31,9 @@ type tm =
     | Lam(name, tm, tm)
     | Var(int)
     | Ap(tm, tm)
-    | Unguard(tm);
+    | Unguard(tm)
+    | FreeVar(string)
+    | Nonsense;
 
 type ctx = 
     | Empty 
@@ -67,6 +81,8 @@ let rec wkn(n : int, a : tm) : tm = switch(a) {
     | Var(y) => Var(wknvar(n, y))
     | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
     | Unguard(a) => Unguard(wkn(n, a))
+    | FreeVar(x) => FreeVar(x)
+    | Nonsense => Nonsense
 }
 
 let wk(a : tm) : tm = wkn(0, a)
@@ -87,6 +103,8 @@ let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
     | Var(y) => substnvar(n, s, y)
     | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
     | Unguard(a) => Unguard(substn(n, s, a))
+    | FreeVar(x) => FreeVar(x)
+    | Nonsense => Nonsense
 }
 
 let subst(s : tm, t : tm) : tm = substn(0, s, t)
@@ -106,6 +124,8 @@ let rec headnormalize(t : tm) : tm = switch(t) {
         }
     }
     | Unguard(t) => Unguard(t)
+    | FreeVar(x) => FreeVar(x)
+    | Nonsense => Nonsense
 }
 
 let rec normalize(t : tm) : tm = switch(t) {
@@ -122,6 +142,8 @@ let rec normalize(t : tm) : tm = switch(t) {
         }
     }
     | Unguard(t) => Unguard(normalize(t))
+    | FreeVar(x) => FreeVar(x)
+    | Nonsense => Nonsense
 }
 
 let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
@@ -134,6 +156,8 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Var(x1), Var(x2)) => x1 == x2
     | (Ap(a1, a2), Ap(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
     | (Unguard(a1), Unguard(a2)) => alphaequiv(a1, a2)
+    | (FreeVar(x), FreeVar(y)) => x == y
+    | (Nonsense, Nonsense) => false
     | (Prop, _) => false
     | (Typ, _) => false
     | (In(_), _) => false
@@ -142,6 +166,8 @@ let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
     | (Var(_), _) => false
     | (Ap(_), _) => false
     | (Unguard(_), _) => false
+    | (FreeVar(_), _) => false
+    | (Nonsense, _) => false
     }
 }
 
@@ -158,6 +184,8 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Var(x1), Var(x2)) => x1 == x2
         | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
         | (Unguard(a1), Unguard(a2)) => equiv(a1, a2)
+        | (FreeVar(x), FreeVar(y)) => x == y
+        | (Nonsense, Nonsense) => false
         | (Prop, _) => false
         | (Typ, _) => false
         | (In(_), _) => false
@@ -166,6 +194,8 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
         | (Var(_), _) => false
         | (Ap(_), _) => false
         | (Unguard(_), _) => false
+        | (FreeVar(_), _) => false
+        | (Nonsense, _) => false
         }
     }
 }

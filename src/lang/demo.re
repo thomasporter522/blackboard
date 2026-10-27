@@ -6,16 +6,6 @@ open Deriv
 let probe(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_type(s));
 let probes(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_types(s));
 
-type surface_tm = 
-    | SurfaceProp 
-    | SurfaceTyp 
-    | SurfaceIn(surface_tm, surface_tm)
-    | SurfaceArrow(strength, list(name), surface_tm, surface_tm)
-    | SurfaceLambda(list(name), surface_tm, surface_tm)
-    | SimpleArrow(surface_tm, surface_tm)
-    | SurfaceVar(name)
-    | SurfaceAp(surface_tm, surface_tm)
-    | SurfaceUnguard(surface_tm);
 
 type schema = 
     | Definition
@@ -28,7 +18,7 @@ type tactic =
     | Schema(schema)
 
 type demo = 
-    | Hole
+    | Hole((int, int))
     | HypProp(name, demo)
     | ElabHypProp(int, demo)
     | HypTyp(name, demo)
@@ -56,11 +46,11 @@ and tm_or_demo =
     | Demo(demo)
 
 type report = {
-    open_goals : list(judgment),
+    open_goals : list((judgment, (int, int))),
     errors : list(error)
 }
 
-let mk_report (open_goals : list(judgment), errors : list(string)) : report = {
+let mk_report (open_goals : list((judgment, (int, int))), errors : list(string)) : report = {
     open_goals, errors
 }
 
@@ -110,10 +100,12 @@ let (let-&) = (x : (t, result('a, error)), f : 'a => demo_result) : demo_result 
     }
 }
 
-let rec var_of_surface (c : ctx, x : name) : int = switch(c) {
-    | Cons(_, y, _) when x == y => 0 
-    | Cons(c, _, _) => 1+var_of_surface(c, x)
-    | Empty => failwith("unbound variable: " ++ x)
+let rec var_of_surface (c : ctx, x : name) : Result.t(int, error) = switch(c) {
+    | Cons(_, y, _) when x == y => Ok(0)
+    | Cons(c, _, _) => 
+        let* n = var_of_surface(c, x);
+        Ok(1+n)
+    | Empty => Error("unbound variable: " ++ x)
 }
 
 let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
@@ -126,8 +118,13 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
     | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
     | SimpleArrow(t1, t2) => Arrow(Weak, "_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
     | SurfaceAp(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
-    | SurfaceVar(x) => Var(var_of_surface(c, x))
-    | SurfaceUnguard(t) => Unguard(tm_of_surface(c, t));
+    | SurfaceVar(x) => 
+        switch(var_of_surface(c, x)) {
+        | Ok(n) =>  Var(n)
+        | Error(_) => FreeVar(x)
+        }
+    | SurfaceUnguard(t) => Unguard(tm_of_surface(c, t))
+    | SurfaceNonsense => Nonsense;
 }
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
@@ -177,6 +174,8 @@ let rec invert_wkn(n : int, a : tm) : result(tm, error) = switch(a) {
         let* a' = invert_wkn(n, a);
         Ok(Unguard(a'))
     } 
+    | FreeVar(x) => Ok(FreeVar(x))
+    | Nonsense => Ok(Nonsense)
 }
 
 // inverse of wk(_)
@@ -261,6 +260,8 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
         | Ok(_) => Error("Unguarded term does not have arrow type")
         | Error(e) => Error(e)
     }
+    | FreeVar(_) => Error("Inferring from free var")
+    | Nonsense => Error("Inferring from nonsense")
 }
 
 // if the focus of [s] is c, x : A |- T, refines to goal c |- T' where wk(T') = T
@@ -616,10 +617,10 @@ let cooler_definition(s : t) : result(t, error) = {
 // invariant: the focused of returned PD.t is the tail of that of [s]
 let rec check_demo(s : t, d : demo) : (t, report) = 
     switch(d) {
-    | Hole =>
+    | Hole(r) =>
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));
-        (s', mk_report([j], []))
+        (s', mk_report([(j, r)], []))
     | HypProp(x, d) =>
         let c = goal_ctx(s);
         let-& n = (s, index_of_name(c, x));

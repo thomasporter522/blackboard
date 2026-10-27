@@ -78,3 +78,7 @@ let rec check_program (p : program) : program_check_report = {
     | Prove(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
     }
 }
+
+let rec check_surface_program (p : surface_program) : program_check_report = {
+    check_program(program_of_surface(Empty, p))
+}

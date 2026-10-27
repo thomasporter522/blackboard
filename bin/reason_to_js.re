@@ -25,16 +25,26 @@ type error = Js.t({.
     underline : Js.readonly_prop(Js.t(bool)),
 });
 
+type goal = Js.t({. 
+    statement: Js.readonly_prop(Js.t(Js.js_string)), 
+    context: Js.readonly_prop(jsarray(Js.t(Js.js_string))), 
+    range: Js.readonly_prop(range),
+});
+
 type parse_result = Js.t({. 
     runes: Js.readonly_prop(jsarray(range)), 
     delimiters : Js.readonly_prop(jsarray(range)),
     parseerrors : Js.readonly_prop(jsarray(error)),
     completions : Js.readonly_prop(jsarray(Js.t(Js.js_string))),
+    goals : Js.readonly_prop(jsarray(goal))
 });
 
 let js_parser(s : string, cursor_position : int) : parse_result = {
     let (li, pi, a) = Lytr.Blackboard.parse(s, cursor_position);
-    let _ =  Lytr.Elab.elab(a);
+    let sp =  Lytr.Elab.elab(a);
+    let pp = Lang.Program.check_surface_program(sp);
+    // let report_string = Lang.Printing.string_of_report(pp);
+    // print_endline(report_string)
     let f1(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
         let(a, b) = x;
         let l = [Js.int32(Int32.of_int(a)), Js.int32(Int32.of_int(b))];
@@ -54,11 +64,23 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val underline = if (Lytr.Blackboard.BlackboardParser.format_of_error_kind(x.kind) == Underline) {Js.bool(true)} else {Js.bool(false)};
     }];
     let f3(x : list(string)) : list(Js.t(Js.js_string)) = List.map(s => Js.string(s), x);
+    let f5(r : (Lang.Term.judgment, (int, int))) : goal = {
+        let (cs, g) = Lang.Lang_printing.strings_of_judgment(fst(r));
+        [%js {as _; 
+            val statement = Js.string(g); 
+            val context = Js.array(Array.of_list(List.map(Js.string, cs)));
+            val range = f1(snd(r)); 
+        }]
+    };
+    let f4(r : Lang.Demo.report) : list(goal) = {
+        List.map(f5, r.open_goals);
+    };
     let result = [%js {as _; 
         val runes = Js.array(Array.of_list(List.map(f1, li.lex_errors))); 
         val delimiters = Js.array(Array.of_list(List.map(f1, li.delimiters)));
         val parseerrors = Js.array(Array.of_list(List.map(f2, pi.errors)));
         val completions = Js.array(Array.of_list(f3(pi.completions)));
+        val goals = Js.array(Array.of_list(List.concat_map(f4, pp)));
     }];
     result
 };

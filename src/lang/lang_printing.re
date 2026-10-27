@@ -56,6 +56,8 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         if (lp >= fst(strictap_prec)) { wrap(c, outer_a) } else {
             prec_string_of_term(lp, fst(ap_prec), c, a) ++ " ."
         }
+    | FreeVar(x) => "\"" ++ x ++ "\""
+    | Nonsense => "<some nonsense>"
     }
 
 } and wrap(c : ctx, a : tm) : string = {
@@ -78,22 +80,33 @@ let string_of_judgment_short(j : judgment) : string = {
     }
 }
 
+let rec strings_of_ctx(c : ctx) : list(string) = switch(c) {
+    | Empty => []
+    | Cons(c, x, ty) => strings_of_ctx(c) @ [ctx_prefix(x) ++ string_of_term(c, normalize(ty))]
+}
+
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
     | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, normalize(ty))
     | Cons(c, x, ty) => string_of_ctx(c) ++ ",\n" ++ ctx_prefix(x) ++ string_of_term(c, normalize(ty))
 }
 
+
 let string_of_mode(m : mode) : string = switch(m) {
     | Red => "red"
     | Blue => "blue"
 }
 
-let string_of_judgment(j : judgment) : string = {
+let strings_of_judgment(j : judgment) : (list(string), string) = {
     switch(j) {
     | J(c, a, _) => 
         let s = string_of_term(c, normalize(a));
-        let bar = String.make(String.length(s), '-');
-        string_of_ctx(c) ++ "\n" ++ bar ++ "\n" ++ s
+        (strings_of_ctx(c), s)
     }
+}
+
+let string_of_judgment(j : judgment) : string = {
+    let (c, s) = strings_of_judgment(j);
+    let bar = String.make(String.length(s), '-');
+    String.concat(",\n", c) ++ "\n" ++ bar ++ "\n" ++ s
 }

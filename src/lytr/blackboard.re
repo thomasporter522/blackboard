@@ -85,7 +85,7 @@ module BlackboardLanguage : Language = {
         }
     }
 
-    let mixfix_form_of_string(s : string, (arity, head)) : Option.t(form) = {
+    let mixfix_form_of_string(s : string, (arity, builder)) : Option.t(form) = {
         let (p1, s) = munch_int(s);
         let (left_tip, s) = 
             if(p1 == "") { (Uninterested, s) } 
@@ -111,11 +111,11 @@ module BlackboardLanguage : Language = {
             }
         };
         let (interior, right_tip) = build_middle(s);
-        Some(Mixfix({left_tip, interior: Option.get(interior), right_tip, arity, head}))
+        Some(Mixfix({left_tip, interior: Option.get(interior), right_tip, arity, builder}))
     }
 
 
-    let repeater_form_of_string(s : string, (arity, head)) : Option.t(form) = {
+    let repeater_form_of_string(s : string, (arity, builder)) : Option.t(form) = {
         let split = String.split_on_char('_', s);
         let (left_tip : tip, rest : list(string)) = switch(int_of_string_opt(List.hd(split))) {
             | Some(p1) => (Precedence(Need, Precedence(p1)), List.tl(split))
@@ -126,23 +126,68 @@ module BlackboardLanguage : Language = {
         | [d, p2] => (d, Precedence(Need, Precedence(int_of_string(p2))))
         | _ => failwith("incorrect formatting: repeater_form_of_string")
         };
-        Some(Repeater({left_tip, delim, right_tip, arity, head}))
+        Some(Repeater({left_tip, delim, right_tip, arity, builder}))
     }
 
-    let mixfix_form_summaries = 
-        [("(_)", (c => (Default, [c], Default), _c => Parens)),
-        ("?", (_c => (Default, [], Default), _c => Interaction)),
-        ("100_:_0", (_c => (Ident, [], Term), _c => Colon)),
-        ("(_:_)$->_10", (_c => (Default, [Ident, Term, Default], Term), _c => Arrow)),
-        ("11_->_10", (_c => (Domain, [], Term), _c => Arrow)),
-        ("11_=>_10", (_c => (Domain, [], Term), _c => Lambda)),
-        ("20_::_21", (_c => (Term, [], Term), _c => In)),
-        ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
-        ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), _c => Construct)),
-        ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), _c => Construct)),
+    let mixfix_form_summaries : list((string, (context => (context, list(context), context), builder_type(context)))) = 
+        [
+        ("(_)", (c => (Default, [c], Default), 
+            (_, _, m, _, _) => Parens(List.hd(m)))),
+        ("?", (_c => (Default, [], Default), (_, _, _, _, r) => Interaction(r))),
+        ("prop", (_c => (Default, [], Default), (_, _, _, _, _) => Prop)),
+        ("type", (_c => (Default, [], Default), (_, _, _, _, _) => Type)),
+        ("100_:_10", (_c => (Ident, [], Term), 
+            (_, first, _, last, _) => {
+                let (c1, ss1) = Option.get(first);
+                let (ss2, c2) = Option.get(last);
+                Colon(c1, ss1, ss2, c2)
+            })),
+        ("20_::_21", (_c => (Term, [], Term), 
+            (_, first, _, last, _) => {
+                let (c1, ss1) = Option.get(first);
+                let (ss2, c2) = Option.get(last);
+                In(c1, ss1, ss2, c2)
+            })),
+        ("11_->_10", (_c => (Domain, [], Term), 
+            (_, first, _, last, _) => {
+                let (c1, ss1) = Option.get(first);
+                let (ss2, c2) = Option.get(last);
+                Arrow(c1, ss1, ss2, c2)
+            })),
+        ("11_=>_10", (_c => (Domain, [], Term), 
+            (_, first, _, last, _) => {
+                let (c1, ss1) = Option.get(first);
+                let (ss2, c2) = Option.get(last);
+                Lambda(c1, ss1, ss2, c2)
+            })),
+        // ("(_:_)$->_10", (_c => (Default, [Ident, Term, Default], Term), 
+        //     (_, first, _, last) => {
+        //         let (sg, d) = switch(middle) {
+        //         | [sg, d, ... _] => (sg, d)
+        //         | _ => failwith("assumption missing args")
+        //         };
+        //         let (ss, rest) = Option.get(last);
+        //         Assume(sg, d, ss, rest)
+        //     })),
+        // ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
+        // ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), _c => Construct)),
+        ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), 
+            (_, _, middle, last, _) => {
+                let (sg, d) = switch(middle) {
+                | [sg, _, d] => (sg, d)
+                | _ => failwith("assumption missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                Assume(sg, d, ss, rest)
+            })),
         ];
     let repeater_form_summaries = 
-        [("5_,_5", (_c => Domain, _c => Commas)),];
+        [("5_,_5", (_c => Domain, 
+            (_, first, middle, last, _) => {
+                let (c1, ss1) = Option.get(first);
+                let (ss2, c2) = Option.get(last);
+                Commas(c1, ss1, middle, ss2, c2)
+            }))];
     let ap_precs = (30, 31);
 
     let forms : list(form) = 
@@ -154,7 +199,7 @@ module BlackboardLanguage : Language = {
         Some((Precedence(fst(ap_precs)), Precedence(snd(ap_precs))));
 
     let white_arity(_c : context) : (context, context) = (Term, Term);
-    let white_head(_c : context) : term_head = Ap;
+    let white_builder(_c : context, lc : abstract_term, ss : list(secondary), rc : abstract_term) : abstract_term = Ap(lc, ss, rc);
 
     let initial_context(): context = Program;
 }
