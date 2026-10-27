@@ -30,9 +30,10 @@ type abstract_term =
     | In(abstract_term, list(secondary), list(secondary), abstract_term)
     | Arrow(abstract_term, list(secondary), list(secondary), abstract_term)
     | Lambda(abstract_term, list(secondary), list(secondary), abstract_term)
-    | Assume(abstract_span, abstract_span, list(secondary), abstract_term)
     | Commas(abstract_term, list(secondary), list(abstract_span), list(secondary), abstract_term)
     | Ap(abstract_term, list(secondary), abstract_term)
+    | Assume(abstract_span, abstract_span, list(secondary), abstract_term)
+    | Construct(abstract_span, abstract_span, list(secondary), abstract_term)
     // | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
 
 and abstract_span = 

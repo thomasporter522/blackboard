@@ -18,7 +18,7 @@ let rec elab_term(t : Language.abstract_term) : Lang.Term.surface_tm = {
     | Ap(l, _, r) => SurfaceAp(elab_term(l), elab_term(r))
     | Arrow(l,_, _, r) => failwith("todo term")
     | Lambda(l, _,_, r) => failwith("todo term")
-    | Hole(_) | Interaction(_) | Colon(_) | Assume(_) | Commas(_) => SurfaceNonsense
+    | Hole(_) | Interaction(_) | Colon(_) | Assume(_) | Construct(_) | Commas(_) => SurfaceNonsense
     }
 }
 
@@ -86,6 +86,7 @@ let rec elab_program(t : Language.abstract_term) : surface_program = {
     | Hole(_) => Empty // TODO (error)
     | Ident(_) => Empty // TODO (error)
     | Assume(sg, demo, _, rest) => Assume(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
+    | Construct(sg, demo, _, rest) => Construct(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
     | _ => Empty // TODO (error)
     }
 }

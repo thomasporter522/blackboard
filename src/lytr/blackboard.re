@@ -170,7 +170,15 @@ module BlackboardLanguage : Language = {
         //         Assume(sg, d, ss, rest)
         //     })),
         // ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
-        // ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), _c => Construct)),
+        ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), 
+            (_, _, middle, last, _) => {
+                let (sg, d) = switch(middle) {
+                | [sg, d] => (sg, d)
+                | _ => failwith("construction missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                Construct(sg, d, ss, rest)
+            })),
         ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), 
             (_, _, middle, last, _) => {
                 let (sg, d) = switch(middle) {
