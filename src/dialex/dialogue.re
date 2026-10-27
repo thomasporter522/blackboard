@@ -231,19 +231,23 @@ let option_of_message(m : message, rest : stack('state)) : 'state => state_optio
     | (Puter, m) =>  s => PuterTurn(m, proceed(s, rest))
 }
 
-let rec options_state((s, d, k) : dialogue_state('state)) : state_option('state) = switch(d) {
+let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = switch(d) {
     | S(m) => option_of_message(m, k, s)
-    | Check(pre) => pre(s) ? options_state(proceed(s, k)) : End
-    | Do(act) => options_state(proceed(act(s), k))
-    | Seq(d1, d2) => options_state((s, d1, Seq(d2, k)))
-    | Alt(d1, d2) => combine(options_state((s, d1, k)), options_state((s, d2, k)))
-    | Loop(d) => options_state((s, d, Loop(d)))
-    | Chunk(d) => options_state((s, d, Chunk(k)))
-    | Par(d1, d2) => combine(options_state((s, d1, Par(d2, k))), options_state((s, d2, Par(d1, k))))
+    | Check(pre) => pre(s) ? options(proceed(s, k)) : End
+    | Do(act) => options(proceed(act(s), k))
+    | Seq(d1, d2) => options((s, d1, Seq(d2, k)))
+    | Alt(d1, d2) => combine(options((s, d1, k)), options((s, d2, k)))
+    | Loop(d) => options((s, d, Loop(d)))
+    | Chunk(d) => options((s, d, Chunk(k)))
+    | Par(d1, d2) => combine(options((s, d1, Par(d2, k))), options((s, d2, Par(d1, k))))
 }
 
 
 let me(s) = S((Puter, S(s)))
 let you(s) = S((Player, S(s)))
-// let opt(d) = Alt(d, Skip)
+let null = Check(_ => true)
+let block = Check(_ => false)
+let opt(d) = Alt(d, null)
 let branch(check : 'state => bool, d1, d2) = Alt(Seq(Check(check), d1), Seq(Check(s => !check(s)), d2))
+let seq(ds : list(dialogue('state))) = List.fold_left((a : dialogue('state), b) => Seq(a, b), null, ds)
+let alt(ds : list(dialogue('state))) = List.fold_left((a : dialogue('state), b) => Alt(a, b), block, ds)
