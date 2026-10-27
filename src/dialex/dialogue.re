@@ -59,6 +59,7 @@ type dialogue('state) =
     | Alt(dialogue('state), dialogue('state))
     // | Star(dialogue('state))
     | Loop(dialogue('state))
+    | Star(dialogue('state), dialogue('state))
     | Chunk(dialogue('state))
     // | Par(list(dialogue('state)))
     | Par(dialogue('state), dialogue('state))
@@ -87,7 +88,7 @@ type state_option('state) =
 let pre0 : 'state => bool = _ => true
 let act0 : 'state => 'state = s => s
 
-let rec combine_alts(s1 :  state_option('state), s2 :  state_option('state)) :  state_option('state) = switch(s1, s2) {
+let combine_alts(s1 :  state_option('state), s2 :  state_option('state)) :  state_option('state) = switch(s1, s2) {
     | (s1, End) => s1
     | (End, s2) => s2
     | (PlayerTurn(_), PuterTurn(_)) => failwith("DIALOGUE ERROR: TURN CONFLICT")
@@ -238,6 +239,7 @@ let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = swi
     | Seq(d1, d2) => options((s, d1, Seq(d2, k)))
     | Alt(d1, d2) => combine(options((s, d1, k)), options((s, d2, k)))
     | Loop(d) => options((s, d, Loop(d)))
+    | Star(d1, d2) => combine(options((s, d1, Seq(Star(d1, d2), k))), options((s, d2, k)))
     | Chunk(d) => options((s, d, Chunk(k)))
     | Par(d1, d2) => combine(options((s, d1, Par(d2, k))), options((s, d2, Par(d1, k))))
 }
