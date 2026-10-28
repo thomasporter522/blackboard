@@ -104,7 +104,6 @@ let js_dia_case(s : Dialex.Dialex_explainer.mystate) : int = {
 let js_dia_opt_player(s : Dialex.Dialex_explainer.mystate) : jsarray(Js.t(Js.js_string)) = {
     let js_opt((o, _) : (Dialex.Dialogue.message_option, Dialex.Dialex_explainer.mystate)) : Js.t(Js.js_string) = switch(o) {
         | Say(S(s)) => Js.string(s) 
-        | Skip => Js.string("")
     };
     switch( Dialex.Dialogue.options(s)) {
     | PlayerTurn(options) => 
