@@ -8,8 +8,8 @@ type message = (speaker, text)
 
 type dialogue('state) = 
     | S(message)
-    | Check('state => bool)
-    | Do('state => 'state)
+    | Check('state => bool, dialogue('state))
+    | Do('state => 'state, dialogue('state))
     | Seq(dialogue('state), dialogue('state))
     | Alt(dialogue('state), dialogue('state))
     | Loop(dialogue('state))
@@ -76,38 +76,28 @@ let rec continue(s : 'state, k : stack('state)) : dialogue_state('state) = switc
     | Par(d, k) => (s, d, k)
 }
 
-let rec guarded(d : dialogue('state)) : bool = switch(d) {
-    | S(_) => true
-    | Check(_) => false
-    | Do(_) => false
-    | Seq(d1, d2) => guarded(d1) || guarded(d2)
-    | Alt(d1, d2) => guarded(d1) && guarded(d2)
-    | Loop(d) => guarded(d)
-    | Star(_, d2) => guarded(d2)
-    | Chunk(d) => guarded(d)
-    | Par(d1, d2) => guarded(d1) || guarded(d2)
-}
-
 let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = switch(d) {
     | S(m) => option_of_message(m, k, s)
-    | Check(pre) => pre(s) ? options(continue(s, k)) : End
-    | Do(act) => options(continue(act(s), k))
+    | Check(pre, d) => pre(s) ? options((s, d, k)) : End
+    | Do(act, d) => options((act(s), d, k))
     | Seq(d1, d2) => options((s, d1, Seq(d2, k)))
     | Alt(d1, d2) => combine(false, options((s, d1, k)), options((s, d2, k)))
     | Loop(d) => options((s, d, Seq(Loop(d), k)))
     | Star(d1, d2) => combine(false, options((s, d1, Seq(Star(d1, d2), k))), options((s, d2, k)))
     | Chunk(d) => options((s, d, Chunk(k)))
-    | Par(d1, d2) => 
-        if(!guarded(d1) || !guarded(d2)) { failwith("dialogue has unguarded pars") } else
-        combine(true, options((s, d1, Par(d2, k))), options((s, d2, Par(d1, k))))
+    | Par(d1, d2) => combine(true, options((s, d1, Par(d2, k))), options((s, d2, Par(d1, k))))
 }
 
 
 let me(s) = S((Puter, S(s)))
 let you(s) = S((Player, S(s)))
-let null = Check(_ => true)
-let block = Check(_ => false)
-let opt(d) = Alt(d, null)
-let branch(check : 'state => bool, d1, d2) = Alt(Seq(Check(check), d1), Seq(Check(s => !check(s)), d2))
-let seq(ds : list(dialogue('state))) = List.fold_left((a : dialogue('state), b) => Seq(a, b), null, ds)
-let alt(ds : list(dialogue('state))) = List.fold_left((a : dialogue('state), b) => Alt(a, b), block, ds)
+let branch(check : 'state => bool, d1, d2) = Alt(Check(check, d1), Check(s => !check(s), d2))
+let seq(ds : list(dialogue('state))) = switch(ds) {
+    | [] => failwith("empty seq")
+    | [h,...t] => List.fold_left((a : dialogue('state), b) => Seq(a, b), h, t)
+}
+
+let alt(ds : list(dialogue('state))) = switch(ds) {
+    | [] => failwith("empty alt")
+    | [h,...t] => List.fold_left((a : dialogue('state), b) => Alt(a, b), h, t)
+}
