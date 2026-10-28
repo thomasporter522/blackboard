@@ -1,6 +1,8 @@
 
 type name = string;
 
+type range = (int, int)
+
 type arrow = 
     | Implies
     | Forall 
@@ -12,13 +14,13 @@ type strength =
     | Weak
 
 type surface_tm = 
-    | SurfaceProp 
-    | SurfaceTyp 
+    | SurfaceProp(range)
+    | SurfaceTyp(range)
     | SurfaceIn(surface_tm, surface_tm)
     | SurfaceArrow(strength, list(name), surface_tm, surface_tm)
     | SurfaceLambda(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
-    | SurfaceVar(name)
+    | SurfaceVar(range, name)
     | SurfaceAp(surface_tm, surface_tm)
     | SurfaceUnguard(surface_tm)
     | SurfaceNonsense;
@@ -40,6 +42,19 @@ type ctx =
     | Cons(ctx, name, tm);
 
 type error = string;
+
+type ranged_error = {
+    message : error, 
+    range : range
+}
+
+let err(message, range) : ranged_error = {message, range}
+
+let arrange(a, r) = 
+    switch(a) {
+    | Ok(n) => Ok(n)
+    | Error(e) => Error(err(e, r))
+    }
 
 let ( let* ) = (x: result('a, 'b), f: 'a => result('c, 'b)): result('c, 'b) =>
   switch (x) {

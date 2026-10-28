@@ -48,6 +48,7 @@ type parse_info = {
   runes : number[][];
   delimiters : number[][];
   parseerrors : error[];
+  checkerrors : error[];
   completions : string[];
   goals : goal[];
 }
@@ -60,6 +61,7 @@ function process(state : EditorState) : parse_info {
     runes : parse_result.runes,
     delimiters : parse_result.delimiters,
     parseerrors : parse_result.parseerrors,
+    checkerrors : parse_result.checkerrors,
     completions : parse_result.completions,
     goals : parse_result.goals,
   }
@@ -92,7 +94,7 @@ function decorateInteractions(state : EditorState) {
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 
-function render_message(_view : EditorView, messageText : string) : Node {
+function render_message(_view : EditorView, messageText : string, range: number[]) : Node {
   const node = document.createElement("div");
   const sigil =  document.createElement("span");
   sigil.textContent = "⚠ ";
@@ -101,14 +103,20 @@ function render_message(_view : EditorView, messageText : string) : Node {
   const message = document.createElement("span");
   message.textContent = messageText;
   node.appendChild(message);
+  const asker =  document.createElement("button");
+  asker.onclick = _ => print("Error at " + range);
+  asker.textContent = " ⓘ";
+  asker.className = "error-asker";
+  node.appendChild(asker);
   return node
 }
 
 function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
   const info = view.state.field(parseInfoField);
   const diagnostics: Diagnostic[] = [];
-  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, "unrecognized character"), markClass: "color-error"}));
-  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message), markClass: e.underline ? "line-error" : "color-error"}));
+  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, "unrecognized character", e), markClass: "color-error"}));
+  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
+  info.checkerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
   return diagnostics
 }
 
@@ -258,19 +266,19 @@ function App() {
   useEffect(() => updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons), [diaState]);
   return (<>
     <div className='page'>
-      {/* <div className='topSection'>
+      <div className='topSection'>
         <h1>Blackboard</h1>
-      </div> */}
+      </div>
       <div className='nontopSection'>
-        {/* <div className='leftSection'>
-        </div> */}
+        <div className='leftSection'>
+        </div>
         <div className='middleSection'>
-          {/* {block} */}
+          {block}
           {dialogue}
         </div>
-        {/* <div className='rightSection'>
+        <div className='rightSection'>
           {infobar}
-        </div> */}
+        </div>
       </div>
     </div>
     </>

@@ -18,6 +18,7 @@
   --delim-color: #9f9e7d;
   --interaction-color:rgb(199, 96, 228);
   --mark-color: #d96048;
+  --asker-color: #48bad9;
   --bg: #282828;
   --beam: #999988;
   --orang: #b922ff;
@@ -64,9 +65,17 @@
 }
 
 .error-sigil {
-  /* font-size: 30px; */
+  /* font-size: 10px; */
   color: var(--mark-color) !important;
 }
+
+.error-asker {
+  font-size: 15px;
+  background: none;
+  border: none;
+  color: var(--asker-color) !important;
+}
+
 
 .color-error {
   color: var(--mark-color) !important;

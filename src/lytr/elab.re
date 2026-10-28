@@ -3,22 +3,30 @@ open Lang.Program
 let elab_id(t : Language.abstract_term) : string = {
     switch(t) {
     | Hole(_) => failwith("Todo id") // TODO (error)
-    | Ident(x) => x
+    | Ident(_, x) => x
     | _ => failwith("Todo idd") // TODO (error)
+    }
+}
+
+let elab_id_span(t : Language.abstract_span) : string = {
+    switch(t) {
+    | Empty(_) => failwith("todo ID")
+    | Single(_, x, _, _) => elab_id(x)
+    | Multiple(_) => failwith("todo ID")
     }
 }
 
 let rec elab_term(t : Language.abstract_term) : Lang.Term.surface_tm = {
     switch(t) {
-    | Parens(t) => elab_term_span(t)
-    | Ident(x) => SurfaceVar(x)
-    | Prop => SurfaceProp
-    | Type => SurfaceTyp
-    | In(l,_, _, r) => SurfaceIn(elab_term(l), elab_term(r))
-    | Ap(l, _, r) => SurfaceAp(elab_term(l), elab_term(r))
-    | Arrow(l,_, _, r) => failwith("todo term")
-    | Lambda(l, _,_, r) => failwith("todo term")
-    | Hole(_) | Interaction(_) | Colon(_) | Assume(_) | Construct(_) | Commas(_) => SurfaceNonsense
+    | Parens(_, t) => elab_term_span(t)
+    | Ident(r, x) => SurfaceVar(r, x)
+    | Prop(r) => SurfaceProp(r)
+    | Type(r) => SurfaceTyp(r)
+    | In(_ra, l,_, _, r) => SurfaceIn(elab_term(l), elab_term(r))
+    | Ap(_ra, l, _, r) => SurfaceAp(elab_term(l), elab_term(r))
+    | Arrow(_ra, _l,_, _, _r) => failwith("todo term")
+    | Lambda(_ra, _l, _,_, _r) => failwith("todo term")
+    | Hole(_) | Interaction(_) | Colon(_) | Assume(_) | Construct(_) | Commas(_) | Given(_)  => SurfaceNonsense
     }
 }
 
@@ -30,16 +38,19 @@ and elab_term_span(t : Language.abstract_span) : Lang.Term.surface_tm = {
     }
 }
 
-let elab_demo(t : Language.abstract_term) : Lang.Demo.demo = {
+let rec elab_demo(t : Language.abstract_term) : Lang.Demo.demo = {
     switch(t) {
     | Hole(r) => Hole(r)
     | Interaction(r) => Hole(r)
-    | Ident(x) => HypProp(x, Obvious)
-    | _ => failwith("TODO demo") // TODO (error)
+    | Ident(r, x) => HypProp(r, x, Obvious(r))
+    | Parens(_, s) => elab_demo_span(s)
+    | Ap(r, t1, _, t2) => Use(r, elab_demo(t1), elab_demo(t2))
+    | Given(r, x, t, _, d) => Given(r, elab_id_span(x), elab_term_span(t), Obvious(r), elab_demo(d))
+    | _ => Nonsense(Language.whole_range(t)) // TODO (error)
     }
 }
 
-let elab_demo_span(t : Language.abstract_span) : Lang.Demo.demo = {
+and elab_demo_span(t : Language.abstract_span) : Lang.Demo.demo = {
     switch(t) {
     | Empty(_, r) => Hole(r)
     | Single(_ss1, t, _ss2, _r) => elab_demo(t)
@@ -50,7 +61,7 @@ let elab_demo_span(t : Language.abstract_span) : Lang.Demo.demo = {
 let elab_entry(t : Language.abstract_term) :  Option.t((string, list(arg_chunk), Lang.Term.surface_tm)) = {
     switch(t) {
     | Hole(_) => None // TODO (error)
-    | Colon(x, _, _, t) => Some((elab_id(x), [], elab_term(t)))
+    | Colon(_, x, _, _, t) => Some((elab_id(x), [], elab_term(t)))
     | _ => None // TODO (error)
     }
 }
@@ -67,8 +78,8 @@ let elab_signature(t : Language.abstract_term) : surface_signature = {
     switch(t) {
     | Hole(_) => [] // TODO (error)
     | Ident(_) => [] // TODO (error)
-    | Colon(x, _, _, t) => [(elab_id(x), [], elab_term(t))]
-    | Commas(first, _, middle, _, last) => List.filter_map(x => x, [elab_entry(first)] @ List.map(elab_entry_span, middle) @ [elab_entry(last)] )
+    | Colon(_, x, _, _, t) => [(elab_id(x), [], elab_term(t))]
+    | Commas(_, first, _, middle, _, last) => List.filter_map(x => x, [elab_entry(first)] @ List.map(elab_entry_span, middle) @ [elab_entry(last)] )
     | _ => [] // TODO (error)
     }
 }
@@ -85,8 +96,8 @@ let rec elab_program(t : Language.abstract_term) : surface_program = {
     switch(t) {
     | Hole(_) => Empty // TODO (error)
     | Ident(_) => Empty // TODO (error)
-    | Assume(sg, demo, _, rest) => Assume(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
-    | Construct(sg, demo, _, rest) => Construct(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
+    | Assume(_, sg, demo, _, rest) => Assume(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
+    | Construct(_, sg, demo, _, rest) => Construct(elab_signature_span(sg), elab_demo_span(demo), elab_program(rest))
     | _ => Empty // TODO (error)
     }
 }

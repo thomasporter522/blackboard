@@ -132,33 +132,37 @@ module BlackboardLanguage : Language = {
     let mixfix_form_summaries : list((string, (context => (context, list(context), context), builder_type(context)))) = 
         [
         ("(_)", (c => (Default, [c], Default), 
-            (_, _, m, _, _) => Parens(List.hd(m)))),
+            (_, _, m, _, r) => Parens(r, List.hd(m)))),
         ("?", (_c => (Default, [], Default), (_, _, _, _, r) => Interaction(r))),
-        ("prop", (_c => (Default, [], Default), (_, _, _, _, _) => Prop)),
-        ("type", (_c => (Default, [], Default), (_, _, _, _, _) => Type)),
+        ("prop", (_c => (Default, [], Default), (_, _, _, _, r) => Prop(r))),
+        ("type", (_c => (Default, [], Default), (_, _, _, _, r) => Type(r))),
         ("100_:_10", (_c => (Ident, [], Term), 
             (_, first, _, last, _) => {
                 let (c1, ss1) = Option.get(first);
                 let (ss2, c2) = Option.get(last);
-                Colon(c1, ss1, ss2, c2)
+                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+                Colon(r, c1, ss1, ss2, c2)
             })),
         ("20_::_21", (_c => (Term, [], Term), 
             (_, first, _, last, _) => {
                 let (c1, ss1) = Option.get(first);
                 let (ss2, c2) = Option.get(last);
-                In(c1, ss1, ss2, c2)
+                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+                In(r, c1, ss1, ss2, c2)
             })),
         ("11_->_10", (_c => (Domain, [], Term), 
             (_, first, _, last, _) => {
                 let (c1, ss1) = Option.get(first);
                 let (ss2, c2) = Option.get(last);
-                Arrow(c1, ss1, ss2, c2)
+                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+                Arrow(r, c1, ss1, ss2, c2)
             })),
         ("11_=>_10", (_c => (Domain, [], Term), 
             (_, first, _, last, _) => {
                 let (c1, ss1) = Option.get(first);
                 let (ss2, c2) = Option.get(last);
-                Lambda(c1, ss1, ss2, c2)
+                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+                Lambda(r, c1, ss1, ss2, c2)
             })),
         // ("(_:_)$->_10", (_c => (Default, [Ident, Term, Default], Term), 
         //     (_, first, _, last) => {
@@ -170,23 +174,35 @@ module BlackboardLanguage : Language = {
         //         Assume(sg, d, ss, rest)
         //     })),
         // ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
+        ("given_:_,_0", (_c => (Default, [Ident, Term], Demo), 
+            (_, _, middle, last, r) => {
+                let (x, t) = switch(middle) {
+                | [x, t] => (x, t)
+                | _ => failwith("given missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Given(r', x, t, ss, rest)
+            })),
         ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), 
-            (_, _, middle, last, _) => {
+            (_, _, middle, last, r) => {
                 let (sg, d) = switch(middle) {
                 | [sg, d] => (sg, d)
                 | _ => failwith("construction missing args")
                 };
                 let (ss, rest) = Option.get(last);
-                Construct(sg, d, ss, rest)
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Construct(r', sg, d, ss, rest)
             })),
         ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), 
-            (_, _, middle, last, _) => {
+            (_, _, middle, last, r) => {
                 let (sg, d) = switch(middle) {
                 | [sg, _, d] => (sg, d)
                 | _ => failwith("assumption missing args")
                 };
                 let (ss, rest) = Option.get(last);
-                Assume(sg, d, ss, rest)
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Assume(r', sg, d, ss, rest)
             })),
         ];
     let repeater_form_summaries = 
@@ -194,7 +210,8 @@ module BlackboardLanguage : Language = {
             (_, first, middle, last, _) => {
                 let (c1, ss1) = Option.get(first);
                 let (ss2, c2) = Option.get(last);
-                Commas(c1, ss1, middle, ss2, c2)
+                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+                Commas(r, c1, ss1, middle, ss2, c2)
             }))];
     let ap_precs = (30, 31);
 
@@ -207,7 +224,10 @@ module BlackboardLanguage : Language = {
         Some((Precedence(fst(ap_precs)), Precedence(snd(ap_precs))));
 
     let white_arity(_c : context) : (context, context) = (Term, Term);
-    let white_builder(_c : context, lc : abstract_term, ss : list(secondary), rc : abstract_term) : abstract_term = Ap(lc, ss, rc);
+    let white_builder(_c : context, lc : abstract_term, ss : list(secondary), rc : abstract_term) : abstract_term = {
+        let r = (snd(whole_range(lc)), fst(whole_range(rc)));
+        Ap(r, lc, ss, rc);
+    }
 
     let initial_context(): context = Program;
 }

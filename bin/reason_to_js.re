@@ -35,6 +35,7 @@ type parse_result = Js.t({.
     runes: Js.readonly_prop(jsarray(range)), 
     delimiters : Js.readonly_prop(jsarray(range)),
     parseerrors : Js.readonly_prop(jsarray(error)),
+    checkerrors : Js.readonly_prop(jsarray(error)),
     completions : Js.readonly_prop(jsarray(Js.t(Js.js_string))),
     goals : Js.readonly_prop(jsarray(goal))
 });
@@ -43,8 +44,6 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
     let (li, pi, a) = Lytr.Blackboard.parse(s, cursor_position);
     let sp =  Lytr.Elab.elab(a);
     let pp = Lang.Program.check_surface_program(sp);
-    // let report_string = Lang.Printing.string_of_report(pp);
-    // print_endline(report_string)
     let f1(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
         let(a, b) = x;
         let l = [Js.int32(Int32.of_int(a)), Js.int32(Int32.of_int(b))];
@@ -75,10 +74,17 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
     let f4(r : Lang.Demo.report) : list(goal) = {
         List.map(f5, r.open_goals);
     };
+    let f7(e : Lang.Term.ranged_error) : error = [%js {as _; 
+        val message = e.message;
+        val range = f1(e.range);
+        val underline = Js.bool(true);
+    }];
+    let f6(r : Lang.Demo.report) : list(error) = List.map(f7, r.errors);
     let result = [%js {as _; 
         val runes = Js.array(Array.of_list(List.map(f1, li.lex_errors))); 
         val delimiters = Js.array(Array.of_list(List.map(f1, li.delimiters)));
         val parseerrors = Js.array(Array.of_list(List.map(f2, pi.errors)));
+        val checkerrors = Js.array(Array.of_list(List.concat_map(f6, pp)));
         val completions = Js.array(Array.of_list(f3(pi.completions)));
         val goals = Js.array(Array.of_list(List.concat_map(f4, pp)));
     }];

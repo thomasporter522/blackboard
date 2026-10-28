@@ -79,6 +79,6 @@ let rec check_program (p : program) : program_check_report = {
     }
 }
 
-let rec check_surface_program (p : surface_program) : program_check_report = {
+let check_surface_program (p : surface_program) : program_check_report = {
     check_program(program_of_surface(Empty, p))
 }

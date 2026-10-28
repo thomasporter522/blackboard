@@ -110,3 +110,5 @@ let string_of_judgment(j : judgment) : string = {
     let bar = String.make(String.length(s), '-');
     String.concat(",\n", c) ++ "\n" ++ bar ++ "\n" ++ s
 }
+
+let string_of_error(e : ranged_error) : string = e.message

@@ -233,7 +233,7 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
 
     let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_span), rc : abstract_right_child, range: (int, int)) : (abstract_term, list(abstraction_error)) = {
         switch(f) {
-        | Ident(s) => (Ident(s), [])
+        | Ident(s) => (Ident(range, s), [])
         | _ => {
             let (b1, b2) = needs_outer_children(f);
             let (lc', rs1) = switch(lc) {

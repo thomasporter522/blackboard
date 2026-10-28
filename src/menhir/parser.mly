@@ -73,9 +73,9 @@ let signature :=
   | x = ID; a = sigargs; COLON; t = term; COMMA; s = signature; { (x, a, t) :: s }
 
 let atom := 
-  | x = ID; { SurfaceVar x }
-  | PROP; { SurfaceProp }
-  | TYPE; { SurfaceTyp }
+  | x = ID; { SurfaceVar((-1, -1), x) }
+  | PROP; { SurfaceProp((-1, -1)) }
+  | TYPE; { SurfaceTyp((-1, -1)) }
   | LPAREN; t = term; RPAREN; { t }
 
 let atom_list := 
@@ -92,13 +92,13 @@ let term :=
 
 let demo_atom := 
   | _ = HOLE; { Hole((-1, -1)) }
-  | x = ID; { HypProp (x, Obvious) }
-  | LPAREN; x = ID; VALID; BY; d = demo; RPAREN; { HypProp (x, d) }
-  | OBVIOUS; { Obvious }
-  | TYPETYPE; { TypForm }
+  | x = ID; { HypProp ((-1, -1), x, Obvious((-1, -1))) }
+  | LPAREN; x = ID; VALID; BY; d = demo; RPAREN; { HypProp ((-1, -1), x, d) }
+  | OBVIOUS; { Obvious((-1, -1)) }
+  | TYPETYPE; { TypForm((-1, -1)) }
   | LPAREN; d = demo; RPAREN; { d }
-  | CHECK; { Tactic (Check, []) }
-  | DEFINITION; { Tactic (Schema(Definition), []) }
+  | CHECK; { Tactic ((-1, -1), Check, []) }
+  | DEFINITION; { Tactic ((-1, -1), Schema(Definition), []) }
 
 // let demo_list := 
 //   | d = demo_atom; { d :: [] }
@@ -106,24 +106,24 @@ let demo_atom :=
 
 let chain_demo := 
   | d = demo_atom; { d }
-  | d1 = chain_demo; d2 = demo_atom; { Use(d1, d2) }
-  | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At(d1, t, d2) }
-  | d1 = chain_demo; AT; t = atom; { At(d1, t, Obvious) }
+  | d1 = chain_demo; d2 = demo_atom; { Use((-1, -1), d1, d2) }
+  | d1 = chain_demo; AT; t = atom; VALID; BY; d2 = demo_atom; { At((-1, -1), d1, t, d2) }
+  | d1 = chain_demo; AT; t = atom; { At((-1, -1), d1, t, Obvious((-1, -1))) }
 
 let demo :=
   | d = chain_demo; { d }
-  | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given (x, t, d1, d2) }
-  | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given (x, t, Obvious, d) }
-  | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim (x, t, d1, d2) }
-  | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim (x, t, Obvious, d2) }
-  | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices (x, t, d1, d2) }
-  | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices (x, t, Obvious, d2) }
-  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp (x, t1, t2, d1, d2) }
-  | TYPEOF; x = ID; { HypTyp (x, Obvious) }
-  | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm (x, d1, d2) }
-  | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm (x, d1, d2) }
-  | DIRECT; d1 = demo_atom; d2 = demo; { Tactic (Direct, d1 :: d2 :: []) }
-  | DIRECT; d = demo_atom; { Tactic (Direct, d :: []) }
-  | WITNESS; t = atom; COMMA; d = demo; { Tactic (Witness(t), Obvious :: d :: []) }
-  | WITNESS; t = atom; VALID; BY; d1 = demo; COMMA; d2 = demo; { Tactic (Witness(t), d1 :: d2 :: []) }
-  | GIVENALL; d = demo; { Tactic (GivenAll, d :: []) }
+  | GIVEN; x = ID; COLON; t = term; VALID; BY; d1 = demo; COMMA; d2 = demo; { Given ((-1, -1), x, t, d1, d2) }
+  | GIVEN; x = ID; COLON; t = term; COMMA; d = demo; { Given ((-1, -1), x, t, Obvious((-1, -1)), d) }
+  | CLAIM; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Claim ((-1, -1), x, t, d1, d2) }
+  | CLAIM; x = ID; COLON; t = term; COMMA; d2 = demo; { Claim ((-1, -1), x, t, Obvious((-1, -1)), d2) }
+  | SUFFICES; x = ID; COLON; t = term; BY; d1 = demo; COMMA; d2 = demo; { Suffices ((-1, -1), x, t, d1, d2) }
+  | SUFFICES; x = ID; COLON; t = term; COMMA; d2 = demo; { Suffices ((-1, -1), x, t, Obvious((-1, -1)), d2) }
+  | AP; x = ID; t1 = atom; t2 = atom; d1 = demo_atom; d2 = demo_atom; { ApTyp ((-1, -1), x, t1, t2, d1, d2) }
+  | TYPEOF; x = ID; { HypTyp ((-1, -1), x, Obvious((-1, -1))) }
+  | PROPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { PropArrowForm ((-1, -1), x, d1, d2) }
+  | TYPARROWTYPE; x = ID; d1 = demo_atom; d2 = demo_atom; { TypArrowForm ((-1, -1), x, d1, d2) }
+  | DIRECT; d1 = demo_atom; d2 = demo; { Tactic ((-1, -1), Direct, d1 :: d2 :: []) }
+  | DIRECT; d = demo_atom; { Tactic ((-1, -1), Direct, d :: []) }
+  | WITNESS; t = atom; COMMA; d = demo; { Tactic ((-1, -1), Witness(t), Obvious((-1, -1)) :: d :: []) }
+  | WITNESS; t = atom; VALID; BY; d1 = demo; COMMA; d2 = demo; { Tactic ((-1, -1), Witness(t), d1 :: d2 :: []) }
+  | GIVENALL; d = demo; { Tactic ((-1, -1), GivenAll, d :: []) }
