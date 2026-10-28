@@ -91,9 +91,9 @@ type dia_option_case =
     | PlayerTurn 
     | PuterTurn;
 
-let js_dia_init() = Dialex.Dialex_explainer.myinit(); 
+let js_dia_init() = Dialex.Example.myinit(); 
 
-let js_dia_case(s : Dialex.Dialex_explainer.mystate) : int = {
+let js_dia_case(s : Dialex.Example.mystate) : int = {
     switch(Dialex.Dialogue.options(s)) {
     | End => dia_option_case_to_enum(End)
     | PlayerTurn(_) => dia_option_case_to_enum(PlayerTurn)
@@ -101,8 +101,8 @@ let js_dia_case(s : Dialex.Dialex_explainer.mystate) : int = {
     }
 }
 
-let js_dia_opt_player(s : Dialex.Dialex_explainer.mystate) : jsarray(Js.t(Js.js_string)) = {
-    let js_opt((o, _) : (Dialex.Dialogue.message_option, Dialex.Dialex_explainer.mystate)) : Js.t(Js.js_string) = switch(o) {
+let js_dia_opt_player(s : Dialex.Example.mystate) : jsarray(Js.t(Js.js_string)) = {
+    let js_opt((o, _) : (Dialex.Dialogue.message_option, Dialex.Example.mystate)) : Js.t(Js.js_string) = switch(o) {
         | Say(S(s)) => Js.string(s) 
     };
     switch( Dialex.Dialogue.options(s)) {
@@ -114,11 +114,11 @@ let js_dia_opt_player(s : Dialex.Dialex_explainer.mystate) : jsarray(Js.t(Js.js_
 }
 
 type select_type = Js.t({. 
-    state:  Js.readonly_prop(Dialex.Dialex_explainer.mystate), 
+    state:  Js.readonly_prop(Dialex.Example.mystate), 
     choice : Js.readonly_prop(int),
 });
 
-let js_dia_opt_player_select(s : select_type) : Dialex.Dialex_explainer.mystate = {
+let js_dia_opt_player_select(s : select_type) : Dialex.Example.mystate = {
     switch(Dialex.Dialogue.options(s##.state)) {
     | PlayerTurn(options) => 
         let (_, s') = List.nth(options, s##.choice);
@@ -127,7 +127,7 @@ let js_dia_opt_player_select(s : select_type) : Dialex.Dialex_explainer.mystate 
     }
 }
 
-let js_dia_opt_puter(s : Dialex.Dialex_explainer.mystate) : (string, Dialex.Dialex_explainer.mystate) = {
+let js_dia_opt_puter(s : Dialex.Example.mystate) : (string, Dialex.Example.mystate) = {
     switch( Dialex.Dialogue.options(s)) {
     | PuterTurn(S(t), s') => (t, s')
     | _ => failwith("wrong dialogue case")
