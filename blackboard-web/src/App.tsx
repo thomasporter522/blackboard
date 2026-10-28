@@ -258,19 +258,19 @@ function App() {
   useEffect(() => updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons), [diaState]);
   return (<>
     <div className='page'>
-      <div className='topSection'>
+      {/* <div className='topSection'>
         <h1>Blackboard</h1>
-      </div>
+      </div> */}
       <div className='nontopSection'>
-        <div className='leftSection'>
-        </div>
+        {/* <div className='leftSection'>
+        </div> */}
         <div className='middleSection'>
-          {block}
+          {/* {block} */}
           {dialogue}
         </div>
-        <div className='rightSection'>
+        {/* <div className='rightSection'>
           {infobar}
-        </div>
+        </div> */}
       </div>
     </div>
     </>
