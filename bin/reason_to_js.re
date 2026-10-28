@@ -102,8 +102,8 @@ let js_dia_case(s : Dialex.Example.mystate) : int = {
 }
 
 let js_dia_opt_player(s : Dialex.Example.mystate) : jsarray(Js.t(Js.js_string)) = {
-    let js_opt((o, _) : (Dialex.Dialogue.message_option, Dialex.Example.mystate)) : Js.t(Js.js_string) = switch(o) {
-        | Say(S(s)) => Js.string(s) 
+    let js_opt((o, _) : (Dialex.Dialogue.text, Dialex.Example.mystate)) : Js.t(Js.js_string) = switch(o) {
+        | S(s) => Js.string(s) 
     };
     switch( Dialex.Dialogue.options(s)) {
     | PlayerTurn(options) => 

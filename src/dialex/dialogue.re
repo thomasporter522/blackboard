@@ -1,67 +1,20 @@
 type text = S(string)
 
-
-// dialogue state is
-// - state 
-// - dialogue
-// - stack 
-
-// when an end is reached in the dialogue, pull everything from the stack until a chunk is hit (unless that's nothing)
-
-
-
 type speaker = 
     | Player 
     | Puter
 
 type message = (speaker, text)
 
-// type of dialogues where the first word is always X, the last is always Y 
-
-// type puterPuter('state) = 
-//     | Say(text)
-
-// type puterPlayer('state) = 
-//     | Hi
-
-// type playerPlayer('state) = 
-//     | Say(text)
-
-// type playerPuter('state) = 
-//     | SeqPuter(playerPuter('state), puterPuter('state))
-
-// type dia('state) = 
-//     | Loop(playerPuter('state))
-
-// type puterSays('state) = 
-//     | Player(playerSays('state)) 
-//     | Say(text)
-//     | Seq(puterSays('state), puterSays('state))
-//     | Check('state => bool, puterSays('state), puterSays('state))
-//     | While('state => bool, puterSays('state), puterSays('state))
-//     | Do('state => 'state)
-
-// and playerSays('state) = 
-//     | Puter(puterSays('state))
-//     | Say(text)
-//     | 
-
-
 type dialogue('state) = 
     | S(message)
     | Check('state => bool)
     | Do('state => 'state)
-    // | Check('state => bool, dialogue('state))
-    // | Do(dialogue('state), 'state => 'state)
-    // | Skip
-    // | Null
     | Seq(dialogue('state), dialogue('state))
     | Alt(dialogue('state), dialogue('state))
-    // | Star(dialogue('state))
     | Loop(dialogue('state))
     | Star(dialogue('state), dialogue('state))
     | Chunk(dialogue('state))
-    // | Par(list(dialogue('state)))
     | Par(dialogue('state), dialogue('state))
 
 type stack('state) = 
@@ -72,16 +25,8 @@ type stack('state) =
 
 type dialogue_state('state) = ('state, dialogue('state), stack('state))
 
-type message_option = 
-    | Say(text)
-    // | Skip
-
-// type continuation('state) = 
-//     | Next(dialogue_state('state))
-//     // | End('state)
-
 type state_option('state) = 
-    | PlayerTurn(list((message_option, dialogue_state('state))))
+    | PlayerTurn(list((text, dialogue_state('state))))
     | PuterTurn(text, dialogue_state('state))
     | End
 
@@ -120,7 +65,7 @@ let rec proceed_acc(s : 'state, acc : Option.t(dialogue('state)), k : stack('sta
 let proceed(s : 'state, k : stack('state)) = proceed_acc(s, None, k);
 
 let option_of_message(m : message, rest : stack('state)) : 'state => state_option('state) = switch(m) {
-    | (Player, m) => s => PlayerTurn([(Say(m), proceed(s, rest))])
+    | (Player, m) => s => PlayerTurn([(m, proceed(s, rest))])
     | (Puter, m) =>  s => PuterTurn(m, proceed(s, rest))
 }
 
