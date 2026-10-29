@@ -20,9 +20,10 @@ module BlackboardLanguage : Language = {
     }
 
     let is_alpha(c : char) = Str.string_match(Str.regexp("[a-z]\|[A-Z]"), String.make(1, c), 0)
+    let is_num(c : char) = Str.string_match(Str.regexp("[0-9]"), String.make(1, c), 0)
 
     let is_identifier_char (is_start : bool, c : char) : bool = {
-        is_start ? is_alpha(c) : (is_alpha(c) || c == '-')
+        is_start ? is_alpha(c) : (is_alpha(c) || is_num(c) || c == '-')
     }
 
     // let old_mixfix_form_of_string(s : string, (arity, head)) : Option.t(form) = {
