@@ -5,6 +5,7 @@ module PartialDerivation : {
     type t; 
     let init : judgment => t;
     let verify : (t, judgment) => bool;
+    let complete : t => bool;
     let focused : t => result(judgment, error);
     let skip : t => result(t, error);
     let swap : t => result(t, error);
@@ -42,6 +43,10 @@ module PartialDerivation : {
 
     let verify (s : t, j : judgment) = {
         s.focused == [] && s.root == j
+    }
+
+    let complete (s : t) = {
+        s.focused == [] && s.skipped == []
     }
 
     let focused (s : t) : result(judgment, error) = {

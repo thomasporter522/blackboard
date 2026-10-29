@@ -136,13 +136,16 @@ module BlackboardLanguage : Language = {
         Infix(head, r, c1, ss1, ss2, c2)
     }
 
+    let atom_of(head, _, _, _, _, r) = Atom(head,r);
+
     let mixfix_form_summaries : list((string, (context => (context, list(context), context), builder_type(context)))) = 
         [
         ("(_)", (c => (Default, [c], Default), 
             (_, _, m, _, r) => Parens(r, List.hd(m)))),
-        ("?", (_c => (Default, [], Default), (_, _, _, _, r) => Interaction(r))),
-        ("prop", (_c => (Default, [], Default), (_, _, _, _, r) => Prop(r))),
-        ("type", (_c => (Default, [], Default), (_, _, _, _, r) => Type(r))),
+        ("?", (_c => (Default, [], Default), atom_of(Hole))),
+        ("prop", (_c => (Default, [], Default), atom_of(Prop))),
+        ("type", (_c => (Default, [], Default), atom_of(Type))),
+        ("check", (_c => (Default, [], Default), atom_of(Check))),
         ("11_:_10", (_c => (Ident, [], Term), infix_of(Colon))),
         ("20_::_21", (_c => (Term, [], Term), infix_of(In))),
         ("11_->_10", (_c => (Domain, [], Term), infix_of(Arrow))),
@@ -165,7 +168,7 @@ module BlackboardLanguage : Language = {
                 | _ => failwith("construction missing args")
                 };
                 let (ss, rest) = Option.get(last);
-                let r' = (fst(r), fst(range_of_some_rc(last)));
+                let r' = (fst(r), fst(r) + String.length("construct"));
                 Construct(r', sg, d, ss, rest)
             })),
         ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), 
@@ -175,7 +178,7 @@ module BlackboardLanguage : Language = {
                 | _ => failwith("assumption missing args")
                 };
                 let (ss, rest) = Option.get(last);
-                let r' = (fst(r), fst(range_of_some_rc(last)));
+                let r' = (fst(r), fst(r) + String.length("assume"));
                 Assume(r', sg, d, ss, rest)
             })),
         ];

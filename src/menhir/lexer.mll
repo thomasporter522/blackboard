@@ -14,8 +14,8 @@ rule read =
   | white { read lexbuf }
   | "(" { LPAREN }
   | ")" { RPAREN }
-  | "[" { LSQAREN }
-  | "]" { RSQAREN }
+  (* | "[" { LSQAREN }
+  | "]" { RSQAREN } *)
   | "prop" { PROP }
   | "type" { TYPE }
   | "." { PERIOD }

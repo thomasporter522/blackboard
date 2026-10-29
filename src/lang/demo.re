@@ -48,18 +48,20 @@ and tm_or_demo =
 
 type report = {
     open_goals : list((judgment, (int, int))),
-    errors : list(ranged_error)
+    errors : list(ranged_error),
+    completes : list((int, int))
 }
 
 let mk_report (open_goals : list((judgment, (int, int))), errors : list(ranged_error)) : report = {
-    open_goals, errors
+    open_goals, errors, completes: []
 }
 
 let pure_report : report = mk_report([], [])
 
 let merge_reports(r1 : report, r2 : report) : report = {
     open_goals : r1.open_goals @ r2.open_goals,
-    errors : r1.errors @ r2.errors
+    errors : r1.errors @ r2.errors,
+    completes: r1.completes @ r2.completes,
 }
 
 let rec merge_report_list(rs : list(report)) : report = switch(rs){
@@ -108,7 +110,7 @@ let (let-&) = (x : (t, result('a, ranged_error)), f : 'a => demo_result) : demo_
 
 let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_result => {
   let (t, r) = f(x);
-  (t, {open_goals: r.open_goals, errors : r.errors @ es})
+  (t, {...r, errors : r.errors @ es})
 }
 
 let rec var_of_surface (c : ctx, x : name) : Result.t(int, error) = switch(c) {
@@ -851,8 +853,8 @@ let rec check_demo(s : t, d : demo) : (t, report) =
 // }
 
 
-let check_demo_root(root : judgment, d : demo) : report = {
+let check_demo_root(root : judgment, d : demo, complete_range : (int, int)) : report = {
     let (s, r) = check_demo(init(root), d);
     assert(verify(s,root));
-    r
+    if(complete(s)) { {...r, completes : r.completes @ [complete_range]} } else r
 }

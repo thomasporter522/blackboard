@@ -8,15 +8,15 @@ type surface_signature = list((name, list(arg_chunk), surface_tm))
 
 type surface_program = 
     | SurfaceEmpty 
-    | SurfaceAssume(surface_signature, demo, surface_program)
-    | SurfaceConstruct(surface_signature, demo, surface_program)
-    | SurfaceProve(surface_tm, demo, surface_program)
+    | SurfaceAssume(range, surface_signature, demo, surface_program)
+    | SurfaceConstruct(range, surface_signature, demo, surface_program)
+    | SurfaceProve(range, surface_tm, demo, surface_program)
 
 type program = 
     | Empty 
-    | Assume(ctx, tm, demo, program)
-    | Construct(ctx, tm, demo, program)
-    | Prove(ctx, tm, demo, program)
+    | Assume(range, ctx, tm, demo, program)
+    | Construct(range, ctx, tm, demo, program)
+    | Prove(range, ctx, tm, demo, program)
 
 // let rec signature_of_surface(c : ctx, s : surface_signature) : (ctx, signature) = switch(s) {
 //     | [] => (c, [])
@@ -58,20 +58,20 @@ let ty_of_surface_signature(c : ctx, s : surface_signature) : tm = {
 
 let rec program_of_surface (c : ctx, p : surface_program) : (program, list(ranged_error)) = switch(p) {
     | SurfaceEmpty => (Empty, [])
-    | SurfaceAssume(s, d, p) => 
+    | SurfaceAssume(r, s, d, p) => 
         let (c', es1) = extend_context_surface_signature(c, s);
         let ty = ty_of_surface_signature(c, s);
         let (p', es2) = program_of_surface(c', p);
-        (Assume(c, ty, d, p'), es1 @ es2)
-    | SurfaceConstruct(s, d, p) => 
+        (Assume(r, c, ty, d, p'), es1 @ es2)
+    | SurfaceConstruct(r, s, d, p) => 
         let (c', es1) = extend_context_surface_signature(c, s);
         let ty = ty_of_surface_signature(c, s);
         let (p', es2) = program_of_surface(c', p);
-        (Construct(c, ty, d, p'), es1 @ es2)
-    | SurfaceProve(a, d, p) => 
+        (Construct(r, c, ty, d, p'), es1 @ es2)
+    | SurfaceProve(r, a, d, p) => 
         let (p', es1) = program_of_surface(c, p);
         let (t', es2) = tm_of_surface(Empty, a);
-        (Prove(c, t', d, p'), es1 @ es2)
+        (Prove(r, c, t', d, p'), es1 @ es2)
 }
 
 type program_check_report = list(report);
@@ -79,13 +79,13 @@ type program_check_report = list(report);
 let rec check_program (p : program) : program_check_report = {
     switch(p) {
     | Empty => []
-    | Assume(c, ty, d, p) => [check_demo_root(J(c, In(ty, Prop), Blue), d),... check_program(p)]
-    | Construct(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
-    | Prove(c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d),... check_program(p)]
+    | Assume(r, c, ty, d, p) => [check_demo_root(J(c, In(ty, Prop), Blue), d, r),... check_program(p)]
+    | Construct(r, c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d, r),... check_program(p)]
+    | Prove(r, c, ty, d, p) => [check_demo_root(J(c, ty, Blue), d, r),... check_program(p)]
     }
 }
 
 let check_surface_program (p : surface_program) : program_check_report = {
     let (p', es) = program_of_surface(Empty, p);
-    [{open_goals: [], errors: es}] @ check_program(p')
+    [{open_goals: [], errors: es, completes: []}] @ check_program(p')
 }

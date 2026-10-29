@@ -38,6 +38,7 @@ type parse_result = Js.t({.
     elaberrors : Js.readonly_prop(jsarray(error)),
     checkerrors : Js.readonly_prop(jsarray(error)),
     completions : Js.readonly_prop(jsarray(Js.t(Js.js_string))),
+    victories : Js.readonly_prop(jsarray(range)),
     goals : Js.readonly_prop(jsarray(goal))
 });
 
@@ -81,6 +82,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val underline = Js.bool(true);
     }];
     let f6(r : Lang.Demo.report) : list(error) = List.map(f7, r.errors);
+    let f8(r : Lang.Demo.report) : list(range) = List.map(f1, r.completes);
     let result = [%js {as _; 
         val runes = Js.array(Array.of_list(List.map(f1, li.lex_errors))); 
         val delimiters = Js.array(Array.of_list(List.map(f1, li.delimiters)));
@@ -88,6 +90,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val elaberrors = Js.array(Array.of_list(List.map(f7, elab_errors)));
         val checkerrors = Js.array(Array.of_list(List.concat_map(f6, pp)));
         val completions = Js.array(Array.of_list(f3(pi.completions)));
+        val victories = Js.array(Array.of_list(List.concat_map(f8, pp)));
         val goals = Js.array(Array.of_list(List.concat_map(f4, pp)));
     }];
     result

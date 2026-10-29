@@ -15,6 +15,20 @@ import Markdown from 'react-markdown'
 
 import { blackboardTheme } from "./CodeTheme.tsx"
 
+const init_text = `assume 
+x : type
+valid by 
+check
+end
+construct
+z : type
+by
+given M : prop,
+given H : type -> M,
+?
+end
+?`
+
 function dia_test_init() { return globalThis.dia_test_init() }
 
 function dia_test_case(s) { return globalThis.dia_test_case(s) }
@@ -51,6 +65,7 @@ type parse_info = {
   elaberrors : error[];
   checkerrors : error[];
   completions : string[];
+  victories : number[][];
   goals : goal[];
 }
 
@@ -65,6 +80,7 @@ function process(state : EditorState) : parse_info {
     elaberrors : parse_result.elaberrors,
     checkerrors : parse_result.checkerrors,
     completions : parse_result.completions,
+    victories : parse_result.victories,
     goals : parse_result.goals,
   }
 }
@@ -86,6 +102,13 @@ function decorateDelims(state : EditorState) {
   return Decoration.set(state.field(parseInfoField).delimiters.map(decorateDelim))
 }
 
+function decorateVictories(state : EditorState) {
+  function decorateVictory(x : number[]) {
+    return Decoration.mark({class: "victory"}).range(x[0], x[1])
+  };
+  return Decoration.set(state.field(parseInfoField).victories.map(decorateVictory))
+}
+
 function decorateInteractions(state : EditorState) {
   function decorateInteraction(x : goal) {
     return Decoration.mark({class: "interaction"}).range(x.range[0], x.range[1])
@@ -94,6 +117,7 @@ function decorateInteractions(state : EditorState) {
 }
 
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
+const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 
 function render_message(_view : EditorView, messageText : string, range: number[]) : Node {
@@ -182,14 +206,17 @@ const extensions = [
   parseInfoField,
   linterExtension,
   interactionExtension,
+  victoryExtension,
   delimiterExtension,
   completionExtension,
   Prec.highest(insertCompletionExtension),
   ];
 
+
+
 function MainCodeblock(setInfo) {
   return <div className='mainBlock'><CodeMirror
-      value={"construct\nz : type\nby\ngiven M : prop,\ngiven H : type -> M,\nH @ thing\nend\n?"}
+      value={init_text}
       height="600px"
       theme={blackboardTheme}
       extensions={extensions}

@@ -12,8 +12,8 @@ let (let*) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {
 
 let elab_id(t : Language.abstract_term) : (Option.t(string), list(error)) = {
     switch(t) {
-    | Hole(r) => (None, [err("Missing name", r)])
-    | Ident(_, x) => (Some(x), [])
+    | Atom(Hole, r) => (None, [err("Missing name", r)])
+    | Atom(Ident(x), _) => (Some(x), [])
     | _ => (None, [err("Invalid name", whole_range(t))])
     }
 }
@@ -30,7 +30,7 @@ let elab_id_span(t : Language.abstract_span) : (Option.t(string), list(error)) =
 }
 
 let rec elab_id_list(t: Language.abstract_term) = switch(t) {
-    | Ident(_, x) => ([x], [])
+    | Atom(Ident(x), _) => ([x], [])
     | Ap(_, xs1, _, xs2) => 
         let* xs1' = elab_id_list(xs1);
         let* xs2' = elab_id_list(xs2);
@@ -58,9 +58,9 @@ and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t((list(string), L
 and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) = {
     switch(t) {
     | Parens(_, t) => elab_term_span(t)
-    | Ident(r, x) => (SurfaceVar(r, x), [])
-    | Prop(r) => (SurfaceProp(r), [])
-    | Type(r) => (SurfaceTyp(r), [])
+    | Atom(Ident(x), r) => (SurfaceVar(r, x), [])
+    | Atom(Prop, r) => (SurfaceProp(r), [])
+    | Atom(Type, r) => (SurfaceTyp(r), [])
     | Infix(In, _, t1, _, _, t2) => 
         let* t1' = elab_term(t1);
         let* t2' = elab_term(t2);
@@ -83,8 +83,9 @@ and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) 
         | None => (t2', [])
         | Some((xs, t1'')) => (Lang.Term.SurfaceLambda(xs, t1'', t2'), [])
         }
-    | Hole(_) 
-    | Interaction(_) 
+    | Atom(Hole,_) 
+    | Atom(Interaction,_) 
+    | Atom(Check,_) 
     | Infix(Colon, _, _, _, _, _) 
     | Infix(At, _, _, _, _, _) 
     | Assume(_) 
@@ -107,9 +108,10 @@ and elab_term_span(t : Language.abstract_span) : (Lang.Term.surface_tm, list(err
 
 let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     switch(t) {
-    | Hole(r) => (Hole(r), [])
-    | Interaction(r) => (Hole(r), [])
-    | Ident(r, x) => (HypProp(r, x, Obvious(r)), [])
+    | Atom(Hole, r) => (Hole(r), [])
+    | Atom(Interaction, r) => (Hole(r), [])
+    | Atom(Ident(x), r) => (HypProp(r, x, Obvious(r)), [])
+    | Atom(Check,r) => (Tactic(r, Check, []), [])
     | Parens(_, s) => elab_demo_span(s)
     | Ap(r, t1, _, t2) => 
         let* t1' = elab_demo(t1);
@@ -127,7 +129,15 @@ let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = 
         let* t1' = elab_demo(t1);
         let* t2' = elab_term(t2);
         (Lang.Demo.At(r, t1', t2', Obvious(r)), [])
-    | _ => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
+    | Atom(Prop,_) 
+    | Atom(Type,_) 
+    | Infix(In, _, _, _, _, _) 
+    | Infix(Colon, _, _, _, _, _) 
+    | Infix(Arrow, _, _, _, _, _) 
+    | Infix(Lambda, _, _, _, _, _) 
+    | Assume(_) 
+    | Construct(_) 
+    | Commas(_) => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
     }
 }
 
@@ -166,9 +176,9 @@ let elab_entry_span(t : Language.abstract_span) : (Option.t((string, list(arg_ch
     }
 }
 
-let rec elab_signature(t : Language.abstract_term) : (surface_signature, list(error)) = {
+let elab_signature(t : Language.abstract_term) : (surface_signature, list(error)) = {
     switch(t) {
-    | Hole(_) => ([], [])
+    | Atom(Hole, _) => ([], [])
     | Infix(Colon, _, x, _, _, t) => 
         let* x' = elab_id(x);
         let* t' = elab_term(t);
@@ -200,18 +210,18 @@ let elab_signature_span(t : Language.abstract_span) : (surface_signature, list(e
 
 let rec elab_program(t : Language.abstract_term) : (surface_program, list(error)) = {
     switch(t) {
-    | Hole(_) 
-    | Interaction(_) => (SurfaceEmpty, [])
-    | Assume(_, sg, demo, _, p) => 
+    | Atom(Hole, _) 
+    | Atom(Interaction, _) => (SurfaceEmpty, [])
+    | Assume(r, sg, demo, _, p) => 
         let* sg' = elab_signature_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceAssume(sg',demo', p'), [])
-    | Construct(_, sg, demo, _, p) => 
+        (SurfaceAssume(r, sg',demo', p'), [])
+    | Construct(r, sg, demo, _, p) => 
         let* sg' = elab_signature_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceConstruct(sg',demo', p'), [])
+        (SurfaceConstruct(r, sg',demo', p'), [])
     | _ => (SurfaceEmpty, [err("Invalid program", whole_range(t))])
     }
 }

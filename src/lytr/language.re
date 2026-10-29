@@ -26,13 +26,17 @@ type infix =
     | Lambda
     | At
 
+type atom = 
+    | Hole 
+    | Interaction
+    | Ident(string)
+    | Prop 
+    | Type 
+    | Check
+
 type abstract_term =
-    | Hole(range)
-    | Ident(range, string)
-    | Interaction(range)
+    | Atom(atom, range)
     | Parens(range, abstract_span)
-    | Prop(range)
-    | Type(range)
     | Infix(infix, range, abstract_term, list(secondary), list(secondary), abstract_term)
     | Commas(range, abstract_term, list(secondary), list(abstract_span), list(secondary), abstract_term)
     | Ap(range, abstract_term, list(secondary), abstract_term)
@@ -55,12 +59,8 @@ and abstract_right_child = Option.t((list(secondary), abstract_term))
 let combine_ranges((a, _), (_, b)) = (a, b)
 
 let rec whole_range(a : abstract_term) : range = switch(a) {
-    | Hole(r)
-    | Ident(r, _)
-    | Interaction(r)
     | Parens(r, _) 
-    | Prop(r)
-    | Type(r) => r
+    | Atom(_, r) => r
     | Commas(_, t1,_, _, _, t2) 
     | Ap(_, t1, _, t2)
     | Infix(_, _, t1, _, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))

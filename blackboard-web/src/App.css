@@ -19,6 +19,7 @@
   --interaction-color:rgb(199, 96, 228);
   --mark-color: #d96048;
   --asker-color: #48bad9;
+  --victory-color: #12e6a3;
   --bg: #282828;
   --beam: #999988;
   --orang: #b922ff;
@@ -83,6 +84,12 @@
 
 .delimiter {
   color: var(--delim-color);
+}
+.victory:before {
+  content: "☑ ";
+}
+.victory {
+  color: var(--victory-color);
 }
 .interaction {
   color: var(--interaction-color) !important;

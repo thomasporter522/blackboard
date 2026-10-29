@@ -233,21 +233,21 @@ module GrammarOfLanguage = (L : Language) : Grammar => {
 
     let abstract_term(c : context, f : form, lc : abstract_left_child, ats : list(abstract_span), rc : abstract_right_child, range: (int, int)) : (abstract_term, list(abstraction_error)) = {
         switch(f) {
-        | Ident(s) => (Ident(range, s), [])
+        | Ident(s) => (Atom(Ident(s), range), [])
         | _ => {
             let (b1, b2) = needs_outer_children(f);
             let (lc', rs1) = switch(lc) {
-                | None => b1 ? (Some((Hole((fst(range), fst(range))), [])), [{kind: MissingLeftChild, range: (fst(range), fst(range))}]) : (None, [])
+                | None => b1 ? (Some((Atom(Hole, (fst(range), fst(range))), [])), [{kind: MissingLeftChild, range: (fst(range), fst(range))}]) : (None, [])
                 | Some(_) => (lc, [])
             };
             let (rc', rs2) = switch(rc) {
-                | None => b2 ? (Some(([], Hole((snd(range), snd(range))))), [{kind: MissingRightChild, range: (snd(range), snd(range))}]) : (None, [])
+                | None => b2 ? (Some(([], Atom(Hole, (snd(range), snd(range))))), [{kind: MissingRightChild, range: (snd(range), snd(range))}]) : (None, [])
                 | Some(_) => (rc, [])
             };
             let (ats', rs3, _) = List.fold_left({
                 ((acc_ats, acc_rs, i), at) => {
                     switch(at, needs_inner_children(f, i)) {
-                    | (Empty(ss, r), true) => (acc_ats @ [Single(ss, Hole(r), [], r)], [{kind: MissingInnerChild, range: r}] @ acc_rs, i+1)
+                    | (Empty(ss, r), true) => (acc_ats @ [Single(ss, Atom(Hole, r), [], r)], [{kind: MissingInnerChild, range: r}] @ acc_rs, i+1)
                     | (Single(_, _, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
                     | (Multiple(_, _, r), false) => (acc_ats @ [at], [{kind: ExtraneousChild, range: r}] @ acc_rs, i+1)
                     | _ => (acc_ats @ [at], acc_rs, i+1)
