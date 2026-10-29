@@ -853,8 +853,8 @@ let rec check_demo(s : t, d : demo) : (t, report) =
 // }
 
 
-let check_demo_root(root : judgment, d : demo, complete_range : (int, int)) : report = {
+let check_demo_root(root : judgment, d : demo, complete_range : (int, int), tidy : bool) : report = {
     let (s, r) = check_demo(init(root), d);
     assert(verify(s,root));
-    if(complete(s)) { {...r, completes : r.completes @ [complete_range]} } else r
+    if(complete(s) && tidy) { {...r, completes : r.completes @ [complete_range]} } else r
 }

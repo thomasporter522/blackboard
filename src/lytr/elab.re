@@ -213,15 +213,15 @@ let rec elab_program(t : Language.abstract_term) : (surface_program, list(error)
     | Atom(Hole, _) 
     | Atom(Interaction, _) => (SurfaceEmpty, [])
     | Assume(r, sg, demo, _, p) => 
-        let* sg' = elab_signature_span(sg);
+        let (sg', es) = elab_signature_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceAssume(r, sg',demo', p'), [])
+        (SurfaceAssume(r, es == [], sg',demo', p'), es)
     | Construct(r, sg, demo, _, p) => 
-        let* sg' = elab_signature_span(sg);
+        let (sg', es) = elab_signature_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceConstruct(r, sg',demo', p'), [])
+        (SurfaceConstruct(r, es == [], sg',demo', p'), es)
     | _ => (SurfaceEmpty, [err("Invalid program", whole_range(t))])
     }
 }

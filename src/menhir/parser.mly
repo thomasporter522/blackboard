@@ -50,9 +50,9 @@ open Lang.Program
 
 let prog :=
   | EOF; { SurfaceEmpty }
-  | ASSUME; s = signature; VALID; BY; d = demo; p = prog; { SurfaceAssume ((-1, -1), s, d, p) }
-  | CONSTRUCT; s = signature; BY; d = demo; p = prog; { SurfaceConstruct ((-1, -1), s, d, p) }
-  | PROVE; t = term; BY; d = demo; p = prog; { SurfaceProve ((-1, -1), t, d, p) }
+  | ASSUME; s = signature; VALID; BY; d = demo; p = prog; { SurfaceAssume ((-1, -1), true, s, d, p) }
+  | CONSTRUCT; s = signature; BY; d = demo; p = prog; { SurfaceConstruct ((-1, -1), true, s, d, p) }
+  | PROVE; t = term; BY; d = demo; p = prog; { SurfaceProve ((-1, -1), true, t, d, p) }
 
 let id_list := 
   | x = ID; { [x] }
