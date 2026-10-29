@@ -79,8 +79,7 @@ direct (
 construct
 sub (A B : type) : prop, 
 sub-eq : (A B : type) -> eq prop (sub A B) ((x : A) -> x :: B)
-by
-definition
+by definition
 
 assume 
 small : type -> prop,

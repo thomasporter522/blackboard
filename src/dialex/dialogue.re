@@ -8,6 +8,7 @@ type message = (speaker, text)
 
 type dialogue('state) = 
     | S(message)
+    | SaySmart('state => text)
     | Check('state => bool, dialogue('state))
     | Do('state => 'state, dialogue('state))
     | Seq(dialogue('state), dialogue('state))
@@ -78,6 +79,7 @@ let rec continue(s : 'state, k : stack('state)) : dialogue_state('state) = switc
 
 let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = switch(d) {
     | S(m) => option_of_message(m, k, s)
+    | SaySmart(f) => option_of_message((Puter, f(s)), k, s)
     | Check(pre, d) => pre(s) ? options((s, d, k)) : End
     | Do(act, d) => options((act(s), d, k))
     | Seq(d1, d2) => options((s, d1, Seq(d2, k)))
