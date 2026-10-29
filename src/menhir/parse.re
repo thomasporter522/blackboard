@@ -4,7 +4,7 @@ open Lang.Program
 let parse_program(s : string) : program = {
     let lexbuf = Lexing.from_string(s);
     let p = Parser.prog(Lexer.read, lexbuf);
-    program_of_surface(Empty, p)
+    fst(program_of_surface(Empty, p))
 }
 
 let program_of_file(filename : string) = {

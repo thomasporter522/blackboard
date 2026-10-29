@@ -48,6 +48,7 @@ type parse_info = {
   runes : number[][];
   delimiters : number[][];
   parseerrors : error[];
+  elaberrors : error[];
   checkerrors : error[];
   completions : string[];
   goals : goal[];
@@ -61,6 +62,7 @@ function process(state : EditorState) : parse_info {
     runes : parse_result.runes,
     delimiters : parse_result.delimiters,
     parseerrors : parse_result.parseerrors,
+    elaberrors : parse_result.elaberrors,
     checkerrors : parse_result.checkerrors,
     completions : parse_result.completions,
     goals : parse_result.goals,
@@ -116,6 +118,7 @@ function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, "unrecognized character", e), markClass: "color-error"}));
   info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
+  info.elaberrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
   info.checkerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
   return diagnostics
 }
@@ -186,7 +189,7 @@ const extensions = [
 
 function MainCodeblock(setInfo) {
   return <div className='mainBlock'><CodeMirror
-      value={"assume\nx : type\nvalid by ? end\nassume\ny : type\nvalid by ? end\nassume\nz : type\nvalid by ? end\n?"}
+      value={"construct\nz : type\nby\ngiven M : prop,\ngiven H : type -> M,\nH @ thing\nend\n?"}
       height="600px"
       theme={blackboardTheme}
       extensions={extensions}

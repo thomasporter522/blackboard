@@ -106,6 +106,11 @@ let (let-&) = (x : (t, result('a, ranged_error)), f : 'a => demo_result) : demo_
     }
 }
 
+let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_result => {
+  let (t, r) = f(x);
+  (t, {open_goals: r.open_goals, errors : r.errors @ es})
+}
+
 let rec var_of_surface (c : ctx, x : name) : Result.t(int, error) = switch(c) {
     | Cons(_, y, _) when x == y => Ok(0)
     | Cons(c, _, _) => 
@@ -114,23 +119,46 @@ let rec var_of_surface (c : ctx, x : name) : Result.t(int, error) = switch(c) {
     | Empty => Error("unbound variable: " ++ x)
 }
 
-let rec tm_of_surface (c : ctx, t : surface_tm) : tm = switch(t) {
-    | SurfaceProp(_) => Prop
-    | SurfaceTyp(_) => Typ
-    | SurfaceIn(t1, t2) => In(tm_of_surface(c, t1),tm_of_surface(c, t2))
-    | SurfaceArrow(st, [x,...xs], t1, t2) => Arrow(st, x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceArrow(st, xs, t1, t2)))
+let (let**) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {
+    let (a, l1) = f;
+    let (c, l2) = b(a);
+    (c, l1 @ l2)
+}
+
+let rec tm_of_surface (c : ctx, t : surface_tm) : (tm, list(ranged_error)) = switch(t) {
+    | SurfaceProp(_) => (Prop, [])
+    | SurfaceTyp(_) => (Typ, [])
+    | SurfaceIn(t1, t2) => 
+        let** t1' = tm_of_surface(c, t1);
+        let** t2' = tm_of_surface(c, t2);
+        (In(t1', t2'), [])
+    | SurfaceArrow(st, [x,...xs], t1, t2) => 
+        let** t1' = tm_of_surface(c, t1);
+        let** t2' = tm_of_surface(Cons(c, x, t1'), SurfaceArrow(st, xs, t1, t2));
+        (Arrow(st, x, t1', t2'), [])
     | SurfaceArrow(_, [], _, t2) => tm_of_surface(c, t2)
-    | SurfaceLambda([x,...xs], t1, t2) => Lam(x, tm_of_surface(c, t1), tm_of_surface(Cons(c, x, tm_of_surface(c, t1)), SurfaceLambda(xs, t1, t2)))
+    | SurfaceLambda([x,...xs], t1, t2) => 
+        let** t1' = tm_of_surface(c, t1);
+        let** t2' = tm_of_surface(Cons(c, x, t1'), SurfaceLambda(xs, t1, t2));
+        (Lam(x, t1', t2'), [])
     | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
-    | SimpleArrow(t1, t2) => Arrow(Weak, "_", tm_of_surface(c, t1), tm_of_surface(Cons(c, "_", tm_of_surface(c, t1)), t2))
-    | SurfaceAp(t1, t2) => Ap(tm_of_surface(c, t1),tm_of_surface(c, t2));
-    | SurfaceVar(_, x) => 
+    | SimpleArrow(t1, t2) => 
+        let** t1' = tm_of_surface(c, t1);
+        let** t2' = tm_of_surface(Cons(c, "_", t1'), t2);
+        (Arrow(Weak, "_", t1', t2'), [])
+    | SurfaceAp(t1, t2) => 
+        let** t1' = tm_of_surface(c, t1);
+        let** t2' = tm_of_surface(c, t2);
+        (Ap(t1', t2'), [])
+    | SurfaceVar(r, x) => 
         switch(var_of_surface(c, x)) {
-        | Ok(n) =>  Var(n)
-        | Error(_) => FreeVar(x)
+        | Ok(n) =>  (Var(n), [])
+        | Error(_) => (FreeVar(x), [err("Unrecognized name", r)])
         }
-    | SurfaceUnguard(t) => Unguard(tm_of_surface(c, t))
-    | SurfaceNonsense => Nonsense;
+    | SurfaceUnguard(t) => 
+        let** t' = tm_of_surface(c, t);
+        (Unguard(t'), [])
+    | SurfaceNonsense => (Nonsense, []);
 }
 
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
@@ -202,7 +230,7 @@ let rec infer_arrow_typ_of_ap(c, hd_ty: tm, tds: list((surface_tm, demo))) : res
     | [(a, _), ...other_tds] => {
         Result.bind(infer_arrow_typ_of_ap(c, hd_ty, other_tds), f => {
             let (_, _, _, ty_b) = f;
-            let elab_a = tm_of_surface(c, a);
+            let (elab_a, _) = tm_of_surface(c, a);
             switch(subst(elab_a, ty_b)) {
             | Arrow(st, x, a, b) => Ok((st, x, a, b))
             | _ => Error("constituent is not of arrow type")
@@ -242,7 +270,7 @@ let rec infer_proven_ty(c : ctx, d : demo) : result(tm, ranged_error) = switch(d
     | HypProp(r, x, d) => Result.bind(arrange(index_of_name(c, x), r), n => infer_proven_ty(c, ElabHypProp(r, n, d)))
     | ElabHypProp(r, n, _) => arrange(lookup_index(c, n), r)
     | At(r, d1, a, d2) => {
-        let elab_a = tm_of_surface(c, a);
+        let (elab_a, _) = tm_of_surface(c, a);
         infer_proven_ty(c, ElabAt(r, d1, elab_a, d2))
     }
     | ElabAt(r, d, a, _) => {
@@ -416,7 +444,9 @@ let rec check(s : t) : result(t, error) = {
                 Ok(s)
             | _ => Error("unguarding a non-arrow")
             }
-        // | In(_, _) => failwith("impossible")
+        | In(Nonsense, _) => skip(s)
+        | In(FreeVar(_), _) => skip(s)
+        // | In(_, _) => failwith("MISSING TYPE CHECK CASE")
         | _ => Error("not a type obligation: " ++ string_of_term(c, ty_goal))
     }
 }
@@ -459,7 +489,8 @@ let rec givenall(s : t) : result(t, error) =
 
 let given_type(s : t, x, ty_elab) : result(t, error) = {
     switch(goal_type(s)) {
-    | Arrow(_, _, ty1, _) when !equiv(ty_elab, ty1) =>  Error("wrong given type")
+    | Arrow(_, _, ty1, _) when !equiv(ty_elab, ty1) => 
+        Error("Wrong given type (should be " ++ x ++ " : " ++ string_of_term(goal_ctx(s), ty1) ++ ")")
     | _ => given(s, x)
     }
 }
@@ -677,14 +708,14 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         check_demo(s, d2)
     | Claim(r, x, ty, d1, d2) => {
         let c = goal_ctx(s);
-        let ty_elab = tm_of_surface(c, ty);
+        let-** ty_elab = tm_of_surface(c, ty);
         let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
         let-* s = check_demo(s, d1);
         check_demo(s, d2)
     }
     | Suffices(r, x, ty, d1, d2) => {
         let c = goal_ctx(s);
-        let ty_elab = tm_of_surface(c, ty);
+        let-** ty_elab = tm_of_surface(c, ty);
         let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
         let-& s = (s, arrange(swap(s), r)); 
         let-* s = check_demo(s, d1);
@@ -702,8 +733,8 @@ let rec check_demo(s : t, d : demo) : (t, report) =
         check_demo(s, d2)
     | ApTyp(r, x, ty1, ty2, d1, d2) => {
         let c = goal_ctx(s);
-        let ty1_elab = tm_of_surface(c, ty1);
-        let ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
+        let-** ty1_elab = tm_of_surface(c, ty1);
+        let-** ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
         check_demo(s, ElabApTyp(r, x, ty1_elab, ty2_elab, d1, d2))
     }
     | ElabApTyp(r, x, ty1, ty2, d1, d2) => {
@@ -713,7 +744,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     }
     | At(r, d1, a, d2) => {
         let c = goal_ctx(s);
-        let a_elab = tm_of_surface(c, a);
+        let-** a_elab = tm_of_surface(c, a);
         check_demo(s, ElabAt(r, d1, a_elab, d2))
     }
     | ElabAt(r, d1, a, d2) => {
@@ -725,7 +756,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     }
     | Given(r, x, ty, d1, d2) => {
         let c = goal_ctx(s);
-        let ty_elab = tm_of_surface(c, ty);
+        let-** ty_elab = tm_of_surface(c, ty);
         check_demo(s, ElabGiven(r, x, ty_elab, d1, d2));
     }
     | ElabGiven(r, x, ty_elab, d1, d2) => {
@@ -774,7 +805,7 @@ let rec check_demo(s : t, d : demo) : (t, report) =
     | Tactic(r, Witness(a), ds) => switch(ds) {
         | [d1, d2] =>
             let c = goal_ctx(s);
-            let a_elab = tm_of_surface(c, a);
+            let-** a_elab = tm_of_surface(c, a);
             let-& s = (s, arrange(witness(s, a_elab), r));
             let-* s = check_demo(s, d1);
             check_demo(s, d2)

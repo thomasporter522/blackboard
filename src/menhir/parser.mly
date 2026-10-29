@@ -49,10 +49,10 @@ open Lang.Program
 %%
 
 let prog :=
-  | EOF; { Empty }
-  | ASSUME; s = signature; VALID; BY; d = demo; p = prog; { Assume (s, d, p) }
-  | CONSTRUCT; s = signature; BY; d = demo; p = prog; { Construct (s, d, p) }
-  | PROVE; t = term; BY; d = demo; p = prog; { Prove (t, d, p) }
+  | EOF; { SurfaceEmpty }
+  | ASSUME; s = signature; VALID; BY; d = demo; p = prog; { SurfaceAssume (s, d, p) }
+  | CONSTRUCT; s = signature; BY; d = demo; p = prog; { SurfaceConstruct (s, d, p) }
+  | PROVE; t = term; BY; d = demo; p = prog; { SurfaceProve (t, d, p) }
 
 let id_list := 
   | x = ID; { [x] }

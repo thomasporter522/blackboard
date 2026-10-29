@@ -19,6 +19,13 @@ type secondary =
     | Shard(token)
     | Cursor
 
+type infix = 
+    | Colon
+    | In 
+    | Arrow 
+    | Lambda
+    | At
+
 type abstract_term =
     | Hole(range)
     | Ident(range, string)
@@ -26,10 +33,7 @@ type abstract_term =
     | Parens(range, abstract_span)
     | Prop(range)
     | Type(range)
-    | Colon(range, abstract_term, list(secondary), list(secondary), abstract_term)
-    | In(range, abstract_term, list(secondary), list(secondary), abstract_term)
-    | Arrow(range, abstract_term, list(secondary), list(secondary), abstract_term)
-    | Lambda(range, abstract_term, list(secondary), list(secondary), abstract_term)
+    | Infix(infix, range, abstract_term, list(secondary), list(secondary), abstract_term)
     | Commas(range, abstract_term, list(secondary), list(abstract_span), list(secondary), abstract_term)
     | Ap(range, abstract_term, list(secondary), abstract_term)
     | Assume(range, abstract_span, abstract_span, list(secondary), abstract_term)
@@ -57,12 +61,9 @@ let rec whole_range(a : abstract_term) : range = switch(a) {
     | Parens(r, _) 
     | Prop(r)
     | Type(r) => r
-    | Colon(_, t1, _, _, t2)
-    | In(_,  t1, _, _, t2) 
     | Commas(_, t1,_, _, _, t2) 
-    | Ap(_, t1, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))
-    | Arrow(_, t1, _, _, t2) 
-    | Lambda(_, t1, _, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))
+    | Ap(_, t1, _, t2)
+    | Infix(_, _, t1, _, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))
     | Assume(r, _, _, _, t)
     | Construct(r, _, _, _, t) 
     | Given(r, _, _, _, t) => combine_ranges(r, whole_range(t))

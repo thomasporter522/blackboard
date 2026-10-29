@@ -129,6 +129,13 @@ module BlackboardLanguage : Language = {
         Some(Repeater({left_tip, delim, right_tip, arity, builder}))
     }
 
+    let infix_of( head, _, first, _, last, _) = {
+        let (c1, ss1) = Option.get(first);
+        let (ss2, c2) = Option.get(last);
+        let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
+        Infix(head, r, c1, ss1, ss2, c2)
+    }
+
     let mixfix_form_summaries : list((string, (context => (context, list(context), context), builder_type(context)))) = 
         [
         ("(_)", (c => (Default, [c], Default), 
@@ -136,44 +143,11 @@ module BlackboardLanguage : Language = {
         ("?", (_c => (Default, [], Default), (_, _, _, _, r) => Interaction(r))),
         ("prop", (_c => (Default, [], Default), (_, _, _, _, r) => Prop(r))),
         ("type", (_c => (Default, [], Default), (_, _, _, _, r) => Type(r))),
-        ("100_:_10", (_c => (Ident, [], Term), 
-            (_, first, _, last, _) => {
-                let (c1, ss1) = Option.get(first);
-                let (ss2, c2) = Option.get(last);
-                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
-                Colon(r, c1, ss1, ss2, c2)
-            })),
-        ("20_::_21", (_c => (Term, [], Term), 
-            (_, first, _, last, _) => {
-                let (c1, ss1) = Option.get(first);
-                let (ss2, c2) = Option.get(last);
-                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
-                In(r, c1, ss1, ss2, c2)
-            })),
-        ("11_->_10", (_c => (Domain, [], Term), 
-            (_, first, _, last, _) => {
-                let (c1, ss1) = Option.get(first);
-                let (ss2, c2) = Option.get(last);
-                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
-                Arrow(r, c1, ss1, ss2, c2)
-            })),
-        ("11_=>_10", (_c => (Domain, [], Term), 
-            (_, first, _, last, _) => {
-                let (c1, ss1) = Option.get(first);
-                let (ss2, c2) = Option.get(last);
-                let r = (snd(range_of_some_lc(first)), fst(range_of_some_rc(last)));
-                Lambda(r, c1, ss1, ss2, c2)
-            })),
-        // ("(_:_)$->_10", (_c => (Default, [Ident, Term, Default], Term), 
-        //     (_, first, _, last) => {
-        //         let (sg, d) = switch(middle) {
-        //         | [sg, d, ... _] => (sg, d)
-        //         | _ => failwith("assumption missing args")
-        //         };
-        //         let (ss, rest) = Option.get(last);
-        //         Assume(sg, d, ss, rest)
-        //     })),
-        // ("if_then_else_6", (_c => (Default, [Term, Term], Term), _c => ITE)),
+        ("11_:_10", (_c => (Ident, [], Term), infix_of(Colon))),
+        ("20_::_21", (_c => (Term, [], Term), infix_of(In))),
+        ("11_->_10", (_c => (Domain, [], Term), infix_of(Arrow))),
+        ("11_=>_10", (_c => (Domain, [], Term), infix_of(Lambda))),
+        ("30_@_31", (_c => (Domain, [], Term), infix_of(At))),
         ("given_:_,_0", (_c => (Default, [Ident, Term], Demo), 
             (_, _, middle, last, r) => {
                 let (x, t) = switch(middle) {

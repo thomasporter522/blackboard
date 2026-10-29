@@ -20,7 +20,7 @@ let js_lexer(s : string) : lex_result = {
 }
 
 type error = Js.t({.
-    message: Js.readonly_prop(string), 
+    message: Js.readonly_prop(Js.t(Js.js_string)), 
     range: Js.readonly_prop(range),
     underline : Js.readonly_prop(Js.t(bool)),
 });
@@ -35,6 +35,7 @@ type parse_result = Js.t({.
     runes: Js.readonly_prop(jsarray(range)), 
     delimiters : Js.readonly_prop(jsarray(range)),
     parseerrors : Js.readonly_prop(jsarray(error)),
+    elaberrors : Js.readonly_prop(jsarray(error)),
     checkerrors : Js.readonly_prop(jsarray(error)),
     completions : Js.readonly_prop(jsarray(Js.t(Js.js_string))),
     goals : Js.readonly_prop(jsarray(goal))
@@ -42,7 +43,7 @@ type parse_result = Js.t({.
 
 let js_parser(s : string, cursor_position : int) : parse_result = {
     let (li, pi, a) = Lytr.Blackboard.parse(s, cursor_position);
-    let sp =  Lytr.Elab.elab(a);
+    let (sp, elab_errors) =  Lytr.Elab.elab(a);
     let pp = Lang.Program.check_surface_program(sp);
     let f1(x : (int, int)) : Js.t(Js.js_array(Js.number_t)) = {
         let(a, b) = x;
@@ -58,7 +59,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         | Multiple => "multiple terms"
     }
     let f2(x : Lytr.Blackboard.BlackboardParser.error) : error = [%js {as _; 
-        val message = message_f(x.kind);
+        val message = Js.string(message_f(x.kind));
         val range = f1(x.range);
         val underline = if (Lytr.Blackboard.BlackboardParser.format_of_error_kind(x.kind) == Underline) {Js.bool(true)} else {Js.bool(false)};
     }];
@@ -75,7 +76,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         List.map(f5, r.open_goals);
     };
     let f7(e : Lang.Term.ranged_error) : error = [%js {as _; 
-        val message = e.message;
+        val message = Js.string(e.message);
         val range = f1(e.range);
         val underline = Js.bool(true);
     }];
@@ -84,6 +85,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val runes = Js.array(Array.of_list(List.map(f1, li.lex_errors))); 
         val delimiters = Js.array(Array.of_list(List.map(f1, li.delimiters)));
         val parseerrors = Js.array(Array.of_list(List.map(f2, pi.errors)));
+        val elaberrors = Js.array(Array.of_list(List.map(f7, elab_errors)));
         val checkerrors = Js.array(Array.of_list(List.concat_map(f6, pp)));
         val completions = Js.array(Array.of_list(f3(pi.completions)));
         val goals = Js.array(Array.of_list(List.concat_map(f4, pp)));
