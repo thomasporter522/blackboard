@@ -43,6 +43,9 @@ type abstract_term =
     | Assume(range, abstract_span, abstract_span, list(secondary), abstract_term)
     | Construct(range, abstract_span, abstract_span, list(secondary), abstract_term)
     | Given(range, abstract_span, abstract_span, list(secondary), abstract_term)
+    | Witness(range, abstract_span, list(secondary), abstract_term)
+    | Direct2(range, abstract_span, list(secondary), abstract_term)
+    | Direct1(range, list(secondary), abstract_term)
     // | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
 
 and abstract_span = 
@@ -66,7 +69,10 @@ let rec whole_range(a : abstract_term) : range = switch(a) {
     | Infix(_, _, t1, _, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))
     | Assume(r, _, _, _, t)
     | Construct(r, _, _, _, t) 
-    | Given(r, _, _, _, t) => combine_ranges(r, whole_range(t))
+    | Given(r, _, _, _, t)
+    | Witness(r, _, _, t)
+    | Direct2(r, _, _, t)
+    | Direct1(r, _, t) => combine_ranges(r, whole_range(t))
 }
 
 let rec secondaries_range(ss : list(secondary)) : Option.t(range) = switch(ss) {

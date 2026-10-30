@@ -72,7 +72,7 @@ let rec index_of_name(c : ctx, x : name) : result(int, error) = {
     switch(c, x) {
     | (Cons(_, y, _), x) when y == x => Ok(0)
     | (Cons(c, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
-    | _ => Error("Context lookup unbound name")
+    | _ => Error("Unrecognized name")
     }
 }
 

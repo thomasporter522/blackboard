@@ -112,7 +112,8 @@ module BlackboardLanguage : Language = {
             }
         };
         let (interior, right_tip) = build_middle(s);
-        Some(Mixfix({left_tip, interior: Option.get(interior), right_tip, arity, builder}))
+        let interior = Option.get(interior);
+        Some(Mixfix({left_tip, interior: interior, right_tip, arity, builder}))
     }
 
 
@@ -161,6 +162,32 @@ module BlackboardLanguage : Language = {
                 let (ss, rest) = Option.get(last);
                 let r' = (fst(r), fst(range_of_some_rc(last)));
                 Given(r', x, t, ss, rest)
+            })),
+        ("witness_,_0", (_c => (Default, [Term], Demo), 
+            (_, _, middle, last, r) => {
+                let (t) = switch(middle) {
+                | [t] => t
+                | _ => failwith("missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Witness(r', t, ss, rest)
+            })),
+        ("direct_,_0", (_c => (Default, [Demo], Demo), 
+            (_, _, middle, last, r) => {
+                let (t) = switch(middle) {
+                | [t] => t
+                | _ => failwith("missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Direct2(r', t, ss, rest)
+            })),
+        ("direct_0", (_c => (Default, [], Demo), 
+            (_, _, _, last, r) => {
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Direct1(r', ss, rest)
             })),
         ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), 
             (_, _, middle, last, r) => {

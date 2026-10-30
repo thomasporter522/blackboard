@@ -15,19 +15,30 @@ import Markdown from 'react-markdown'
 
 import { blackboardTheme } from "./CodeTheme.tsx"
 
-const init_text = `assume 
-x : type
-valid by 
-check
-end
-construct
-z : type
-by
-given M : prop,
-given H : type -> M,
+const init_text = 
+`construct 
+and (p1 p2 : prop) : prop,
+andi : (p1 p2 : prop) -> p1 -> p2 -> and p1 p2,
+ande : (p1 p2 : prop) -> (h : and p1 p2) -> (M : prop) -> (p1 -> p2 -> M) -> M
+by 
+witness ((p1 : prop) => (p2 : prop) => ((M : prop) -> (h : (p1 -> p2 -> M)) -> M)),
+direct (
+  given p1 : prop,
+  given p2 : prop,
+  given h1 : p1,
+  given h2 : p2,
+  given M : prop,
+  given h : p1 -> p2 -> M,
+  h h1 h2
+),
+direct
+  given p1 : prop,
+  given p2 : prop,
+  given h : (M : prop) -> (h : p1 -> p2 -> M) -> M,
+  h
+end 
 ?
-end
-?`
+`
 
 function dia_test_init() { return globalThis.dia_test_init() }
 

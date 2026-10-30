@@ -490,9 +490,9 @@ let rec givenall(s : t) : result(t, error) =
 }
 
 let given_type(s : t, x, ty_elab) : result(t, error) = {
-    switch(goal_type(s)) {
+    switch(headnormalize(goal_type(s))) {
     | Arrow(_, _, ty1, _) when !equiv(ty_elab, ty1) => 
-        Error("Wrong given type (should be " ++ x ++ " : " ++ string_of_term(goal_ctx(s), ty1) ++ ")")
+        Error("Wrong given type (should be " ++ x ++ " : " ++ string_of_term(goal_ctx(s), normalize(ty1)) ++ ")")
     | _ => given(s, x)
     }
 }

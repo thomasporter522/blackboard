@@ -38,7 +38,7 @@ let rec elab_id_list(t: Language.abstract_term) = switch(t) {
     | _ => ([], [err("Invalid variable", whole_range(t))])
 }
 
-let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t((list(string), Lang.Term.surface_tm)), list(error)) = switch(t) {
+let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t(arg_chunk), list(error)) = switch(t) {
     | Parens(_, t) => elab_arrow_lhs_span(t)
     | Infix(Colon,_, xs, _, _, t) => 
         let* xs' = elab_id_list(xs);
@@ -49,7 +49,7 @@ let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t((list(string), La
         (Some((["_"], t')), [])
 }
 
-and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t((list(string), Lang.Term.surface_tm)), list(error)) = switch(t) {
+and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t(arg_chunk), list(error)) = switch(t) {
     | Empty(_) => failwith("impossible")
     | Single(_, t, _, _) => elab_arrow_lhs(t)
     | Multiple(_) => failwith("impossible")
@@ -91,7 +91,10 @@ and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) 
     | Assume(_) 
     | Construct(_) 
     | Commas(_) 
-    | Given(_) => (SurfaceNonsense, [err("Invalid term", whole_range(t))])
+    | Given(_)  
+    | Witness(_)
+    | Direct2(_)
+    | Direct1(_) => (SurfaceNonsense, [err("Invalid term", whole_range(t))])
     }
 }
 
@@ -113,7 +116,14 @@ let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = 
     | Atom(Ident(x), r) => (HypProp(r, x, Obvious(r)), [])
     | Atom(Check,r) => (Tactic(r, Check, []), [])
     | Parens(_, s) => elab_demo_span(s)
-    | Ap(r, t1, _, t2) => 
+    | Direct2(r, d1, _, d2) =>
+        let* d1' = elab_demo_span(d1);
+        let* d2' = elab_demo(d2);
+        (Lang.Demo.Tactic(r, Direct, [d1', d2']), [])
+    | Direct1(r, _, d) =>
+        let* d' = elab_demo(d);
+        (Lang.Demo.Tactic(r, Direct, [d']), [])
+    | Ap(r, t1, _, t2) =>
         let* t1' = elab_demo(t1);
         let* t2' = elab_demo(t2);
         (Lang.Demo.Use(r, t1', t2'), [])
@@ -125,6 +135,10 @@ let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = 
         | None => (d', [])
         | Some(x'') => (Lang.Demo.Given(r, x'', ty', Obvious(r), d'), [])
         }
+    | Witness(r, t, _, d) => 
+        let* t' = elab_term_span(t);
+        let* d' = elab_demo(d);
+        (Lang.Demo.Tactic(r, Witness(t'), [Obvious(r), d']), [])
     | Infix(At, r, t1, _, _, t2) => 
         let* t1' = elab_demo(t1);
         let* t2' = elab_term(t2);
@@ -152,14 +166,29 @@ and elab_demo_span(t : Language.abstract_span) : (Lang.Demo.demo, list(error)) =
     }
 }
 
+let rec elab_entry_lhs(t : Language.abstract_term) : (Option.t((string, list(arg_chunk))), list(error)) = {
+    switch(t) {
+    | Atom(Ident(x), _) => (Some((x, [])), [])
+    | Ap(_, t1, _, t2) => 
+        let* t1' = elab_entry_lhs(t1);
+        let* t2' = elab_arrow_lhs(t2);
+        switch(t1', t2') {
+        | (None, _)
+        | (_, None) => (None, [])
+        | (Some((x, args1)), Some(args2)) => (Some((x, args1 @ [args2])), [])
+        }
+    | _ => (None, [err("Invalid signature LHS", whole_range(t))])
+    }
+}
+
 let elab_entry(t : Language.abstract_term) :  (Option.t((string, list(arg_chunk), Lang.Term.surface_tm)), list(error)) = {
     switch(t) {
     | Infix(Colon, _, x, _, _, t) => 
-        let* x' = elab_id(x);
+        let* x' = elab_entry_lhs(x);
         let* t' = elab_term(t);
         switch(x') {
         | None => (None, [])
-        | Some(x'') => (Some((x'', [], t')), [])
+        | Some((x'', args)) => (Some((x'', args, t')), [])
         }
     | _ => (None, [err("Invalid entry", whole_range(t))])
     }
@@ -179,12 +208,11 @@ let elab_entry_span(t : Language.abstract_span) : (Option.t((string, list(arg_ch
 let elab_signature(t : Language.abstract_term) : (surface_signature, list(error)) = {
     switch(t) {
     | Atom(Hole, _) => ([], [])
-    | Infix(Colon, _, x, _, _, t) => 
-        let* x' = elab_id(x);
-        let* t' = elab_term(t);
+    | Infix(Colon, _, _, _, _, _) => 
+        let* x' = elab_entry(t);
         switch(x') {
         | None => ([], [])
-        | Some(x'') => ([(x'', [], t')], [])
+        | Some(t') => ([t'], [])
         }
     | Commas(_, first, _, middle, _, last) => 
         let middles = List.map(elab_entry_span, middle);
