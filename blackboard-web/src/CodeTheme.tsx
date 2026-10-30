@@ -7,7 +7,7 @@ const blackboardEditorTheme = EditorView.theme({
   '&': {
     color: 'var(--text)',
     backgroundColor: 'var(--bg)',
-    fontSize: '15pt'
+    fontSize: '15pt',
   },
   '& *': {
     fontFamily: "'FiraCode' !important"

@@ -4,6 +4,8 @@
 // import viteLogo from './assets/vite.svg'
 import { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror'
+import readOnlyRangesExtension from 'codemirror-readonly-ranges'
+
 import { EditorView, Decoration, keymap } from '@codemirror/view'
 import { EditorState, StateField, Prec } from "@codemirror/state";
 import type {Tooltip} from "@codemirror/view"
@@ -132,11 +134,16 @@ function decorateInteractions(state : EditorState) {
   return Decoration.set(state.field(parseInfoField).goals.filter(x => x.range[0] < x.range[1]).map(decorateInteraction))
 }
 
+function decorateLocks(state : EditorState) {
+  return Decoration.set([Decoration.line({class: "locked"}).range(state.doc.line(5).from)])
+}
+
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
 const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
+const lockDecoExtension = EditorView.decorations.compute([parseInfoField], state => decorateLocks(state))
 
-function render_message(_view : EditorView, diaState, setDiaState, messageText : string, range: number[]) : Node {
+function render_message(_view : EditorView, diaState, setDiaState, messageText : string, _range: number[]) : Node {
   const node = document.createElement("div");
   const sigil =  document.createElement("span");
   sigil.textContent = "⚠ ";
@@ -212,6 +219,17 @@ function insertCompletion(view : EditorView) {
 
 const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}])
 
+const getlockLines = (targetState:EditorState):Array<{from:number|undefined, to:number|undefined}> => {
+  return [
+  {
+    from: undefined, //same as targetState.doc.line(0).from or 0
+    to: targetState.doc.line(5).to
+  }
+  ]
+}
+
+const lockLines = readOnlyRangesExtension(getlockLines);
+
 function extensions(diaState, setDiaState) {
   return [
   // mintlang(),
@@ -230,6 +248,8 @@ function extensions(diaState, setDiaState) {
   victoryExtension,
   delimiterExtension,
   completionExtension,
+  lockDecoExtension,
+  lockLines,
   Prec.highest(insertCompletionExtension),
   ];
 }

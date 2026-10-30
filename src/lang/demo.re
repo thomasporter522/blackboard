@@ -312,13 +312,19 @@ let rec infer_typ(c : ctx, a : tm) : result(tm, error) = switch(a) {
     //     }
     | Var(x) => lookup_index(c, x)
     | Ap(a1, a2) => switch(infer_typ(c, a1)) {
-        | Ok(Arrow(_, _, _, ty2)) => Ok(subst(a2, ty2))
-        | Ok(_) => Error("Applied term does not have arrow type")
+        | Ok(ty) => 
+            switch(headnormalize(ty)) {
+            | Arrow(_, _, _, ty2) => Ok(subst(a2, ty2))
+            | _ =>  Error("Applied term does not have arrow type")
+            }
         | Error(e) => Error(e)
     }
     | Unguard(a) => switch(infer_typ(c, a)) {
-        | Ok(Arrow(_, _, _, ty2)) => invert_wk(ty2)
-        | Ok(_) => Error("Unguarded term does not have arrow type")
+        | Ok(ty) => 
+            switch(headnormalize(ty)) {
+            | Arrow(_, _, _, ty2) => invert_wk(ty2)
+            | _ => Error("Unguarded term does not have arrow type")
+            }
         | Error(e) => Error(e)
     }
     | FreeVar(_) => Error("Inferring from free var")
@@ -586,7 +592,7 @@ let better_direct(s : t) : result(t, error) = {
 
 // if the goal is (M : prop) -> ((x : A) -> SIG -> M) -> M, refines to goals a : A and (M : prop) -> (SIG[a/x] -> M) -> M.
 let witness(s : t, a : tm) : result(t, error) = {
-    let* (tyA, rest) = switch(goal_type(s)) {
+    let* (tyA, rest) = switch(headnormalize(goal_type(s))) {
         | Arrow(Weak, _, Prop, Arrow(Weak, _, Arrow(Weak, _, tyA, rest), Var(1))) => Ok((tyA, rest))
         | _ => Error("wrong goal shape for witness: " ++ string_of_term(goal_ctx(s), goal_type(s)))
     };
