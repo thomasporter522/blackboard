@@ -31,7 +31,7 @@ direct (
   given h2 : p2,
   given M : prop,
   given h : p1 -> p2 -> M,
-  h h1 h2
+  h h1 ?
 ),
 direct
   given p1 : prop,
@@ -55,6 +55,8 @@ function dia_opt_player_can_select_hidden(s, i) { return globalThis.dia_opt_play
 function dia_opt_player_select_hidden(s, i) { return globalThis.dia_opt_player_select_hidden({state: s, choice : i}) }
 
 function dia_opt_puter(s) { return globalThis.dia_opt_puter(s); }
+
+function dia_enact(s, m) { return globalThis.dia_enact({state: s, signal: m}); }
 
 function parse_test(s, cursor_position) { return globalThis.parse_test(s, cursor_position); }
 
@@ -139,9 +141,9 @@ function decorateLocks(state : EditorState) {
 }
 
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
-const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 const lockDecoExtension = EditorView.decorations.compute([parseInfoField], state => decorateLocks(state))
+const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state));
 
 function render_message(_view : EditorView, diaState, setDiaState, messageText : string, _range: number[]) : Node {
   const node = document.createElement("div");
@@ -255,7 +257,7 @@ function extensions(diaState, setDiaState) {
 }
 
 
-function MainCodeblock(setInfo, extensions) {
+function MainCodeblock(setInfo, setDiaState, extensions) {
   return <div className='mainBlock'><CodeMirror
       value={init_text}
       height="600px"
@@ -273,7 +275,12 @@ function MainCodeblock(setInfo, extensions) {
       }}
       onCreateEditor={(view) => { setInfo(view.state.field(parseInfoField)) }}
       onUpdate={(viewUpdate) => { 
-        setInfo(viewUpdate.view.state.field(parseInfoField))
+        const oldInfo = viewUpdate.startState.field(parseInfoField);
+        const newInfo = viewUpdate.state.field(parseInfoField);
+        setInfo(newInfo)
+        if(!oldInfo.victories.some(r => r[0] == 0) && newInfo.victories.some(r => r[0] == 0)) {
+          setDiaState(diaState => dia_enact(diaState, "solved"));
+        }
       }}
     /></div>;
 }
@@ -330,7 +337,7 @@ function App() {
   const [puterMessage, setPuterMessage] = useState("")
   const [diaButtons, setDiaButtons] = useState(<></>)
   const [info, setInfo] = useState<parse_info>(null);
-  const block = MainCodeblock(setInfo, extensions(diaState, setDiaState));
+  const block = MainCodeblock(setInfo, setDiaState, extensions(diaState, setDiaState));
   const dialogue = DialogueBox(puterMessage, diaButtons);
   const infobar = InfoBar(info);
   

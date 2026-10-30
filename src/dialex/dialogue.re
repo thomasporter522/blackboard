@@ -88,12 +88,20 @@ let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = swi
 }
 
 
+let enact((s, d, k) : dialogue_state('state), action : 'state => 'state) : dialogue_state('state) = 
+    (action(s), d, k)
+
 let me(s) = PuterSays(S(s))
 let you(s) = PlayerSays(S(s))
 let branch(check : 'state => bool, d1, d2) = Alt(Check(check, d1), Check(s => !check(s), d2))
 let seq(ds : list(dialogue('state))) = switch(ds) {
     | [] => failwith("empty seq")
     | [h,...t] => List.fold_left((a : dialogue('state), b) => Seq(a, b), h, t)
+}
+
+let par(ds : list(dialogue('state))) = switch(ds) {
+    | [] => failwith("empty par")
+    | [h,...t] => List.fold_left((a : dialogue('state), b) => Par(a, b), h, t)
 }
 
 let alt(ds : list(dialogue('state))) = switch(ds) {

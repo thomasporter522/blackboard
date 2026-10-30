@@ -135,6 +135,11 @@ type hidden_select_type = Js.t({.
     choice : Js.readonly_prop(Js.t(Js.js_string)),
 });
 
+type enaction_type = Js.t({. 
+    state:  Js.readonly_prop(Dialex.Example.mystate), 
+    signal : Js.readonly_prop(Js.t(Js.js_string)),
+});
+
 let js_dia_opt_player_select(s : select_type) : Dialex.Example.mystate = {
     switch(Dialex.Dialogue.options(s##.state)) {
     | PlayerTurn(options, _) => 
@@ -167,12 +172,20 @@ let js_dia_opt_player_select_hidden(s : hidden_select_type) : Dialex.Example.mys
     }
 }
 
+let js_dia_enact(s : enaction_type) : Dialex.Example.mystate = {
+    switch(Js.to_string(s##.signal)) {
+    | "solved" => Dialex.Dialogue.enact(s##.state, s => {count: s.count, solved: true})
+    | _ => s##.state
+    }
+}
+
 let js_dia_opt_puter(s : Dialex.Example.mystate) : (string, Dialex.Example.mystate) = {
     switch( Dialex.Dialogue.options(s)) {
     | PuterTurn(S(t), s') => (t, s')
     | _ => failwith("wrong dialogue case")
     }
 }
+
 
 let () = {
     Js.export("lex_test", js_lexer);
@@ -183,5 +196,6 @@ let () = {
     Js.export("dia_opt_player_select", js_dia_opt_player_select);
     Js.export("dia_opt_player_can_select_hidden", js_dia_opt_player_can_select_hidden);
     Js.export("dia_opt_player_select_hidden", js_dia_opt_player_select_hidden);
+    Js.export("dia_enact", js_dia_enact);
     Js.export("dia_opt_puter", js_dia_opt_puter);
 }
