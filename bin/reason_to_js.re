@@ -112,14 +112,15 @@ let js_dia_case(s : Dialex.Example.mystate) : int = {
     }
 }
 
-let js_dia_opt_player(s : Dialex.Example.mystate) : jsarray(Js.t(Js.js_string)) = {
+let js_dia_opt_player(s : Dialex.Example.mystate) : jsarray(jsarray(Js.t(Js.js_string))) = {
     let js_opt((o, _) : (Dialex.Dialogue.text, Dialex.Example.mystate)) : Js.t(Js.js_string) = switch(o) {
         | S(s) => Js.string(s) 
     };
     switch( Dialex.Dialogue.options(s)) {
-    | PlayerTurn(options) => 
-        let js_options = List.map(js_opt, options);
-        Js.array(Array.of_list(js_options));
+    | PlayerTurn(options1, options2) => 
+        let js_options1 = List.map(js_opt, options1);
+        let js_options2 = List.map(js_opt, options2);
+        Js.array(Array.of_list([Js.array(Array.of_list(js_options1)), Js.array(Array.of_list(js_options2))]))
     | _ => failwith("wrong dialogue case")
     }
 }
@@ -129,12 +130,40 @@ type select_type = Js.t({.
     choice : Js.readonly_prop(int),
 });
 
+type hidden_select_type = Js.t({. 
+    state:  Js.readonly_prop(Dialex.Example.mystate), 
+    choice : Js.readonly_prop(Js.t(Js.js_string)),
+});
+
 let js_dia_opt_player_select(s : select_type) : Dialex.Example.mystate = {
     switch(Dialex.Dialogue.options(s##.state)) {
-    | PlayerTurn(options) => 
+    | PlayerTurn(options, _) => 
         let (_, s') = List.nth(options, s##.choice);
         s'
     | _ => failwith("wrong dialogue case")
+    }
+}
+
+let js_dia_opt_player_can_select_hidden(s : hidden_select_type) : Js.t(bool) = {
+    switch(Dialex.Dialogue.options(s##.state)) {
+    | PlayerTurn(_, options) => 
+        switch(List.find_index(x => fst(x) == Dialex.Dialogue.S(Js.to_string(s##.choice)), options)) {
+        | None => Js.bool(false)
+        | Some(_) => Js.bool(true)
+        }
+    | _ => Js.bool(false)
+    }
+}
+
+let js_dia_opt_player_select_hidden(s : hidden_select_type) : Dialex.Example.mystate = {
+    switch(Dialex.Dialogue.options(s##.state)) {
+    | PlayerTurn(_, options) => 
+        switch(List.find_index(x => fst(x) == Dialex.Dialogue.S(Js.to_string(s##.choice)), options)) {
+        | None => s##.state
+        | Some(n) => snd(List.nth(options, n))
+        }
+    | PuterTurn(_) => print_endline("It's the computer's turn."); s##.state
+    | End => print_endline("It's the end."); s##.state
     }
 }
 
@@ -152,5 +181,7 @@ let () = {
     Js.export("dia_test_case", js_dia_case);
     Js.export("dia_opt_player", js_dia_opt_player);
     Js.export("dia_opt_player_select", js_dia_opt_player_select);
+    Js.export("dia_opt_player_can_select_hidden", js_dia_opt_player_can_select_hidden);
+    Js.export("dia_opt_player_select_hidden", js_dia_opt_player_select_hidden);
     Js.export("dia_opt_puter", js_dia_opt_puter);
 }

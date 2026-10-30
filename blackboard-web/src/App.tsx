@@ -37,6 +37,10 @@ function dia_opt_player(s) { return globalThis.dia_opt_player(s) }
 
 function dia_opt_player_select(s, i) { return globalThis.dia_opt_player_select({state: s, choice : i}) }
 
+function dia_opt_player_can_select_hidden(s, i) { return globalThis.dia_opt_player_can_select_hidden({state: s, choice : i}) }
+
+function dia_opt_player_select_hidden(s, i) { return globalThis.dia_opt_player_select_hidden({state: s, choice : i}) }
+
 function dia_opt_puter(s) { return globalThis.dia_opt_puter(s); }
 
 function parse_test(s, cursor_position) { return globalThis.parse_test(s, cursor_position); }
@@ -95,6 +99,7 @@ const parseInfoField = StateField.define<parse_info>({
   },
 })
 
+
 function decorateDelims(state : EditorState) {
   function decorateDelim(x : number[]) {
     return Decoration.mark({class: "delimiter"}).range(x[0], x[1])
@@ -120,7 +125,17 @@ const delimiterExtension = EditorView.decorations.compute([parseInfoField], stat
 const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 
-function render_message(_view : EditorView, messageText : string, range: number[]) : Node {
+
+function error_info(diaState) {
+  if(dia_opt_player_can_select_hidden(diaState, "explain_error")) {
+    return dia_opt_player_select_hidden(diaState, "explain_error")
+  } else {
+    print("aahhh")
+    return diaState
+  }
+}
+
+function render_message(_view : EditorView, diaState, setDiaState, messageText : string, range: number[]) : Node {
   const node = document.createElement("div");
   const sigil =  document.createElement("span");
   sigil.textContent = "⚠ ";
@@ -130,24 +145,28 @@ function render_message(_view : EditorView, messageText : string, range: number[
   message.textContent = messageText;
   node.appendChild(message);
   const asker =  document.createElement("button");
-  asker.onclick = _ => print("Error at " + range);
+  asker.onclick = _ => setDiaState(diaState => dia_opt_player_select_hidden(diaState, "explain_error"));
   asker.textContent = " ⓘ";
   asker.className = "error-asker";
-  node.appendChild(asker);
+  if(dia_opt_player_can_select_hidden(diaState, "explain_error")) {
+    node.appendChild(asker);
+  }
   return node
 }
 
-function render_diagnostics(view : EditorView) : readonly Diagnostic[] {
+function render_diagnostics(view : EditorView, diaState, setDiaState) : readonly Diagnostic[] {
   const info = view.state.field(parseInfoField);
   const diagnostics: Diagnostic[] = [];
-  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, "unrecognized character", e), markClass: "color-error"}));
-  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
-  info.elaberrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
-  info.checkerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
+  info.runes.map(e => diagnostics.push({from: e[0], to: e[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, diaState, setDiaState, "unrecognized character", e), markClass: "color-error"}));
+  info.parseerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, diaState, setDiaState, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
+  info.elaberrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, diaState, setDiaState, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
+  info.checkerrors.map(e => diagnostics.push({from: e.range[0], to: e.range[1], severity: "error", message: "IMPOSSIBLE", renderMessage: view => render_message(view, diaState, setDiaState, e.message, e.range), markClass: e.underline ? "line-error" : "color-error"}));
   return diagnostics
 }
 
-const linterExtension = linter(render_diagnostics, {delay: 0});
+function linterExtension(diaState, setDiaState) {
+  return linter(view => render_diagnostics(view, diaState, setDiaState), {delay: 0});
+}
 
 function getCursorTooltips(state): readonly Tooltip[] {
   const info = state.field(parseInfoField);
@@ -192,7 +211,8 @@ function insertCompletion(view : EditorView) {
 
 const insertCompletionExtension = keymap.of([{key: "Tab", run:insertCompletion}])
 
-const extensions = [
+function extensions(diaState, setDiaState) {
+  return [
   // mintlang(),
   EditorView.theme({
     '.cm-editor': {
@@ -204,17 +224,17 @@ const extensions = [
     '.cm-line': { whiteSpace: 'pre' }
   }),
   parseInfoField,
-  linterExtension,
+  linterExtension(diaState, setDiaState),
   interactionExtension,
   victoryExtension,
   delimiterExtension,
   completionExtension,
   Prec.highest(insertCompletionExtension),
   ];
+}
 
 
-
-function MainCodeblock(setInfo) {
+function MainCodeblock(setInfo, extensions) {
   return <div className='mainBlock'><CodeMirror
       value={init_text}
       height="600px"
@@ -263,7 +283,7 @@ function NextOptionBox(nextDiaState, setDiaState) {
 }
 
 function OptionBox(diaState, setDiaState) {
-  return dia_opt_player(diaState).map((s, i) => DiaButton(i, setDiaState, dia_opt_player_select(diaState, i), "> " + s) );
+  return dia_opt_player(diaState)[0].map((s, i) => DiaButton(i, setDiaState, dia_opt_player_select(diaState, i), "> " + s) );
 }
 
 function updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons) {
@@ -274,7 +294,7 @@ function updateDialogue(diaState, setDiaState, setPuterMessage, setDiaButtons) {
     const [_, message, newDiaState] = dia_opt_puter(diaState);
     setPuterMessage(message);
     const newDiaCase = dia_test_case(newDiaState);
-    if(newDiaCase == 1) { setDiaButtons(OptionBox(newDiaState, setDiaState))}
+    if(newDiaCase == 1) { setDiaState(newDiaState); }
     else { setDiaButtons(NextOptionBox(newDiaState, setDiaState))};
   }
   if(diaCase > 2) throw new Error("IMPOSSIBLE DIA CASE");
@@ -289,7 +309,7 @@ function App() {
   const [puterMessage, setPuterMessage] = useState("")
   const [diaButtons, setDiaButtons] = useState(<></>)
   const [info, setInfo] = useState<parse_info>(null);
-  const block = MainCodeblock(setInfo);
+  const block = MainCodeblock(setInfo, extensions(diaState, setDiaState));
   const dialogue = DialogueBox(puterMessage, diaButtons);
   const infobar = InfoBar(info);
   

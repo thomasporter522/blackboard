@@ -4,11 +4,11 @@ type speaker =
     | Player 
     | Puter
 
-type message = (speaker, text)
-
 type dialogue('state) = 
-    | S(message)
-    | SaySmart('state => text)
+    | PlayerSays(text)
+    | PuterSays(text)
+    | PlayerSaysEnv(text)
+    | PuterSaysSmart('state => text)
     | Check('state => bool, dialogue('state))
     | Do('state => 'state, dialogue('state))
     | Seq(dialogue('state), dialogue('state))
@@ -27,7 +27,7 @@ type stack('state) =
 type dialogue_state('state) = ('state, dialogue('state), stack('state))
 
 type state_option('state) = 
-    | PlayerTurn(list((text, dialogue_state('state))))
+    | PlayerTurn(list((text, dialogue_state('state))), list((text, dialogue_state('state))))
     | PuterTurn(text, dialogue_state('state))
     | End
 
@@ -49,7 +49,7 @@ let combine(par : bool, s1 :  state_option('state), s2 :  state_option('state)) 
     | (PlayerTurn(_), PuterTurn(_)) => par ? s2 : failwith("DIALOGUE ERROR: TURN CONFLICT")
     | (PuterTurn(_), PlayerTurn(_)) => par ? s1 : failwith("DIALOGUE ERROR: TURN CONFLICT")
     | (PuterTurn(_), PuterTurn(_)) => failwith("DIALOGUE ERROR: BRANCHING NPC DIALOGUE")
-    | (PlayerTurn(l1), PlayerTurn(l2)) => PlayerTurn(l1 @ l2)
+    | (PlayerTurn(l1, l2), PlayerTurn(l3, l4)) => PlayerTurn(l1 @ l3, l2 @ l4)
 }
 
 let rec proceed_acc(s : 'state, acc : Option.t(dialogue('state)), k : stack('state)) : dialogue_state('state) = switch(acc, k) {
@@ -65,11 +65,6 @@ let rec proceed_acc(s : 'state, acc : Option.t(dialogue('state)), k : stack('sta
 
 let proceed(s : 'state, k : stack('state)) = proceed_acc(s, None, k);
 
-let option_of_message(m : message, rest : stack('state)) : 'state => state_option('state) = switch(m) {
-    | (Player, m) => s => PlayerTurn([(m, proceed(s, rest))])
-    | (Puter, m) =>  s => PuterTurn(m, proceed(s, rest))
-}
-
 let rec continue(s : 'state, k : stack('state)) : dialogue_state('state) = switch(k) {
     | Chunk(k) => continue(s, k)
     | Loop(d) => (s, d, Loop(d))
@@ -78,8 +73,10 @@ let rec continue(s : 'state, k : stack('state)) : dialogue_state('state) = switc
 }
 
 let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = switch(d) {
-    | S(m) => option_of_message(m, k, s)
-    | SaySmart(f) => option_of_message((Puter, f(s)), k, s)
+    | PlayerSays(t) => PlayerTurn([(t, proceed(s, k))], [])
+    | PuterSays(t) => PuterTurn(t, proceed(s, k))
+    | PlayerSaysEnv(t) => PlayerTurn([], [(t, proceed(s, k))])
+    | PuterSaysSmart(f) => PuterTurn(f(s), proceed(s, k))
     | Check(pre, d) => pre(s) ? options((s, d, k)) : End
     | Do(act, d) => options((act(s), d, k))
     | Seq(d1, d2) => options((s, d1, Seq(d2, k)))
@@ -91,8 +88,8 @@ let rec options((s, d, k) : dialogue_state('state)) : state_option('state) = swi
 }
 
 
-let me(s) = S((Puter, S(s)))
-let you(s) = S((Player, S(s)))
+let me(s) = PuterSays(S(s))
+let you(s) = PlayerSays(S(s))
 let branch(check : 'state => bool, d1, d2) = Alt(Check(check, d1), Check(s => !check(s), d2))
 let seq(ds : list(dialogue('state))) = switch(ds) {
     | [] => failwith("empty seq")
