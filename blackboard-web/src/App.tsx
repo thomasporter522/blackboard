@@ -125,16 +125,6 @@ const delimiterExtension = EditorView.decorations.compute([parseInfoField], stat
 const victoryExtension = EditorView.decorations.compute([parseInfoField], state => decorateVictories(state))
 const interactionExtension = EditorView.decorations.compute([parseInfoField], state => decorateInteractions(state))
 
-
-function error_info(diaState) {
-  if(dia_opt_player_can_select_hidden(diaState, "explain_error")) {
-    return dia_opt_player_select_hidden(diaState, "explain_error")
-  } else {
-    print("aahhh")
-    return diaState
-  }
-}
-
 function render_message(_view : EditorView, diaState, setDiaState, messageText : string, range: number[]) : Node {
   const node = document.createElement("div");
   const sigil =  document.createElement("span");
