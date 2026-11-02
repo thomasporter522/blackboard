@@ -3,7 +3,8 @@ type name = Name(string);
 
 type range = (int, int)
 
-type index = Index(int, int)
+type hyp_index = HypIndex(int, int)
+type term_index = Index(int, int)
 
 type surface_tm = 
     | SurfaceProp(range)
@@ -22,7 +23,7 @@ type tm =
     | Typ 
     | In(tm, tm)
     | Arrow(tele, tm)
-    | Ap(index, subst)
+    | Ap(term_index, subst)
     | Nonsense
 
 and tele = 
@@ -39,34 +40,75 @@ type ctx =
     | Cons(ctx, tele)
 
 
-let rec wk(n : int, t : tm) = switch(t) {
+let rec equiv(a1 : tm, a2 : tm) : bool = {
+    switch(a1, a2) {
+    | (Prop, Prop) => true 
+    | (Typ, Typ) => true 
+    | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Arrow(a1, a2), Arrow(a3, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
+    | (Ap(a1, a2), Ap(a3, a4)) => a1 == a3 && equiv_subst(a2, a4)
+    | (Prop, _) => false
+    | (Typ, _) => false
+    | (In(_), _) => false
+    | (Arrow(_), _) => false
+    | (Ap(_), _) => false
+    | (Nonsense, _) => false
+    }
+}
+
+and equiv_tele(a1 : tele, a2 : tele) : bool = switch(a1, a2) {
+    | (Empty, Empty) => true 
+    | (ConsP(a1, _, a2), ConsP(a3, _, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
+    | (ConsT(a1, _, a2, a3), ConsT(a4, _, a5, a6)) => equiv_tele(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (Empty, _)
+    | (ConsP(_), _)
+    | (ConsT(_), _) => false
+}
+and equiv_subst(a1 : subst, a2 : subst) : bool = switch(a1, a2) {
+    | (Empty, Empty) => true 
+    | (Cons(a1, _, a2, a3), Cons(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (Empty, _)
+    | (Cons(_), _) => false
+}
+
+let rec wkn(n : int, t : tm) = switch(t) {
     | Prop => Prop
     | Typ => Typ
-    | In(t1, t2) => In(wk(n, t1), wk(n, t2))
-    | Arrow(te, t1) => Arrow(wk_tele(n+1, te), wk(n+1, t1))
+    | In(t1, t2) => In(wkn(n, t1), wkn(n, t2))
+    | Arrow(te, t1) => Arrow(wkn_tele(n+1, te), wkn(n+1, t1))
     | Ap(Index(x, y), s1) when x >= n => Ap(Index(x+1, y), wk_subst(n, s1))
     | Ap(Index(x, y), s1) => Ap(Index(x, y), wk_subst(n, s1))
     | Nonsense => Nonsense
 }
 
-and wk_tele(n : int, te : tele) = switch(te) {
+and wkn_tele(n : int, te : tele) = switch(te) {
     | Empty => Empty 
-    | ConsP(te1, y, p) => ConsP(wk_tele(n, te1), y, wk(n, p))
-    | ConsT(te1, y, te2, t) => ConsT(wk_tele(n, te1), y, wk_tele(n+1, te2), wk(n+1, t))
+    | ConsP(te1, y, p) => ConsP(wkn_tele(n, te1), y, wkn(n, p))
+    | ConsT(te1, y, te2, t) => ConsT(wkn_tele(n, te1), y, wkn_tele(n+1, te2), wkn(n+1, t))
 }
 
 and wk_subst(n : int, s : subst) = switch(s) {
     | Empty => Empty 
-    | Cons(s', y, te, t) => Cons(wk_subst(n, s'), y, wk_tele(n+1, te), wk(n+1, t))
+    | Cons(s', y, te, t) => Cons(wk_subst(n, s'), y, wkn_tele(n+1, te), wkn(n+1, t))
 }
 
-let rec sub(n : int, s : subst, t : tm) = switch(t) {
+let wk = wkn(0)
+let wk_tele = wkn_tele(0)
+
+// let rec sub_shape(s : subst, te : tele) = switch(s, te) {
+//     | (Empty, Empty) => true 
+//     | (s, ConsP(te', _, _)) => sub_shape(s, te')
+//     | (Cons(s', _, te1, _), ConsT(te', _, te2, _)) => sub_shape(s', te') && equiv_tele(te1, te2)
+//     | (Empty, _) | (Cons(_), _) => false
+// }
+
+let rec subn(n : int, s : subst, t : tm) = switch(t) {
     | Prop => Prop
     | Typ => Typ
-    | In(t1, t2) => In(sub(n, s, t1), sub(n, s, t2))
+    | In(t1, t2) => In(subn(n, s, t1), subn(n, s, t2))
     | Arrow(te, t1) => 
         let s' = wk_subst(0, s);
-        Arrow(sub_tele(n+1, s', te), sub(n+1, s', t1))
+        Arrow(subn_tele(n+1, s', te), subn(n+1, s', t1))
     | Ap(Index(x, y), s1) when x > n => Ap(Index(x-1, y), sub_subst(n, s, s1))
     | Ap(Index(x, y), s1) when x < n => Ap(Index(x, y), sub_subst(n, s, s1))
     | Ap(Index(_n, y), s1) => 
@@ -76,25 +118,28 @@ let rec sub(n : int, s : subst, t : tm) = switch(t) {
 }
 
 and sub_ap(s : subst, y : int, s1' : subst) = switch(y, s) {
-    | (0, Cons(_, _y, _, t)) => sub(0, s1', t)
+    | (0, Cons(_, _y, _, t)) => subn(0, s1', t)
     | (y, Cons(s', _, _, _)) => sub_ap(s', y-1, s1')
     | (_, Empty) => failwith("Misaligned sub_ap")
 }
 
-and sub_tele(n : int, s : subst, te : tele) = switch(te) {
+and subn_tele(n : int, s : subst, te : tele) = switch(te) {
     | Empty => Empty 
-    | ConsP(te1, y, p) => ConsP(sub_tele(n, s, te1), y, sub(n, s, p))
+    | ConsP(te1, y, p) => ConsP(subn_tele(n, s, te1), y, subn(n, s, p))
     | ConsT(te1, y, te2, t) => 
         let s' = wk_subst(0, s);
-        ConsT(sub_tele(n, s, te1), y, sub_tele(n+1, s', te2), sub(n+1, s', t))
+        ConsT(subn_tele(n, s, te1), y, subn_tele(n+1, s', te2), subn(n+1, s', t))
 }
 
 and sub_subst(n : int, s : subst, s1 : subst) = switch(s1) {
     | Empty => Empty 
     | Cons(s1', y, te, t) => 
         let s' = wk_subst(0, s);
-        Cons(sub_subst(n, s, s1'), y, sub_tele(n+1, s', te), sub(n+1, s', t))
+        Cons(sub_subst(n, s, s1'), y, subn_tele(n+1, s', te), subn(n+1, s', t))
 }
+
+let sub = subn(0)
+let sub_tele = subn_tele(0)
 
 type error = string;
 
@@ -134,7 +179,7 @@ let rec index_of_name_tele(te : tele, z : name) : result(int, error) = {
     }
 }
 
-let rec index_of_name(c : ctx, z : name) : result(index, error) = {
+let rec index_of_name(c : ctx, z : name) : result(term_index, error) = {
     switch(c) {
     | Cons(c', te) => 
         switch(index_of_name_tele(te, z)) {
@@ -147,54 +192,55 @@ let rec index_of_name(c : ctx, z : name) : result(index, error) = {
     }
 }
 
+let rec lookup_index_prop_tele(te : tele, y : int) : result(tm, error) = switch(te) {
+    | ConsP(_, _, p) when y == 0 => Ok(p)
+    | ConsT(_) when y == 0 => Error("Wrong kind")
+    | ConsP(te', _, _) when y > 0 => lookup_index_prop_tele(te', y-1)
+    | ConsT(te', _, _, _) when y > 0 => lookup_index_prop_tele(te', y-1)
+    | _ => Error("Out of bounds")
+    }
+
+let rec lookup_index_prop(c : ctx, HypIndex(x, y) : hyp_index) : result(tm, error) = {
+    switch(c) {
+    | Cons(_, te) when x == 0 => lookup_index_prop_tele(te, y)
+    | Cons(c', _) when x > 0 => 
+        let* p = lookup_index_prop(c', HypIndex(x-1, y));
+        Ok(wk(p))
+    | _ => Error("Out of bounds")
+    }
+}
+
+let rec lookup_index_term_tele(te : tele, y : int) : result((tele, tm), error) =  switch(te) {
+    | ConsT(_, _, te, t) when y == 0 => Ok((te, t))
+    | ConsP(_) when y == 0 => Error("Wrong kind")
+    | ConsT(te', _, _, _) when y > 0 => lookup_index_term_tele(te', y-1)
+    | ConsP(te', _, _) when y > 0 => lookup_index_term_tele(te', y)
+    | _ => Error("Out of bounds")
+    }
+
+let rec lookup_index_term(c : ctx, Index(x, y) : term_index) : result((tele, tm), error) = {
+    switch(c) {
+    | Cons(_, te) when x == 0 => lookup_index_term_tele(te, y)
+    | Cons(c', _) when x > 0 => 
+        let* (te, t) = lookup_index_term(c', Index(x-1, y));
+        Ok((wkn_tele(1, te), wkn(1, t)))
+    | _ => Error("Out of bounds")
+    }
+}
+
 let tail_of_ctx(c : ctx) : ctx = switch(c) {
     | Empty => failwith("tail of empty context")
     | Cons(c', _) => c'
 }
 
-let rec equiv(a1 : tm, a2 : tm) : bool = {
-    switch(a1, a2) {
-    | (Prop, Prop) => true 
-    | (Typ, Typ) => true 
-    | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-    | (Arrow(a1, a2), Arrow(a3, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
-    | (Ap(a1, a2), Ap(a3, a4)) => a1 == a3 && equiv_subst(a2, a4)
-    | (Prop, _) => false
-    | (Typ, _) => false
-    | (In(_), _) => false
-    | (Arrow(_), _) => false
-    | (Ap(_), _) => false
-    | (Nonsense, _) => false
-    }
-}
-
-and equiv_tele(a1 : tele, a2 : tele) : bool = switch(a1, a2) {
-    | (Empty, Empty) => true 
-    | (ConsP(a1, _, a2), ConsP(a3, _, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
-    | (ConsT(a1, _, a2, a3), ConsT(a4, _, a5, a6)) => equiv_tele(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
-    | (Empty, _)
-    | (ConsP(_), _)
-    | (ConsT(_), _) => false
-}
-and equiv_subst(a1 : subst, a2 : subst) : bool = switch(a1, a2) {
-    | (Empty, Empty) => true 
-    | (Cons(a1, _, a2, a3), Cons(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
-    | (Empty, _)
-    | (Cons(_), _) => false
-}
-
 type judgment = J(ctx, tm);
 
-let tuple_of_judgment (j : judgment) : (ctx, tm) = switch(j) {
-    | J(c, ty) => (c, ty)
-}
-
 let ctx_of_judgment (j : judgment) : ctx = {
-    let (c, _) = tuple_of_judgment(j);
+    let J(c, _) = j;
     c
 }
 
 let type_of_judgment (j : judgment) : tm = {
-    let (_, p) = tuple_of_judgment(j);
+    let J(_, p) = j;
     p
 }

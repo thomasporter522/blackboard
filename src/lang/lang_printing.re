@@ -1,16 +1,15 @@
 open Term
 
-let string_of_index(Index(x, y) : index) = "!!" ++ string_of_int(x) ++ "." ++ string_of_int(y)
+let string_of_index(Index(x, y) : term_index) = "!!" ++ string_of_int(x) ++ "." ++ string_of_int(y)
 
-let rec text_of_var_tele(te : tele, y : int, original : index) : string = switch(te) {
-    | ConsP(_, Name(z), _) when y == 0 => z
-    | ConsP(te, _, _) when y > 0 => text_of_var_tele(te, y-1, original)
+let rec text_of_var_tele(te : tele, y : int, original : term_index) : string = switch(te) {
+    | ConsP(te, _, _) => text_of_var_tele(te, y, original)
     | ConsT(_, Name(z), _, _) when y == 0 => z
     | ConsT(te, _, _, _) when y > 0 => text_of_var_tele(te, y-1, original)
     | _ => "!!" ++ string_of_index(original)
 }
 
-let rec text_of_index(c : ctx, i : index, original : index) : string = switch(c, i) {
+let rec text_of_index(c : ctx, i : term_index, original : term_index) : string = switch(c, i) {
     | (Cons(_, te), Index(0, y)) => text_of_var_tele(te, y, original)
     | (Cons(c, _), Index(x, y)) when x > 0 => text_of_index(c, Index(x-1, y), original)
     | _ => "!!" ++ string_of_index(original)
@@ -19,7 +18,7 @@ let rec text_of_index(c : ctx, i : index, original : index) : string = switch(c,
 let show_indices = false;
 // let show_indices = true;
 
-let string_of_var(c : ctx, i : index) : string = {
+let string_of_var(c : ctx, i : term_index) : string = {
     text_of_index(c, i, i) ++ (show_indices ? "." ++ string_of_index(i) : "")
 }
 
@@ -60,7 +59,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
 and string_of_tele(c : ctx, te : tele) : string = switch(te) {
     | Empty => ""
     | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == Empty ? "" : " ")  ++ "(" ++ z ++ " : " ++ string_of_term(c, p) ++ ")"
-    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == Empty ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(c, ty) ++ ")"
+    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == Empty ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
 }
 
 and string_of_subst(c : ctx, s : subst) : string = switch(s) {
