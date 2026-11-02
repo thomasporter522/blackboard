@@ -23,6 +23,7 @@ type tm =
     | In(tm, tm)
     | Arrow(tele, tm)
     | Ap(index, subst)
+    | Nonsense
 
 and tele = 
     | Empty 
@@ -45,6 +46,7 @@ let rec wk(n : int, t : tm) = switch(t) {
     | Arrow(te, t1) => Arrow(wk_tele(n+1, te), wk(n+1, t1))
     | Ap(Index(x, y), s1) when x >= n => Ap(Index(x+1, y), wk_subst(n, s1))
     | Ap(Index(x, y), s1) => Ap(Index(x, y), wk_subst(n, s1))
+    | Nonsense => Nonsense
 }
 
 and wk_tele(n : int, te : tele) = switch(te) {
@@ -70,6 +72,7 @@ let rec sub(n : int, s : subst, t : tm) = switch(t) {
     | Ap(Index(_n, y), s1) => 
         let s1' = sub_subst(n, s, s1);
         sub_ap(s, y, s1')
+    | Nonsense => Nonsense
 }
 
 and sub_ap(s : subst, y : int, s1' : subst) = switch(y, s) {
@@ -161,6 +164,7 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (In(_), _) => false
     | (Arrow(_), _) => false
     | (Ap(_), _) => false
+    | (Nonsense, _) => false
     }
 }
 

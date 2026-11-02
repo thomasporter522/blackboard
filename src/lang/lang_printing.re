@@ -1,19 +1,26 @@
 open Term
 
-let rec text_of_var(c : ctx, x : int, original : int) : string = switch(c) {
-    | Cons(_, y, _) when x == 0 => y
-    | Cons(c, y, _) when x > 0 => {
-        let y' = text_of_var(c, x-1, original);
-        if (y' == y) { y ++ " (shadowed)"} else y'
-    }
-    | _ => "!!" ++ string_of_int(original)
+let string_of_index(Index(x, y) : index) = "!!" ++ string_of_int(x) ++ "." ++ string_of_int(y)
+
+let rec text_of_var_tele(te : tele, y : int, original : index) : string = switch(te) {
+    | ConsP(_, Name(z), _) when y == 0 => z
+    | ConsP(te, _, _) when y > 0 => text_of_var_tele(te, y-1, original)
+    | ConsT(_, Name(z), _, _) when y == 0 => z
+    | ConsT(te, _, _, _) when y > 0 => text_of_var_tele(te, y-1, original)
+    | _ => "!!" ++ string_of_index(original)
+}
+
+let rec text_of_index(c : ctx, i : index, original : index) : string = switch(c, i) {
+    | (Cons(_, te), Index(0, y)) => text_of_var_tele(te, y, original)
+    | (Cons(c, _), Index(x, y)) when x > 0 => text_of_index(c, Index(x-1, y), original)
+    | _ => "!!" ++ string_of_index(original)
 }
 
 let show_indices = false;
 // let show_indices = true;
 
-let string_of_var(c : ctx, x : int) : string = {
-    text_of_var(c, x, x) ++ (show_indices ? "." ++ string_of_int(x) : "")
+let string_of_var(c : ctx, i : index) : string = {
+    text_of_index(c, i, i) ++ (show_indices ? "." ++ string_of_index(i) : "")
 }
 
 // precedences:
@@ -22,11 +29,6 @@ let arrow_prec = (11, 10)
 let lam_prec = (-1, 15)
 let strictap_prec = (20, -1)
 let ap_prec = (20, 21)
-
-let string_of_strength(s : strength) : string = switch(s) {
-    | Strong => " |- "
-    | Weak => " -> "
-}
 
 let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string = {
     switch(outer_a) {
@@ -37,26 +39,15 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
             prec_string_of_term(lp, fst(colon_prec), c, a) ++ " :: " ++ prec_string_of_term(snd(colon_prec), rp,c, ty)
         }
     }
-    | Arrow(st, x, ty1, ty2) => 
+    | Arrow(te, t) => 
         if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
-            ((x == "_") ? prec_string_of_term(lp, fst(arrow_prec), c, ty1) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty1) ++ ")")
-            ++ string_of_strength(st) ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, x, ty1), ty2) 
+            string_of_tele(Cons(c, te), te) ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, te), t) 
         }
-    | Lam(x, ty, a) => 
-        if (rp >= snd(lam_prec)) { wrap(c, outer_a) } else {
-            ((x == "_") ? prec_string_of_term(lp, fst(lam_prec), c, ty) : "(" ++ x ++ " : " ++ prec_string_of_term(fst(colon_prec), 0, c, ty) ++ ")")
-            ++ " => " ++ prec_string_of_term(snd(lam_prec), rp, Cons(c, x, ty), a) 
-        }
-    | Var(x) => string_of_var(c, x)
-    | Ap(a1, a2) => 
+    | Ap(i, Empty) => string_of_var(c, i)
+    | Ap(i, s) => 
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
-            prec_string_of_term(lp, fst(ap_prec), c, a1) ++ " " ++ prec_string_of_term(snd(ap_prec), rp, c, a2)
+            string_of_var(c, i) ++ " " ++ string_of_subst(c, s)
         }
-    | Unguard(a) => 
-        if (lp >= fst(strictap_prec)) { wrap(c, outer_a) } else {
-            prec_string_of_term(lp, fst(ap_prec), c, a) ++ " ."
-        }
-    | FreeVar(x) => "\"" ++ x ++ "\""
     | Nonsense => "<some nonsense>"
     }
 
@@ -66,41 +57,31 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     prec_string_of_term(0, 0, c, a)
 }
 
-let ctx_prefix(x : name) : string = x ++ " : ";
-
-let rec string_of_ctx_short(c : ctx) : string = switch(c) {
+and string_of_tele(c : ctx, te : tele) : string = switch(te) {
     | Empty => ""
-    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, ty)
-    | Cons(c, x, ty) => string_of_ctx_short(c) ++ ", " ++ ctx_prefix(x) ++ string_of_term(c, ty)
+    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == Empty ? "" : " ")  ++ "(" ++ z ++ " : " ++ string_of_term(c, p) ++ ")"
+    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == Empty ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(c, ty) ++ ")"
 }
 
-let string_of_judgment_short(j : judgment) : string = {
-    switch(j) {
-    | J(c, a, _) =>  string_of_ctx_short(c) ++ " |- " ++ string_of_term(c, a)
-    }
-}
-
-let rec strings_of_ctx(c : ctx) : list(string) = switch(c) {
-    | Empty => []
-    | Cons(c, x, ty) => strings_of_ctx(c) @ [ctx_prefix(x) ++ string_of_term(c, normalize(ty))]
+and string_of_subst(c : ctx, s : subst) : string = switch(s) {
+    | Empty => ""
+    | Cons(s', Name(z), te, t) => string_of_subst(c, s') ++ (te == Empty ? "" : " ") ++ "("  ++ z ++ " := " ++ string_of_term(c, t) ++ ")"
 }
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {
     | Empty => ""
-    | Cons(Empty, x, ty) => ctx_prefix(x) ++ string_of_term(Empty, normalize(ty))
-    | Cons(c, x, ty) => string_of_ctx(c) ++ ",\n" ++ ctx_prefix(x) ++ string_of_term(c, normalize(ty))
+    | Cons(c', te) => string_of_ctx(c') ++ (c' == Empty ? "" : ",\n")  ++ string_of_tele(Cons(c', te), te)
 }
 
-
-let string_of_mode(m : mode) : string = switch(m) {
-    | Red => "red"
-    | Blue => "blue"
+let rec strings_of_ctx(c : ctx) : list(string) = switch(c) {
+    | Empty => []
+    | Cons(c', te) => strings_of_ctx(c') @ [string_of_tele(Cons(c', te), te)]
 }
 
 let strings_of_judgment(j : judgment) : (list(string), string) = {
     switch(j) {
-    | J(c, a, _) => 
-        let s = string_of_term(c, normalize(a));
+    | J(c, a) => 
+        let s = string_of_term(c, a);
         (strings_of_ctx(c), s)
     }
 }
