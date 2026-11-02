@@ -113,58 +113,8 @@ let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_
   (t, {...r, errors : r.errors @ es})
 }
 
-let rec var_of_surface (c : ctx, x : name) : Result.t(int, error) = switch(c) {
-    | Cons(_, y, _) when x == y => Ok(0)
-    | Cons(c, _, _) => 
-        let* n = var_of_surface(c, x);
-        Ok(1+n)
-    | Empty => Error("unbound variable: " ++ x)
-}
-
-let (let**) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {
-    let (a, l1) = f;
-    let (c, l2) = b(a);
-    (c, l1 @ l2)
-}
-
-let rec tm_of_surface (c : ctx, t : surface_tm) : (tm, list(ranged_error)) = switch(t) {
-    | SurfaceProp(_) => (Prop, [])
-    | SurfaceTyp(_) => (Typ, [])
-    | SurfaceIn(t1, t2) => 
-        let** t1' = tm_of_surface(c, t1);
-        let** t2' = tm_of_surface(c, t2);
-        (In(t1', t2'), [])
-    | SurfaceArrow(st, [x,...xs], t1, t2) => 
-        let** t1' = tm_of_surface(c, t1);
-        let** t2' = tm_of_surface(Cons(c, x, t1'), SurfaceArrow(st, xs, t1, t2));
-        (Arrow(st, x, t1', t2'), [])
-    | SurfaceArrow(_, [], _, t2) => tm_of_surface(c, t2)
-    | SurfaceLambda([x,...xs], t1, t2) => 
-        let** t1' = tm_of_surface(c, t1);
-        let** t2' = tm_of_surface(Cons(c, x, t1'), SurfaceLambda(xs, t1, t2));
-        (Lam(x, t1', t2'), [])
-    | SurfaceLambda([], _, t2) => tm_of_surface(c, t2)
-    | SimpleArrow(t1, t2) => 
-        let** t1' = tm_of_surface(c, t1);
-        let** t2' = tm_of_surface(Cons(c, "_", t1'), t2);
-        (Arrow(Weak, "_", t1', t2'), [])
-    | SurfaceAp(t1, t2) => 
-        let** t1' = tm_of_surface(c, t1);
-        let** t2' = tm_of_surface(c, t2);
-        (Ap(t1', t2'), [])
-    | SurfaceVar(r, x) => 
-        switch(var_of_surface(c, x)) {
-        | Ok(n) =>  (Var(n), [])
-        | Error(_) => (FreeVar(x), [err("Unrecognized name", r)])
-        }
-    | SurfaceUnguard(t) => 
-        let** t' = tm_of_surface(c, t);
-        (Unguard(t'), [])
-    | SurfaceNonsense => (Nonsense, []);
-}
-
 let rec find_assumption(c : ctx, ty : tm, n : int) : result (int, error) = {
-    switch(lookup_index(c, n)) {
+    switch(lookup_index_prop(c, n)) {
     | Ok(ty') when equiv(ty, ty') => Ok(n)
     | Ok(_) => find_assumption(c, ty, n+1)
     | _ => Error("can't find assumption")

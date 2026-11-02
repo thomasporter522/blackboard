@@ -6,16 +6,20 @@ type range = (int, int)
 type hyp_index = HypIndex(int, int)
 type term_index = Index(int, int)
 
-type surface_tm = 
+type surface_tele_entry = 
+    | SurfaceTeleEntryP(name, surface_tm)
+    | SurfaceTeleEntryT(list(name), list(surface_tele_entry), surface_tm)
+
+and surface_subst_entry = 
+    | SurfaceSubstEntry(name, list(surface_tele_entry), surface_tm)
+
+and surface_tm =
     | SurfaceProp(range)
     | SurfaceTyp(range)
     | SurfaceIn(surface_tm, surface_tm)
-    | SurfaceArrow(list(name), surface_tm, surface_tm)
-    | SurfaceLambda(list(name), surface_tm, surface_tm)
-    | SimpleArrow(surface_tm, surface_tm)
+    | SurfaceArrow(list(surface_tele_entry), surface_tm)
     | SurfaceVar(range, name)
-    | SurfaceAp(surface_tm, surface_tm)
-    | SurfaceUnguard(surface_tm)
+    | SurfaceAp(range, name, list(surface_subst_entry))
     | SurfaceNonsense;
 
 type tm = 
