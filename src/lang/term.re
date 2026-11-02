@@ -1,23 +1,15 @@
 
-type name = string;
+type name = Name(string);
 
 type range = (int, int)
 
-type arrow = 
-    | Implies
-    | Forall 
-    | Pi 
-    | Guard
-
-type strength = 
-    | Strong 
-    | Weak
+type index = Index(int, int)
 
 type surface_tm = 
     | SurfaceProp(range)
     | SurfaceTyp(range)
     | SurfaceIn(surface_tm, surface_tm)
-    | SurfaceArrow(strength, list(name), surface_tm, surface_tm)
+    | SurfaceArrow(list(name), surface_tm, surface_tm)
     | SurfaceLambda(list(name), surface_tm, surface_tm)
     | SimpleArrow(surface_tm, surface_tm)
     | SurfaceVar(range, name)
@@ -29,17 +21,77 @@ type tm =
     | Prop
     | Typ 
     | In(tm, tm)
-    | Arrow(strength, name, tm, tm)
-    | Lam(name, tm, tm)
-    | Var(int)
-    | Ap(tm, tm)
-    | Unguard(tm)
-    | FreeVar(string)
-    | Nonsense;
+    | Arrow(tele, tm)
+    | Ap(index, subst)
+
+and tele = 
+    | Empty 
+    | ConsP(tele, name, tm)
+    | ConsT(tele, name, tele, tm)
+    
+and subst =
+    | Empty
+    | Cons(subst, name, tele, tm);
 
 type ctx = 
     | Empty 
-    | Cons(ctx, name, tm);
+    | Cons(ctx, tele)
+
+
+let rec wk(n : int, t : tm) = switch(t) {
+    | Prop => Prop
+    | Typ => Typ
+    | In(t1, t2) => In(wk(n, t1), wk(n, t2))
+    | Arrow(te, t1) => Arrow(wk_tele(n+1, te), wk(n+1, t1))
+    | Ap(Index(x, y), s1) when x >= n => Ap(Index(x+1, y), wk_subst(n, s1))
+    | Ap(Index(x, y), s1) => Ap(Index(x, y), wk_subst(n, s1))
+}
+
+and wk_tele(n : int, te : tele) = switch(te) {
+    | Empty => Empty 
+    | ConsP(te1, y, p) => ConsP(wk_tele(n, te1), y, wk(n, p))
+    | ConsT(te1, y, te2, t) => ConsT(wk_tele(n, te1), y, wk_tele(n+1, te2), wk(n+1, t))
+}
+
+and wk_subst(n : int, s : subst) = switch(s) {
+    | Empty => Empty 
+    | Cons(s', y, te, t) => Cons(wk_subst(n, s'), y, wk_tele(n+1, te), wk(n+1, t))
+}
+
+let rec sub(n : int, s : subst, t : tm) = switch(t) {
+    | Prop => Prop
+    | Typ => Typ
+    | In(t1, t2) => In(sub(n, s, t1), sub(n, s, t2))
+    | Arrow(te, t1) => 
+        let s' = wk_subst(0, s);
+        Arrow(sub_tele(n+1, s', te), sub(n+1, s', t1))
+    | Ap(Index(x, y), s1) when x > n => Ap(Index(x-1, y), sub_subst(n, s, s1))
+    | Ap(Index(x, y), s1) when x < n => Ap(Index(x, y), sub_subst(n, s, s1))
+    | Ap(Index(_n, y), s1) => 
+        let s1' = sub_subst(n, s, s1);
+        sub_ap(s, y, s1')
+}
+
+and sub_ap(s : subst, y : int, s1' : subst) = switch(y, s) {
+    | (0, Cons(_, _y, _, t)) => sub(0, s1', t)
+    | (y, Cons(s', _, _, _)) => sub_ap(s', y-1, s1')
+    | (_, Empty) => failwith("Misaligned sub_ap")
+}
+
+and sub_tele(n : int, s : subst, te : tele) = switch(te) {
+    | Empty => Empty 
+    | ConsP(te1, y, p) => ConsP(sub_tele(n, s, te1), y, sub(n, s, p))
+    | ConsT(te1, y, te2, t) => 
+        let s' = wk_subst(0, s);
+        ConsT(sub_tele(n, s, te1), y, sub_tele(n+1, s', te2), sub(n+1, s', t))
+}
+
+and sub_subst(n : int, s : subst, s1 : subst) = switch(s1) {
+    | Empty => Empty 
+    | Cons(s1', y, te, t) => 
+        let s' = wk_subst(0, s);
+        Cons(sub_subst(n, s, s1'), y, sub_tele(n+1, s', te), sub(n+1, s', t))
+}
 
 type error = string;
 
@@ -68,257 +120,77 @@ let ( let! ) = (x: result('a, 'b), f: 'b => result('a, 'b)): result('a, 'b) =>
   | Error(e) => f(e)
   };
 
-let rec index_of_name(c : ctx, x : name) : result(int, error) = {
-    switch(c, x) {
-    | (Cons(_, y, _), x) when y == x => Ok(0)
-    | (Cons(c, _, _), x) => Result.map(i => 1+i, index_of_name(c, x))
+let rec index_of_name_tele(te : tele, z : name) : result(int, error) = {
+    switch(te) {
+    | ConsP(te', _, _) => index_of_name_tele(te', z)
+    | ConsT(_, z', _, _) when z' == z => Ok(0)
+    | ConsT(te', _, _, _) => 
+        let* i = index_of_name_tele(te', z);
+        Ok(i+1)
+    | _ => Error("Unrecognized name")
+    }
+}
+
+let rec index_of_name(c : ctx, z : name) : result(index, error) = {
+    switch(c) {
+    | Cons(c', te) => 
+        switch(index_of_name_tele(te, z)) {
+        | Ok(y) => Ok(Index(0, y))
+        | Error(_) => 
+            let* Index(x, y) = index_of_name(c', z);
+            Ok(Index(x+1, y))
+        }
     | _ => Error("Unrecognized name")
     }
 }
 
 let tail_of_ctx(c : ctx) : ctx = switch(c) {
     | Empty => failwith("tail of empty context")
-    | Cons(c', _, _) => c'
+    | Cons(c', _) => c'
 }
 
-let rec wknvar(n : int, m : int) : int = {
-    if (n == 0) { m+1 } else
-    if (n > 0 && m == 0) { 0 } else 
-    { wknvar(0, wknvar(n-1, m-1))}
-}
-
-let rec wkn(n : int, a : tm) : tm = switch(a) {
-    | Prop => Prop
-    | Typ => Typ
-    | In(a, ty) => In(wkn(n, a), wkn(n, ty))
-    | Arrow(st, y, ty1, ty2) => Arrow(st, y, wkn(n, ty1), wkn(n+1, ty2))
-    | Lam(y, ty, a) => Lam(y, wkn(n, ty), wkn(n+1, a))
-    | Var(y) => Var(wknvar(n, y))
-    | Ap(a1, a2) => Ap(wkn(n, a1), wkn(n, a2))
-    | Unguard(a) => Unguard(wkn(n, a))
-    | FreeVar(x) => FreeVar(x)
-    | Nonsense => Nonsense
-}
-
-let wk(a : tm) : tm = wkn(0, a)
-
-let rec substnvar(n : int, s : tm, m : int) : tm = {
-    if (n == 0 && m == 0) { s } else
-    if (n == 0 && m > 0) { Var(m-1) } else 
-    if (n > 0 && m == 0) { Var(0) } else 
-    { wkn(0, substnvar(n-1, s, m-1))}
-}
-
-let rec substn(n : int, s : tm, t : tm) : tm = switch(t) {
-    | Prop => Prop
-    | Typ => Typ
-    | In(a, ty) => In(substn(n, s, a), substn(n, s, ty))
-    | Arrow(st, y, ty1, ty2) => Arrow(st, y, substn(n, s, ty1), substn(n+1, s, ty2))
-    | Lam(y, ty, a) => Lam(y, substn(n, s, ty), substn(n+1, s, a))
-    | Var(y) => substnvar(n, s, y)
-    | Ap(a1, a2) => Ap(substn(n, s, a1), substn(n, s, a2))
-    | Unguard(a) => Unguard(substn(n, s, a))
-    | FreeVar(x) => FreeVar(x)
-    | Nonsense => Nonsense
-}
-
-let subst(s : tm, t : tm) : tm = substn(0, s, t)
-
-
-let rec headnormalize(t : tm) : tm = switch(t) {
-    | Prop => Prop
-    | Typ => Typ
-    | In(t1, t2) => In(t1, t2)
-    | Arrow(st, x, t1, t2) => Arrow(st, x, t1, t2)
-    | Lam(x, t1, t2) => Lam(x, t1, t2)
-    | Var(x) => Var(x)
-    | Ap(t1, t2) => {
-        switch(headnormalize(t1)) {
-        | Lam(_, _, body) => headnormalize(subst(t2, body))
-        | _ => Ap(t1, t2)
-        }
-    }
-    | Unguard(t) => Unguard(t)
-    | FreeVar(x) => FreeVar(x)
-    | Nonsense => Nonsense
-}
-
-let rec normalize(t : tm) : tm = switch(t) {
-    | Prop => Prop
-    | Typ => Typ
-    | In(t1, t2) => In(normalize(t1), normalize(t2))
-    | Arrow(st, x, t1, t2) => Arrow(st, x, normalize(t1), normalize(t2))
-    | Lam(x, t1, t2) => Lam(x, normalize(t1), normalize(t2))
-    | Var(x) => Var(x)
-    | Ap(t1, t2) => {
-        switch(normalize(t1)) {
-        | Lam(_, _, body) => normalize(subst(t2, body))
-        | t1' => Ap(t1', normalize(t2))
-        }
-    }
-    | Unguard(t) => Unguard(normalize(t))
-    | FreeVar(x) => FreeVar(x)
-    | Nonsense => Nonsense
-}
-
-let rec alphaequiv(a1 : tm, a2 : tm) : bool = {
+let rec equiv(a1 : tm, a2 : tm) : bool = {
     switch(a1, a2) {
     | (Prop, Prop) => true 
     | (Typ, Typ) => true 
-    | (In(a1, a2), In(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
-    | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4) // && st1 == st2
-    | (Lam(_, a1, a2), Lam(_, a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
-    | (Var(x1), Var(x2)) => x1 == x2
-    | (Ap(a1, a2), Ap(a3, a4)) => alphaequiv(a1, a3) && alphaequiv(a2, a4)
-    | (Unguard(a1), Unguard(a2)) => alphaequiv(a1, a2)
-    | (FreeVar(x), FreeVar(y)) => x == y
-    | (Nonsense, Nonsense) => false
+    | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
+    | (Arrow(a1, a2), Arrow(a3, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
+    | (Ap(a1, a2), Ap(a3, a4)) => a1 == a3 && equiv_subst(a2, a4)
     | (Prop, _) => false
     | (Typ, _) => false
     | (In(_), _) => false
     | (Arrow(_), _) => false
-    | (Lam(_), _) => false
-    | (Var(_), _) => false
     | (Ap(_), _) => false
-    | (Unguard(_), _) => false
-    | (FreeVar(_), _) => false
-    | (Nonsense, _) => false
     }
 }
 
-// definitional equality
-// let rec equiv(a1 : tm, a2 : tm) : bool = alphaequiv(normalize(a1), normalize(a2))
-let rec equiv(a1 : tm, a2 : tm) : bool = {
-    if (alphaequiv(a1, a2)) { true } else {
-        switch(headnormalize(a1), headnormalize(a2)) {
-        | (Prop, Prop) => true 
-        | (Typ, Typ) => true 
-        | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        | (Arrow(_st1, _, a1, a2), Arrow(_st2, _, a3, a4)) => equiv(a1, a3) && equiv(a2, a4) // && st1 == st2
-        | (Lam(_, a1, a2), Lam(_, a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        | (Var(x1), Var(x2)) => x1 == x2
-        | (Ap(a1, a2), Ap(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
-        | (Unguard(a1), Unguard(a2)) => equiv(a1, a2)
-        | (FreeVar(x), FreeVar(y)) => x == y
-        | (Nonsense, Nonsense) => false
-        | (Prop, _) => false
-        | (Typ, _) => false
-        | (In(_), _) => false
-        | (Arrow(_), _) => false
-        | (Lam(_), _) => false
-        | (Var(_), _) => false
-        | (Ap(_), _) => false
-        | (Unguard(_), _) => false
-        | (FreeVar(_), _) => false
-        | (Nonsense, _) => false
-        }
-    }
+and equiv_tele(a1 : tele, a2 : tele) : bool = switch(a1, a2) {
+    | (Empty, Empty) => true 
+    | (ConsP(a1, _, a2), ConsP(a3, _, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
+    | (ConsT(a1, _, a2, a3), ConsT(a4, _, a5, a6)) => equiv_tele(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (Empty, _)
+    | (ConsP(_), _)
+    | (ConsT(_), _) => false
+}
+and equiv_subst(a1 : subst, a2 : subst) : bool = switch(a1, a2) {
+    | (Empty, Empty) => true 
+    | (Cons(a1, _, a2, a3), Cons(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (Empty, _)
+    | (Cons(_), _) => false
 }
 
+type judgment = J(ctx, tm);
 
-// // applies f to each variable in [a] greater than or equal to [n]
-// let rec varmap (a : tm, x : int, f : int => int) : tm = {
-//     switch(a) {
-//     | Typ => Typ
-//     | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
-//     | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, f))
-//     | Var(y) when y >= x => Var(f(y))
-//     | Var(y) => Var(y)
-//     | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
-//     }
-// }
-
-// // smartapplies f to each variable in [a] greater than or equal to [n]
-// let smartvarmap (a : tm, x : int, f : int => int) : tm = {
-//     switch(a) {
-//     | Typ => Typ
-//     | In(a, ty) => In(varmap(a, x, f), varmap(ty, x, f))
-//     | Arrow(y, ty1, ty2) => Arrow(y, varmap(ty1, x, f), varmap(ty2, x+1, y => f(y-1)+1))
-//     | Var(y) when y >= x => Var(f(y))
-//     | Var(y) => Var(y)
-//     | Ap(a1, a2) => Ap(varmap(a1, x, f), varmap(a2, x, f))
-//     }
-// }
-
-// // increments each variable in [a] greater than or equal to [n]
-// let shift (a : tm, x : int) : tm = varmap(a, x, n => n+1)
-
-// // decrements each variable in [a] greater than or equal to [n]
-// let downshift (a : tm, x : int) : tm = varmap(a, x, n => n-1)
-
-// // replaces all occurrences of [x] with [a], downshifting all vars > x.
-// let rec subst (a1 : tm, a : tm, x : int) : tm = {
-//     switch(a1) {
-//     | Typ => Typ
-//     | In(a1, ty) => In(subst(a1, a, x), subst(ty, a, x))
-//     | Arrow(y, ty1, ty2) => Arrow(y, subst(ty1, a, x), subst(ty2, shift(a, 0), x+1))
-//     | Var(y) when y == x => a 
-//     | Var(y) when y > x => Var(y-1)
-//     | Var(y) => Var(y)
-//     | Ap(a1, a2) => Ap(subst(a1, a, x), subst(a2, a, x))
-//     }
-// }
-
-type lookup_index_result = 
-    | Ok(tm)
-    | WrongKind
-    | OutOfBounds
-
-let rec lookup_index(c : ctx, x : int) : result(tm, error) = {
-    switch(c, x) {
-    | (Cons(_, _, t), 0) => Ok(wk(t))
-    | (Cons(c, _, _), x) when x > 0 => 
-        let* t = lookup_index(c, x-1); 
-        Ok(wk(t))
-    | _ => Error("lookup_index out of bounds")
-    }
-}
-
-
-// let rec get_lookup_index(c : ctx, x : int) : tm = {
-//     switch(c, x) {
-//     | (Cons(_, _, t, _), 0) => getwk(t)
-//     | (Cons(c, _, _, _), x) when x > 0 => getwk(get_lookup_index(c, x-1))
-//     | _ => failwith("Context lookup out of bounds")
-//     }
-// }
-
-// let lookup_index(c : ctx, x : int) : result(tm, error) = 
-//     try { Ok(get_lookup_index(c, x)) } {
-//     | _ => Error("lookup index failed")
-//     }
-
-// let rec no_x (a : tm, x : int) : bool = {
-//     switch(a) {
-//     | Typ => true
-//     | In(a, ty) => no_x(a, x) && no_x(ty, x)
-//     | Arrow(_, ty1, ty2) => no_x(ty1, x) && no_x(ty2, x+1) 
-//     | Var(y) => y != x
-//     | Ap(a1, a2) => no_x(a1, x) && no_x(a2, x)
-//     }
-// }
-
-type mode = 
-    | Blue 
-    | Red
-
-type judgment = J(ctx, tm, mode);
-
-let tuple_of_judgment (j : judgment) : (ctx, tm, mode) = switch(j) {
-    | J(c, ty, m) => (c, ty, m)
+let tuple_of_judgment (j : judgment) : (ctx, tm) = switch(j) {
+    | J(c, ty) => (c, ty)
 }
 
 let ctx_of_judgment (j : judgment) : ctx = {
-    let (c, _, _) = tuple_of_judgment(j);
+    let (c, _) = tuple_of_judgment(j);
     c
 }
 
 let type_of_judgment (j : judgment) : tm = {
-    let (_, p, _) = tuple_of_judgment(j);
+    let (_, p) = tuple_of_judgment(j);
     p
-}
-
-let mode_of_judgment (j : judgment) : mode = {
-    let (_, _, m) = tuple_of_judgment(j);
-    m
 }
