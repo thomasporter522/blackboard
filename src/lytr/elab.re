@@ -58,6 +58,7 @@ let rec elab_id_list(t: Language.abstract_term) = switch(t) {
 
 and elab_subst_entry(t : Language.abstract_term) : (Option.t(Lang.Term.surface_subst_entry), list(error)) = {
     switch(t) {
+    | Parens(_, t) => elab_subst_entry_span(t);
     | Infix(Assign, _, t1, _, _, t2)  => 
         let* t1' = elab_entry_lhs(t1);
         let* t2' = elab_term(t2);
@@ -66,6 +67,17 @@ and elab_subst_entry(t : Language.abstract_term) : (Option.t(Lang.Term.surface_s
         | Some((zs, args)) => (Some(Lang.Term.SurfaceSubstEntry(zs, args, t2')), [])
         }
     | _ => (None, [{message: "invalid argument", range: whole_range(t)}])
+    }
+}
+
+and elab_subst_entry_span(t : Language.abstract_span) : (Option.t(Lang.Term.surface_subst_entry), list(error)) = {
+    switch(t) {
+    | Empty(_) => (None, [])
+    | Single(_ss1, t, _ss2, _r) => elab_subst_entry(t)
+    | Multiple([], _, _) => failwith("impossible")
+    | Multiple([t,..._], _, r) => 
+        let* t' = elab_subst_entry(t);
+        (t', [err("Multiple arguments", r)])
     }
 }
 
@@ -100,6 +112,7 @@ and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) 
     | Infix(At, _, _, _, _, _) 
     | Assume(_) 
     | Construct(_) 
+    | Prove(_) 
     | Commas(_) 
     | Given(_)  
     | Witness(_)
@@ -162,6 +175,7 @@ and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     | Infix(Arrow, _, _, _, _, _)
     | Assume(_) 
     | Construct(_) 
+    | Prove(_) 
     | Commas(_) => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
     }
 }
@@ -201,6 +215,7 @@ and elab_entry_lhs(t : Language.abstract_term) : (Option.t((list(Lang.Term.name)
 
 and elab_entry(t : Language.abstract_term) :  (Option.t(surface_tele_entry), list(error)) = {
     switch(t) {
+    | Parens(_, t) => elab_entry_span(t);
     | Infix(Colon, _, x, _, _, t) => 
         let* x' = elab_entry_lhs(x);
         let* t' = elab_term(t);
@@ -215,9 +230,21 @@ and elab_entry(t : Language.abstract_term) :  (Option.t(surface_tele_entry), lis
     }
 }
 
+and elab_entry_span(t : Language.abstract_span) : (Option.t(surface_tele_entry), list(error)) = {
+    switch(t) {
+    | Empty(_) => (None, [])
+    | Single(_ss1, t, _ss2, _r) => elab_entry(t)
+    | Multiple([], _, _) => failwith("impossible")
+    | Multiple([t,..._], _, r) => 
+        let* t' = elab_entry(t);
+        (t', [err("Multiple entries", r)])
+    }
+}
+
 and elab_whitespace_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
     | Atom(Hole, _) => ([], [])
+    | Parens(_)
     | Infix(Colon, _, _, _, _, _)
     | Infix(Semicolon, _, _, _, _, _) => 
         let* x' = elab_entry(t);
@@ -237,19 +264,9 @@ and elab_whitespace_telescope(t : Language.abstract_term) : (list(surface_tele_e
 }
 
 
-let elab_entry_span(t : Language.abstract_span) : (Option.t(surface_tele_entry), list(error)) = {
+let rec elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
-    | Empty(_) => (None, [])
-    | Single(_ss1, t, _ss2, _r) => elab_entry(t)
-    | Multiple([], _, _) => failwith("impossible")
-    | Multiple([t,..._], _, r) => 
-        let* t' = elab_entry(t);
-        (t', [err("Multiple entries", r)])
-    }
-}
-
-let elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
-    switch(t) {
+    | Parens(_, t) => elab_telescope_span(t);
     | Atom(Hole, _) => ([], [])
     | Infix(Colon, _, _, _, _, _)
     | Infix(Semicolon, _, _, _, _, _) => 
@@ -269,7 +286,7 @@ let elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list
     }
 }
 
-let elab_telescope_span(t : Language.abstract_span) : (list(surface_tele_entry), list(error)) = {
+and elab_telescope_span(t : Language.abstract_span) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
     | Empty(_) => ([], [])
     | Single(_ss1, t, _ss2, _r) => elab_telescope(t)
@@ -282,6 +299,7 @@ let elab_telescope_span(t : Language.abstract_span) : (list(surface_tele_entry),
 
 let rec elab_program(t : Language.abstract_term) : (surface_program, list(error)) = {
     switch(t) {
+    | Parens(_, t) => elab(t);
     | Atom(Hole, _) 
     | Atom(Interaction, _) => (SurfaceEmpty, [])
     | Assume(r, sg, demo, _, p) => 
@@ -294,11 +312,19 @@ let rec elab_program(t : Language.abstract_term) : (surface_program, list(error)
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
         (SurfaceConstruct(r, es == [], sg', demo', p'), es)
+    | Prove(r, Single(_, Infix(Colon, _, Atom(Ident(z), _), _, _, t), _, _), demo, _, p) => 
+        let (t', es) = elab_term(t);
+        let* demo' =  elab_demo_span(demo);
+        let* p' =  elab_program(p);
+        (SurfaceProve(r, es == [], Name(z), t', demo', p'), es)
+    | Prove(r, _, _, _, p) => 
+        let* p' =  elab_program(p);
+        (p', [{range: r, message: "prove must be of the form x : P"}])
     | _ => (SurfaceEmpty, [err("Invalid program", whole_range(t))])
     }
 }
 
-let elab(t : Language.abstract_span) : (surface_program, list(error)) = {
+and elab(t : Language.abstract_span) : (surface_program, list(error)) = {
     switch(t) {
     | Empty(_) => (SurfaceEmpty, [])
     | Single(_ss1, t, _ss2, _r) => elab_program(t)

@@ -58,13 +58,13 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
 
 and string_of_tele(c : ctx, te : tele) : string = switch(te) {
     | EmptyTele => ""
-    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ")  ++ "(" ++ z ++ " : " ++ string_of_term(c, p) ++ ")"
-    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
+    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ")  ++ "(" ++ z ++ " ; " ++ string_of_term(c, p) ++ ")"
+    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ "(" ++ z ++ (te1 == EmptyTele ? "" : " ") ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
 }
 
 and string_of_subst(c : ctx, s : subst) : string = switch(s) {
     | EmptySubst => ""
-    | ConsSubst(s', Name(z), te, t) => string_of_subst(c, s') ++ (te == EmptyTele ? "" : " ") ++ "("  ++ z ++ " := " ++ string_of_term(c, t) ++ ")"
+    | ConsSubst(s', Name(z), te, t) => string_of_subst(c, s') ++ (s' == EmptySubst ? "" : " ") ++ "("  ++ z ++ (te == EmptyTele ? "" : " ") ++ string_of_tele(Cons(c, te), te) ++ " := " ++ string_of_term(Cons(c, te), t) ++ ")"
 }
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {

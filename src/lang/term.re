@@ -216,9 +216,8 @@ let rec lookup_index_prop(c : ctx, HypIndex(x, y) : hyp_index) : result(tm, erro
 
 let rec lookup_index_term_tele(te : tele, y : int) : result((tele, tm), error) =  switch(te) {
     | ConsT(_, _, te, t) when y == 0 => Ok((te, t))
-    | ConsP(_) when y == 0 => Error("Wrong kind")
     | ConsT(te', _, _, _) when y > 0 => lookup_index_term_tele(te', y-1)
-    | ConsP(te', _, _) when y > 0 => lookup_index_term_tele(te', y)
+    | ConsP(te', _, _) => lookup_index_term_tele(te', y)
     | _ => Error("Out of bounds")
     }
 

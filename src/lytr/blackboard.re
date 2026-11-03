@@ -201,6 +201,16 @@ module BlackboardLanguage : Language = {
                 let r' = (fst(r), fst(r) + String.length("construct"));
                 Construct(r', sg, d, ss, rest)
             })),
+        ("prove_by_end_0", (_c => (Default, [Sig, Demo], Program), 
+            (_, _, middle, last, r) => {
+                let (sg, d) = switch(middle) {
+                | [sg, d] => (sg, d)
+                | _ => failwith("prove missing args")
+                };
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(r) + String.length("prove"));
+                Prove(r', sg, d, ss, rest)
+            })),
         ("assume_valid$by_end_0", (_c => (Default, [Sig, Default, Demo], Program), 
             (_, _, middle, last, r) => {
                 let (sg, d) = switch(middle) {
