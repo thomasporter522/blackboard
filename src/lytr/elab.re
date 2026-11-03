@@ -39,23 +39,6 @@ let rec elab_id_list(t: Language.abstract_term) = switch(t) {
     | _ => ([], [err("Invalid variable", whole_range(t))])
 }
 
-// let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t(surface_tele_entry), list(error)) = switch(t) {
-//     | Parens(_, t) => elab_arrow_lhs_span(t)
-//     | Infix(Colon,_, xs, _, _, t) => 
-//         let* xs' = elab_id_list(xs);
-//         let* t' = elab_term(t);
-//         (Some((xs', t')), [])
-//     | _ => 
-//         let* t' = elab_term(t);
-//         (Some((["_"], t')), [])
-// }
-
-// and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t(surface_tele_entry), list(error)) = switch(t) {
-//     | Empty(_) => failwith("impossible")
-//     | Single(_, t, _, _) => elab_arrow_lhs(t)
-//     | Multiple(_) => failwith("impossible")
-// }
-
 and elab_subst_entry(t : Language.abstract_term) : (Option.t(Lang.Term.surface_subst_entry), list(error)) = {
     switch(t) {
     | Parens(_, t) => elab_subst_entry_span(t);
@@ -66,7 +49,9 @@ and elab_subst_entry(t : Language.abstract_term) : (Option.t(Lang.Term.surface_s
         | None => (None, [])
         | Some((zs, args)) => (Some(Lang.Term.SurfaceSubstEntry(zs, args, t2')), [])
         }
-    | _ => (None, [{message: "invalid argument", range: whole_range(t)}])
+    | _ => 
+        let* t' = elab_term(t);
+        (Some(Lang.Term.SurfaceSubstEntry([Name("_")], [], t')), [])
     }
 }
 
@@ -100,7 +85,7 @@ and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) 
         | _ => (SurfaceNonsense, [err("Cannot apply a non-variable", r)])
         }
     | Infix(Arrow,_, t1, _, _, t2) => 
-        let* t1' = elab_whitespace_telescope(t1);
+        let* t1' = elab_telescope(t1);
         let* t2' = elab_term(t2);
         (Lang.Term.SurfaceArrow(t1', t2'), [])
     | Atom(Hole,_) 
@@ -226,7 +211,9 @@ and elab_entry(t : Language.abstract_term) :  (Option.t(surface_tele_entry), lis
     | Infix(Semicolon, _, Atom(Ident(z), _), _, _, t) => 
         let* t' = elab_term(t);
         (Some(Lang.Term.SurfaceTeleEntryP(Name(z), t')), [])
-    | _ => (None, [err("Invalid entry", whole_range(t))])
+    | _ => 
+        let* t' = elab_term(t);
+        (Some(Lang.Term.SurfaceTeleEntryP(Name("_"), t')), [])
     }
 }
 
@@ -241,40 +228,9 @@ and elab_entry_span(t : Language.abstract_span) : (Option.t(surface_tele_entry),
     }
 }
 
-and elab_whitespace_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
-    switch(t) {
-    | Atom(Hole, _) => ([], [])
-    | Parens(_)
-    | Infix(Colon, _, _, _, _, _)
-    | Infix(Semicolon, _, _, _, _, _) => 
-        let* x' = elab_entry(t);
-        switch(x') {
-        | None => ([], [])
-        | Some(t') => ([t'], [])
-        }
-    | Ap(_, t1, _, t2) => 
-        let* t1' = elab_whitespace_telescope(t1);
-        let* t2' = elab_entry(t2);
-        switch(t2') {
-        | None => (t1', [])
-        | Some(t2'') => (t1' @ [t2''], [])
-        }
-    | _ => ([], [err("Invalid telescope", whole_range(t))])
-    }
-}
-
-
-let rec elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
+and elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
     | Parens(_, t) => elab_telescope_span(t);
-    | Atom(Hole, _) => ([], [])
-    | Infix(Colon, _, _, _, _, _)
-    | Infix(Semicolon, _, _, _, _, _) => 
-        let* x' = elab_entry(t);
-        switch(x') {
-        | None => ([], [])
-        | Some(t') => ([t'], [])
-        }
     | Commas(_, first, _, middle, _, last) => 
         let middles = List.map(elab_entry_span, middle);
         let (first', first_errors) = elab_entry(first);
@@ -282,7 +238,12 @@ let rec elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), 
         let middle_terms = List.map(fst, middles);
         let middle_errors = List.concat_map(snd, middles);
         (List.filter_map(x => x, [first'] @  middle_terms @ [last']), first_errors @ middle_errors @ last_errors)
-    | _ => ([], [err("Invalid telescope", whole_range(t))])
+    | _ => 
+        let* x' = elab_entry(t);
+        switch(x') {
+        | None => ([], [])
+        | Some(t') => ([t'], [])
+        }
     }
 }
 
