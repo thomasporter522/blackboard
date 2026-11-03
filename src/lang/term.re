@@ -31,13 +31,13 @@ type tm =
     | Nonsense
 
 and tele = 
-    | Empty 
+    | EmptyTele
     | ConsP(tele, name, tm)
     | ConsT(tele, name, tele, tm)
     
 and subst =
-    | Empty
-    | Cons(subst, name, tele, tm);
+    | EmptySubst
+    | ConsSubst(subst, name, tele, tm);
 
 type ctx = 
     | Empty 
@@ -61,18 +61,18 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
 }
 
 and equiv_tele(a1 : tele, a2 : tele) : bool = switch(a1, a2) {
-    | (Empty, Empty) => true 
+    | (EmptyTele, EmptyTele) => true 
     | (ConsP(a1, _, a2), ConsP(a3, _, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
     | (ConsT(a1, _, a2, a3), ConsT(a4, _, a5, a6)) => equiv_tele(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
-    | (Empty, _)
+    | (EmptyTele, _)
     | (ConsP(_), _)
     | (ConsT(_), _) => false
 }
 and equiv_subst(a1 : subst, a2 : subst) : bool = switch(a1, a2) {
-    | (Empty, Empty) => true 
-    | (Cons(a1, _, a2, a3), Cons(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
-    | (Empty, _)
-    | (Cons(_), _) => false
+    | (EmptySubst, EmptySubst) => true 
+    | (ConsSubst(a1, _, a2, a3), ConsSubst(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (EmptySubst, _)
+    | (ConsSubst(_), _) => false
 }
 
 let rec wkn(n : int, t : tm) = switch(t) {
@@ -86,14 +86,14 @@ let rec wkn(n : int, t : tm) = switch(t) {
 }
 
 and wkn_tele(n : int, te : tele) = switch(te) {
-    | Empty => Empty 
+    | EmptyTele => EmptyTele 
     | ConsP(te1, y, p) => ConsP(wkn_tele(n, te1), y, wkn(n, p))
     | ConsT(te1, y, te2, t) => ConsT(wkn_tele(n, te1), y, wkn_tele(n+1, te2), wkn(n+1, t))
 }
 
 and wk_subst(n : int, s : subst) = switch(s) {
-    | Empty => Empty 
-    | Cons(s', y, te, t) => Cons(wk_subst(n, s'), y, wkn_tele(n+1, te), wkn(n+1, t))
+    | EmptySubst => EmptySubst 
+    | ConsSubst(s', y, te, t) => ConsSubst(wk_subst(n, s'), y, wkn_tele(n+1, te), wkn(n+1, t))
 }
 
 let wk = wkn(0)
@@ -122,13 +122,13 @@ let rec subn(n : int, s : subst, t : tm) = switch(t) {
 }
 
 and sub_ap(s : subst, y : int, s1' : subst) = switch(y, s) {
-    | (0, Cons(_, _y, _, t)) => subn(0, s1', t)
-    | (y, Cons(s', _, _, _)) => sub_ap(s', y-1, s1')
-    | (_, Empty) => failwith("Misaligned sub_ap")
+    | (0, ConsSubst(_, _y, _, t)) => subn(0, s1', t)
+    | (y, ConsSubst(s', _, _, _)) => sub_ap(s', y-1, s1')
+    | (_, EmptySubst) => failwith("Misaligned sub_ap")
 }
 
 and subn_tele(n : int, s : subst, te : tele) = switch(te) {
-    | Empty => Empty 
+    | EmptyTele => EmptyTele 
     | ConsP(te1, y, p) => ConsP(subn_tele(n, s, te1), y, subn(n, s, p))
     | ConsT(te1, y, te2, t) => 
         let s' = wk_subst(0, s);
@@ -136,10 +136,10 @@ and subn_tele(n : int, s : subst, te : tele) = switch(te) {
 }
 
 and sub_subst(n : int, s : subst, s1 : subst) = switch(s1) {
-    | Empty => Empty 
-    | Cons(s1', y, te, t) => 
+    | EmptySubst => EmptySubst 
+    | ConsSubst(s1', y, te, t) => 
         let s' = wk_subst(0, s);
-        Cons(sub_subst(n, s, s1'), y, subn_tele(n+1, s', te), subn(n+1, s', t))
+        ConsSubst(sub_subst(n, s, s1'), y, subn_tele(n+1, s', te), subn(n+1, s', t))
 }
 
 let sub = subn(0)

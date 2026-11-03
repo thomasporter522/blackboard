@@ -42,7 +42,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         if (lp >= fst(arrow_prec) || rp >= snd(arrow_prec)) { wrap(c, outer_a) } else {
             string_of_tele(Cons(c, te), te) ++ " -> " ++ prec_string_of_term(snd(arrow_prec), rp, Cons(c, te), t) 
         }
-    | Ap(i, Empty) => string_of_var(c, i)
+    | Ap(i, EmptySubst) => string_of_var(c, i)
     | Ap(i, s) => 
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
             string_of_var(c, i) ++ " " ++ string_of_subst(c, s)
@@ -57,14 +57,14 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
 }
 
 and string_of_tele(c : ctx, te : tele) : string = switch(te) {
-    | Empty => ""
-    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == Empty ? "" : " ")  ++ "(" ++ z ++ " : " ++ string_of_term(c, p) ++ ")"
-    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == Empty ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
+    | EmptyTele => ""
+    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ")  ++ "(" ++ z ++ " : " ++ string_of_term(c, p) ++ ")"
+    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ "(" ++ z ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
 }
 
 and string_of_subst(c : ctx, s : subst) : string = switch(s) {
-    | Empty => ""
-    | Cons(s', Name(z), te, t) => string_of_subst(c, s') ++ (te == Empty ? "" : " ") ++ "("  ++ z ++ " := " ++ string_of_term(c, t) ++ ")"
+    | EmptySubst => ""
+    | ConsSubst(s', Name(z), te, t) => string_of_subst(c, s') ++ (te == EmptyTele ? "" : " ") ++ "("  ++ z ++ " := " ++ string_of_term(c, t) ++ ")"
 }
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {

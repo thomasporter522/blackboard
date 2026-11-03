@@ -112,7 +112,7 @@ module PartialDerivation : {
 
     let cut (s : t, z : name, lemma : tm)  : result(t, error) = refine(s, j => {
         let J(c, goal) = j;
-        Ok([J(c, lemma), J(Cons(c, ConsP(Empty, z, wk(lemma))), wk(goal))])
+        Ok([J(c, lemma), J(Cons(c, ConsP(EmptyTele, z, wk(lemma))), wk(goal))])
     })
 
     let prop_formation (s : t)  : result(t, error) = refine(s, j => {
@@ -130,7 +130,7 @@ module PartialDerivation : {
     })
 
     let rec valid_tele(c : ctx, te : tele) = switch(te) {
-        | Empty => []
+        | EmptyTele => []
         | ConsP(te1, _, p) => valid_tele(c, te1) @ [J(c, In(p, Prop))]
         | ConsT(te1, _, te2, t) => valid_tele(c, te1) @ valid_tele(Cons(c, te2), te2) @ [J(Cons(c, te2), In(t, Typ))]
     }
@@ -152,7 +152,7 @@ module PartialDerivation : {
     })
 
     let rec subst_tele(c : ctx, s : subst, te : tele) = switch(s, te) {
-        | (Empty, Empty) => []
+        | (Empty, EmptyTele) => []
         | (s, ConsP(te', _, p)) => subst_tele(c, s, te') @ [J(c, p)]
         | (Cons(s', _, te1, t), ConsT(te', _, te2, ty)) when equiv_tele(te1, te2) => subst_tele(c, s', te') @ [J(Cons(c, te2), In(t, ty))]
         | _ => failwith("misaligned")
