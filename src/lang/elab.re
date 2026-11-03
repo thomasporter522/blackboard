@@ -1,4 +1,5 @@
 open Term 
+open Program 
 
 let (let**) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {
     let (a, l1) = f;
@@ -70,4 +71,31 @@ and subst_of_surface (c : ctx, s : list(surface_subst_entry)) : (subst, list(ran
         (ConsSubst(acc', z, te', t'), [])
     };
     List.fold_left(f, (EmptySubst, []), s)
+}
+
+let goal_of_surface_signature(c : ctx, te : list(surface_tele_entry)) : tm = {
+    let (te', _) = contained_tele_of_surface(Cons(Cons(c, EmptyTele), EmptyTele), te);
+    let m_prop = ConsT(EmptyTele, Name("M"), EmptyTele, Prop);
+    let portal = ConsT(EmptyTele, Name("_"), te', var(2, 0));
+    Arrow(m_prop, Arrow(portal, var(1, 0)))
+}
+
+let rec program_of_surface (c : ctx, p : surface_program) : (program, list(ranged_error)) = switch(p) {
+    | SurfaceEmpty => (Empty, [])
+    | SurfaceAssume(r, tidy, te, d, p) =>
+        let goal = goal_of_surface_signature(c, te);
+        let** te' = contained_tele_of_surface(c, te);
+        let** p' = program_of_surface(Cons(c, te'), p);
+        (Assume(r, tidy, c, goal, d, p'), [])
+    | SurfaceConstruct(r, tidy, te, d, p) => 
+        let goal = goal_of_surface_signature(c, te);
+        let** te' = contained_tele_of_surface(c, te);
+        let** p' = program_of_surface(Cons(c, te'), p);
+        (Construct(r, tidy, c, goal, d, p'), [])
+    | SurfaceProve(r, tidy, z, a, d, p) => 
+        // bug: indices
+        let** a' = tm_of_surface(Cons(c, EmptyTele), a);
+        let te = ConsP(EmptyTele, z, a');
+        let** p' = program_of_surface(Cons(c, te), p);
+        (Prove(r, tidy, c, a', d, p'), [])
 }

@@ -43,6 +43,7 @@ type ctx =
     | Empty 
     | Cons(ctx, tele)
 
+let var(x, y) = Ap(Index(x, y), EmptySubst)
 
 let rec equiv(a1 : tm, a2 : tm) : bool = {
     switch(a1, a2) {
