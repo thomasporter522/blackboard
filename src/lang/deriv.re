@@ -10,9 +10,9 @@ module PartialDerivation : {
     let skip : t => result(t, error);
     let swap : t => result(t, error);
     let weaken : (t, tm) => result(t, error);
+    let cut : (t, name, tm) => result(t, error);
     let hyp : (t, hyp_index) => result(t, error);
     let in_formation : (t, tm) => result(t, error);
-    let cut : (t, name, tm) => result(t, error);
     let prop_formation : t => result(t, error);
     let typ_formation : t => result(t, error);
     let arrow_formation : t => result(t, error);
@@ -89,6 +89,11 @@ module PartialDerivation : {
         }
     })
 
+    let cut (s : t, z : name, lemma : tm)  : result(t, error) = refine(s, j => {
+        let J(c, goal) = j;
+        Ok([J(c, lemma), J(Cons(c, ConsP(EmptyTele, z, wk(lemma))), wk(goal))])
+    })
+
     let hyp (s : t, i : hyp_index) : result(t, error) = refine(s, j => {
         let J(c, p) = j;
         let* found = lookup_index_prop(c, i);
@@ -108,11 +113,6 @@ module PartialDerivation : {
         | J(_, In(_, _)) => Error("in_formation failure: not membership of (_ : _)")
         | _ => Error("in_formation failure")
         }
-    })
-
-    let cut (s : t, z : name, lemma : tm)  : result(t, error) = refine(s, j => {
-        let J(c, goal) = j;
-        Ok([J(c, lemma), J(Cons(c, ConsP(EmptyTele, z, wk(lemma))), wk(goal))])
     })
 
     let prop_formation (s : t)  : result(t, error) = refine(s, j => {

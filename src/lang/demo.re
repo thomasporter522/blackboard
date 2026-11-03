@@ -6,7 +6,6 @@ open Deriv
 let probe(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_type(s));
 let probes(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_types(s));
 
-
 type schema = 
     | Definition
 
@@ -17,27 +16,24 @@ type tactic =
     | GivenAll
     | Schema(schema)
 
-type demo = 
+type primitive = 
+    | Hyp(name)
+    | ElabHyp(hyp_index)
+    | InFrom(surface_tm, demo, demo)
+    | ElabInFrom(tm)
+    | PropForm
+    | TypForm
+    | ArrowForm(list(demo))
+    | ArrowIntro(list(demo))
+    | ArrowElim(list(surface_tele_entry), surface_tm, list(surface_subst_entry), list(demo))
+    | ElabArrowElim(tele, tm, subst, list(demo))
+    | ApForm(list(demo))
+
+and demo = 
     | Hole(range)
-    | HypProp(range, name, demo)
-    | ElabHypProp(range, int, demo)
-    | HypTyp(range, name, demo)
-    | ElabHypTyp(range, int, demo)
-    | InForm(range, tm, demo, demo)
+    | Primitive(primitive)
     | Claim(range, name, surface_tm, demo, demo)
     | Suffices(range, name, surface_tm, demo, demo)
-    | PropForm(range)
-    | TypForm(range)
-    | PropArrowForm(range, name, demo, demo)
-    | TypArrowForm(range, name, demo, demo)
-    // | ArrowElim(demo)
-    | ApTyp(range, name, surface_tm, surface_tm, demo, demo)
-    | ElabApTyp(range, name, tm, tm, demo, demo)
-    | At(range, demo, surface_tm, demo)
-    | ElabAt(range, demo, tm, demo)
-    | Given(range, name, surface_tm, demo, demo)
-    | ElabGiven(range, name, tm, demo, demo)
-    | Use(range, demo, demo)
     | Obvious(range)
     | Tactic(range, tactic, list(demo))
     | Nonsense(range)
