@@ -93,9 +93,9 @@ let rec program_of_surface (c : ctx, p : surface_program) : (program, list(range
         let** p' = program_of_surface(Cons(c, te'), p);
         (Construct(r, tidy, c, goal, d, p'), [])
     | SurfaceProve(r, tidy, z, a, d, p) => 
-        // bug: indices
-        let** a' = tm_of_surface(Cons(c, EmptyTele), a);
+        let** goal = tm_of_surface(c, a);
+        let (a', _) = tm_of_surface(Cons(c, EmptyTele), a);
         let te = ConsP(EmptyTele, z, a');
         let** p' = program_of_surface(Cons(c, te), p);
-        (Prove(r, tidy, c, a', d, p'), [])
+        (Prove(r, tidy, c, goal, d, p'), [])
 }
