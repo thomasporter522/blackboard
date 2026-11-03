@@ -152,9 +152,9 @@ module PartialDerivation : {
     })
 
     let rec subst_tele(c : ctx, s : subst, te : tele) = switch(s, te) {
-        | (Empty, EmptyTele) => []
+        | (EmptySubst, EmptyTele) => []
         | (s, ConsP(te', _, p)) => subst_tele(c, s, te') @ [J(c, p)]
-        | (Cons(s', _, te1, t), ConsT(te', _, te2, ty)) when equiv_tele(te1, te2) => subst_tele(c, s', te') @ [J(Cons(c, te2), In(t, ty))]
+        | (ConsSubst(s', _, te1, t), ConsT(te', _, te2, ty)) when equiv_tele(te1, te2) => subst_tele(c, s', te') @ [J(Cons(c, te2), In(t, ty))]
         | _ => failwith("misaligned")
     }
 
