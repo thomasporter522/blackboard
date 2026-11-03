@@ -12,6 +12,11 @@ let consTs (te : tele, zs : list(name), args : tele, t : tm) : tele = {
     List.fold_left(f, te, zs)
 }
 
+let consSubsts (s : subst, zs : list(name), args : tele, t : tm) : subst = {
+    let f(acc : subst, z : name) : subst = ConsSubst(acc, z, args, t);
+    List.fold_left(f, s, zs)
+}
+
 let names_of_tele(te : list(surface_tele_entry)) = {
     let f (acc : tele, e : surface_tele_entry) : tele = switch(e) {
     | SurfaceTeleEntryP(z, _) => ConsP(acc, z, Prop) // Prop is a placeholder
@@ -37,11 +42,6 @@ let rec tm_of_surface (c : ctx, t : surface_tm) : (tm, list(ranged_error)) = swi
         | Ok(n) =>  (Ap(n, s'), [])
         | Error(_) => (Nonsense, [err("Unrecognized name", r)])
         }
-    | SurfaceVar(r, z) => 
-        switch(index_of_name(c, z)) {
-        | Ok(n) =>  (Ap(n, EmptySubst), [])
-        | Error(_) => (Nonsense, [err("Unrecognized name", r)])
-        }
     | SurfaceNonsense => (Nonsense, []);
 }
 and contained_tele_of_surface(c, te) : (tele, list(ranged_error)) = {
@@ -64,11 +64,11 @@ and tele_of_surface (c : ctx, te : list(surface_tele_entry)) : (tele, list(range
 }
 
 and subst_of_surface (c : ctx, s : list(surface_subst_entry)) : (subst, list(ranged_error)) = {
-    let f (acc : (subst, list(ranged_error)), SurfaceSubstEntry(z, te, t) : surface_subst_entry) : (subst, list(ranged_error)) = {
+    let f (acc : (subst, list(ranged_error)), SurfaceSubstEntry(zs, te, t) : surface_subst_entry) : (subst, list(ranged_error)) = {
         let** acc' = acc;
         let** te' = contained_tele_of_surface(c, te);
         let** t' = tm_of_surface(Cons(c, te'), t);
-        (ConsSubst(acc', z, te', t'), [])
+        (consSubsts(acc', zs, te', t'), [])
     };
     List.fold_left(f, (EmptySubst, []), s)
 }

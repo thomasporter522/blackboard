@@ -20,10 +20,11 @@ type secondary =
     | Cursor
 
 type infix = 
+    | Semicolon
     | Colon
+    | Assign
     | In 
     | Arrow 
-    | Lambda
     | At
 
 type atom = 

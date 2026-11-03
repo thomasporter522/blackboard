@@ -1,6 +1,7 @@
 open Lang.Program
 
 type error = Lang.Term.ranged_error;
+type surface_tele_entry = Lang.Term.surface_tele_entry;
 let err = Lang.Term.err;
 let whole_range = Language.whole_range;
 
@@ -38,55 +39,64 @@ let rec elab_id_list(t: Language.abstract_term) = switch(t) {
     | _ => ([], [err("Invalid variable", whole_range(t))])
 }
 
-let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t(arg_chunk), list(error)) = switch(t) {
-    | Parens(_, t) => elab_arrow_lhs_span(t)
-    | Infix(Colon,_, xs, _, _, t) => 
-        let* xs' = elab_id_list(xs);
-        let* t' = elab_term(t);
-        (Some((xs', t')), [])
-    | _ => 
-        let* t' = elab_term(t);
-        (Some((["_"], t')), [])
-}
+// let rec elab_arrow_lhs(t : Language.abstract_term) : (Option.t(surface_tele_entry), list(error)) = switch(t) {
+//     | Parens(_, t) => elab_arrow_lhs_span(t)
+//     | Infix(Colon,_, xs, _, _, t) => 
+//         let* xs' = elab_id_list(xs);
+//         let* t' = elab_term(t);
+//         (Some((xs', t')), [])
+//     | _ => 
+//         let* t' = elab_term(t);
+//         (Some((["_"], t')), [])
+// }
 
-and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t(arg_chunk), list(error)) = switch(t) {
-    | Empty(_) => failwith("impossible")
-    | Single(_, t, _, _) => elab_arrow_lhs(t)
-    | Multiple(_) => failwith("impossible")
+// and elab_arrow_lhs_span(t : Language.abstract_span) : (Option.t(surface_tele_entry), list(error)) = switch(t) {
+//     | Empty(_) => failwith("impossible")
+//     | Single(_, t, _, _) => elab_arrow_lhs(t)
+//     | Multiple(_) => failwith("impossible")
+// }
+
+and elab_subst_entry(t : Language.abstract_term) : (Option.t(Lang.Term.surface_subst_entry), list(error)) = {
+    switch(t) {
+    | Infix(Assign, _, t1, _, _, t2)  => 
+        let* t1' = elab_entry_lhs(t1);
+        let* t2' = elab_term(t2);
+        switch(t1') {
+        | None => (None, [])
+        | Some((zs, args)) => (Some(Lang.Term.SurfaceSubstEntry(zs, args, t2')), [])
+        }
+    | _ => (None, [{message: "invalid argument", range: whole_range(t)}])
+    }
 }
 
 and elab_term(t : Language.abstract_term) : (Lang.Term.surface_tm, list(error)) = {
     switch(t) {
     | Parens(_, t) => elab_term_span(t)
-    | Atom(Ident(x), r) => (SurfaceVar(r, x), [])
+    | Atom(Ident(x), r) => (SurfaceAp(r, Name(x), []), [])
     | Atom(Prop, r) => (SurfaceProp(r), [])
     | Atom(Type, r) => (SurfaceTyp(r), [])
     | Infix(In, _, t1, _, _, t2) => 
         let* t1' = elab_term(t1);
         let* t2' = elab_term(t2);
         (Lang.Term.SurfaceIn(t1', t2'), [])
-    | Ap(_, t1, _, t2) => 
+    | Ap(r, t1, _, t2) => 
         let* t1' = elab_term(t1);
-        let* t2' = elab_term(t2);
-        (Lang.Term.SurfaceAp(t1', t2'), [])
+        let* t2' = elab_subst_entry(t2);
+        switch(t1', t2') {
+        | (Lang.Term.SurfaceAp(r, z, args), None) => (Lang.Term.SurfaceAp(r, z, args), [])
+        | (Lang.Term.SurfaceAp(r, z, args), Some(t2'')) => (Lang.Term.SurfaceAp(r, z, args @ [t2'']), [])
+        | _ => (SurfaceNonsense, [err("Cannot apply a non-variable", r)])
+        }
     | Infix(Arrow,_, t1, _, _, t2) => 
-        let* t1' = elab_arrow_lhs(t1);
+        let* t1' = elab_whitespace_telescope(t1);
         let* t2' = elab_term(t2);
-        switch(t1') {
-        | None => (t2', [])
-        | Some((xs, t1'')) => (Lang.Term.SurfaceArrow(Weak, xs, t1'', t2'), [])
-        }
-    | Infix(Lambda,_, t1, _, _, t2) => 
-        let* t1' = elab_arrow_lhs(t1);
-        let* t2' = elab_term(t2);
-        switch(t1') {
-        | None => (t2', [])
-        | Some((xs, t1'')) => (Lang.Term.SurfaceLambda(xs, t1'', t2'), [])
-        }
+        (Lang.Term.SurfaceArrow(t1', t2'), [])
     | Atom(Hole,_) 
     | Atom(Interaction,_) 
     | Atom(Check,_) 
     | Infix(Colon, _, _, _, _, _) 
+    | Infix(Semicolon, _, _, _, _, _) 
+    | Infix(Assign, _, _, _, _, _) 
     | Infix(At, _, _, _, _, _) 
     | Assume(_) 
     | Construct(_) 
@@ -109,11 +119,11 @@ and elab_term_span(t : Language.abstract_span) : (Lang.Term.surface_tm, list(err
     }
 }
 
-let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
+and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     switch(t) {
     | Atom(Hole, r) => (Hole(r), [])
     | Atom(Interaction, r) => (Hole(r), [])
-    | Atom(Ident(x), r) => (HypProp(r, x, Obvious(r)), [])
+    | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
     | Atom(Check,r) => (Tactic(r, Check, []), [])
     | Parens(_, s) => elab_demo_span(s)
     | Direct2(r, d1, _, d2) =>
@@ -133,7 +143,7 @@ let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = 
         let* d' = elab_demo(d);
         switch(x') {
         | None => (d', [])
-        | Some(x'') => (Lang.Demo.Given(r, x'', ty', Obvious(r), d'), [])
+        | Some(x'') => (Lang.Demo.Given(r, Name(x''), ty', Obvious(r), d'), [])
         }
     | Witness(r, t, _, d) => 
         let* t' = elab_term_span(t);
@@ -147,8 +157,9 @@ let rec elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = 
     | Atom(Type,_) 
     | Infix(In, _, _, _, _, _) 
     | Infix(Colon, _, _, _, _, _) 
-    | Infix(Arrow, _, _, _, _, _) 
-    | Infix(Lambda, _, _, _, _, _) 
+    | Infix(Semicolon, _, _, _, _, _) 
+    | Infix(Assign, _, _, _, _, _) 
+    | Infix(Arrow, _, _, _, _, _)
     | Assume(_) 
     | Construct(_) 
     | Commas(_) => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
@@ -166,35 +177,67 @@ and elab_demo_span(t : Language.abstract_span) : (Lang.Demo.demo, list(error)) =
     }
 }
 
-let rec elab_entry_lhs(t : Language.abstract_term) : (Option.t((string, list(arg_chunk))), list(error)) = {
+and elab_entry_lhs(t : Language.abstract_term) : (Option.t((list(Lang.Term.name), list(surface_tele_entry))), list(error)) = {
     switch(t) {
-    | Atom(Ident(x), _) => (Some((x, [])), [])
+    | Atom(Ident(z), _) => (Some(([Name(z)], [])), [])
+    | Ap(_, t, _, Atom(Ident(z), r)) => 
+        let* t' = elab_entry_lhs(t);
+        switch(t') {
+        | None => (None, [])
+        | Some((zs, [])) => (Some((zs @ [Name(z)], [])), [])
+        | Some((zs, args)) => (Some((zs, args @ [Lang.Term.SurfaceTeleEntryP(Name("_"), SurfaceAp(r, Name(z), []))])), [])
+        }
     | Ap(_, t1, _, t2) => 
         let* t1' = elab_entry_lhs(t1);
-        let* t2' = elab_arrow_lhs(t2);
+        let* t2' = elab_entry(t2);
         switch(t1', t2') {
         | (None, _)
         | (_, None) => (None, [])
-        | (Some((x, args1)), Some(args2)) => (Some((x, args1 @ [args2])), [])
+        | (Some((zs, args1)), Some(args2)) => (Some((zs, args1 @ [args2])), [])
         }
-    | _ => (None, [err("Invalid signature LHS", whole_range(t))])
+    | _ => (None, [err("Invalid telescope LHS", whole_range(t))])
     }
 }
 
-let elab_entry(t : Language.abstract_term) :  (Option.t((string, list(arg_chunk), Lang.Term.surface_tm)), list(error)) = {
+and elab_entry(t : Language.abstract_term) :  (Option.t(surface_tele_entry), list(error)) = {
     switch(t) {
     | Infix(Colon, _, x, _, _, t) => 
         let* x' = elab_entry_lhs(x);
         let* t' = elab_term(t);
         switch(x') {
         | None => (None, [])
-        | Some((x'', args)) => (Some((x'', args, t')), [])
+        | Some((zs, args)) => (Some(Lang.Term.SurfaceTeleEntryT(zs, args, t')), [])
         }
+    | Infix(Semicolon, _, Atom(Ident(z), _), _, _, t) => 
+        let* t' = elab_term(t);
+        (Some(Lang.Term.SurfaceTeleEntryP(Name(z), t')), [])
     | _ => (None, [err("Invalid entry", whole_range(t))])
     }
 }
 
-let elab_entry_span(t : Language.abstract_span) : (Option.t((string, list(arg_chunk), Lang.Term.surface_tm)), list(error)) = {
+and elab_whitespace_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
+    switch(t) {
+    | Atom(Hole, _) => ([], [])
+    | Infix(Colon, _, _, _, _, _)
+    | Infix(Semicolon, _, _, _, _, _) => 
+        let* x' = elab_entry(t);
+        switch(x') {
+        | None => ([], [])
+        | Some(t') => ([t'], [])
+        }
+    | Ap(_, t1, _, t2) => 
+        let* t1' = elab_whitespace_telescope(t1);
+        let* t2' = elab_entry(t2);
+        switch(t2') {
+        | None => (t1', [])
+        | Some(t2'') => (t1' @ [t2''], [])
+        }
+    | _ => ([], [err("Invalid telescope", whole_range(t))])
+    }
+}
+
+
+let elab_entry_span(t : Language.abstract_span) : (Option.t(surface_tele_entry), list(error)) = {
     switch(t) {
     | Empty(_) => (None, [])
     | Single(_ss1, t, _ss2, _r) => elab_entry(t)
@@ -205,10 +248,11 @@ let elab_entry_span(t : Language.abstract_span) : (Option.t((string, list(arg_ch
     }
 }
 
-let elab_signature(t : Language.abstract_term) : (surface_signature, list(error)) = {
+let elab_telescope(t : Language.abstract_term) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
     | Atom(Hole, _) => ([], [])
-    | Infix(Colon, _, _, _, _, _) => 
+    | Infix(Colon, _, _, _, _, _)
+    | Infix(Semicolon, _, _, _, _, _) => 
         let* x' = elab_entry(t);
         switch(x') {
         | None => ([], [])
@@ -221,18 +265,18 @@ let elab_signature(t : Language.abstract_term) : (surface_signature, list(error)
         let middle_terms = List.map(fst, middles);
         let middle_errors = List.concat_map(snd, middles);
         (List.filter_map(x => x, [first'] @  middle_terms @ [last']), first_errors @ middle_errors @ last_errors)
-    | _ => ([], [err("Invalid signature", whole_range(t))])
+    | _ => ([], [err("Invalid telescope", whole_range(t))])
     }
 }
 
-let elab_signature_span(t : Language.abstract_span) : (surface_signature, list(error)) = {
+let elab_telescope_span(t : Language.abstract_span) : (list(surface_tele_entry), list(error)) = {
     switch(t) {
     | Empty(_) => ([], [])
-    | Single(_ss1, t, _ss2, _r) => elab_signature(t)
+    | Single(_ss1, t, _ss2, _r) => elab_telescope(t)
     | Multiple([], _, _) => failwith("impossible")
     | Multiple([t,..._], _, r) =>
-        let* sg = elab_signature(t);
-        (sg, [err("Multiple signatures", r)])
+        let* sg = elab_telescope(t);
+        (sg, [err("Multiple telescopes", r)])
     }
 }
 
@@ -241,25 +285,18 @@ let rec elab_program(t : Language.abstract_term) : (surface_program, list(error)
     | Atom(Hole, _) 
     | Atom(Interaction, _) => (SurfaceEmpty, [])
     | Assume(r, sg, demo, _, p) => 
-        let (sg', es) = elab_signature_span(sg);
+        let (sg', es) = elab_telescope_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceAssume(r, es == [], sg',demo', p'), es)
+        (SurfaceAssume(r, es == [], sg', demo', p'), es)
     | Construct(r, sg, demo, _, p) => 
-        let (sg', es) = elab_signature_span(sg);
+        let (sg', es) = elab_telescope_span(sg);
         let* demo' =  elab_demo_span(demo);
         let* p' =  elab_program(p);
-        (SurfaceConstruct(r, es == [], sg',demo', p'), es)
+        (SurfaceConstruct(r, es == [], sg', demo', p'), es)
     | _ => (SurfaceEmpty, [err("Invalid program", whole_range(t))])
     }
 }
-
-// and elab_rest(t : abstract_right_child) : surface_program = {
-//     switch(t) {
-//     | None => Empty
-//     | Some((_, p)) => elab_program(p)
-//     }
-// }
 
 let elab(t : Language.abstract_span) : (surface_program, list(error)) = {
     switch(t) {
@@ -271,5 +308,3 @@ let elab(t : Language.abstract_span) : (surface_program, list(error)) = {
         (p, [err("Multiple programs", r)])
     }
 }
-
-// let elab(t : abstract_span) : surface_program = failwith("Todo")

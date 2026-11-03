@@ -635,7 +635,11 @@ let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
-let check_demo(_s : t, _d : demo) : (t, report) = failwith("todo")
+let check_demo(s : t, _d : demo) : (t, report) = {
+    let s' = Result.get_ok(skip(s));
+    let j = Result.get_ok(focused(s));
+    (s', mk_report([(j, (0, 1))], []))
+}
 //     switch(d) {
 //     | Hole(r) =>
 //         let s' = Result.get_ok(skip(s));

@@ -1,11 +1,4 @@
 (executable
- (name main)
- (public_name blackboard)
- (modes exe)
- (modules main)
- (libraries blackboard))
-
-(executable
  (name reason_to_js)
  (modes js)
  (modules reason_to_js)

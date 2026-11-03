@@ -149,9 +149,11 @@ module BlackboardLanguage : Language = {
         ("type", (_c => (Default, [], Default), atom_of(Type))),
         ("check", (_c => (Default, [], Default), atom_of(Check))),
         ("11_:_10", (_c => (Ident, [], Term), infix_of(Colon))),
+        ("11_;_10", (_c => (Ident, [], Term), infix_of(Semicolon))),
+        ("20_:=_21", (_c => (Term, [], Term), infix_of(Assign))),
         ("20_::_21", (_c => (Term, [], Term), infix_of(In))),
         ("11_->_10", (_c => (Domain, [], Term), infix_of(Arrow))),
-        ("11_=>_10", (_c => (Domain, [], Term), infix_of(Lambda))),
+        // ("11_=>_10", (_c => (Domain, [], Term), infix_of(Lambda))),
         ("30_@_31", (_c => (Domain, [], Term), infix_of(At))),
         ("given_:_,_0", (_c => (Default, [Ident, Term], Demo), 
             (_, _, middle, last, r) => {

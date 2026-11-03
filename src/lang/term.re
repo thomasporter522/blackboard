@@ -11,14 +11,13 @@ type surface_tele_entry =
     | SurfaceTeleEntryT(list(name), list(surface_tele_entry), surface_tm)
 
 and surface_subst_entry = 
-    | SurfaceSubstEntry(name, list(surface_tele_entry), surface_tm)
+    | SurfaceSubstEntry(list(name), list(surface_tele_entry), surface_tm)
 
 and surface_tm =
     | SurfaceProp(range)
     | SurfaceTyp(range)
     | SurfaceIn(surface_tm, surface_tm)
     | SurfaceArrow(list(surface_tele_entry), surface_tm)
-    | SurfaceVar(range, name)
     | SurfaceAp(range, name, list(surface_subst_entry))
     | SurfaceNonsense;
 
