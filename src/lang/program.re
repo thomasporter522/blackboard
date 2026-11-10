@@ -1,4 +1,4 @@
-open Term
+open Kernel.Term
 open Demo
 
 type surface_program = 

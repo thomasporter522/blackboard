@@ -1,4 +1,4 @@
-open Term 
+open Kernel.Term 
 open Program 
 
 let (let**) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {

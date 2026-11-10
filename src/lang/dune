@@ -1,4 +1,5 @@
 
 (library
  (name lang)
+ (libraries kernel)
  (public_name blackboard.lang))

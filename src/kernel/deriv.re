@@ -1,3 +1,4 @@
+open Meta
 open Term
 open Print
 
@@ -7,10 +8,16 @@ module PartialDerivation : {
     let verify : (t, judgment) => bool;
     let complete : t => bool;
     let focused : t => result(judgment, error);
+
     let skip : t => result(t, error);
     let swap : t => result(t, error);
+
+    let fresh_meta : t => (t, meta)
+    let solve_meta : (t, meta, tm) => result(t, error)
+
     let weaken : (t, tm) => result(t, error);
     let cut : (t, name, tm) => result(t, error);
+
     let hyp : (t, hyp_index) => result(t, error);
     let in_formation : (t, tm) => result(t, error);
     let prop_formation : t => result(t, error);
@@ -20,13 +27,19 @@ module PartialDerivation : {
     let arrow_elimination : (t, tele, tm, subst) => result(t, error);
     let ap_formation : t => result(t, error);
 } = {
+    module MetaSet = Set.Make(Meta);
+    
     type t = {
+        next_meta : int,
+        metas : MetaSet.t,
         skipped : list(judgment),
         focused : list(judgment),
         root : judgment
     }
 
     let init (j : judgment) : t = {
+        next_meta: 0,
+        metas: MetaSet.empty,
         skipped : [],
         focused : [j],
         root : j
@@ -49,10 +62,9 @@ module PartialDerivation : {
 
     let skip (s : t) : result(t, error) = {
         switch(s.focused) {
-            | [h, ... t] => Ok({
+            | [h, ... t] => Ok({...s,
                 skipped: [h, ...s.skipped],
                 focused: t,
-                root: s.root
             })
             | [] => Error("nothing to skip")
         }
@@ -60,23 +72,75 @@ module PartialDerivation : {
 
     let swap (s : t) : result(t, error) = {
         switch(s.focused) {
-            | [h1, h2, ... t] => Ok({
+            | [h1, h2, ... t] => Ok({...s,
                 skipped: s.skipped,
                 focused: [h2, h1, ... t],
-                root: s.root
             })
             | _ => Error("nothing to swap")
         }
     }
 
+    let fresh_meta (s : t) : (t, meta) = {
+        let m = Meta.mint(s.next_meta);
+        let s' = {...s,
+            next_meta: s.next_meta + 1,
+            metas: MetaSet.add(m, s.metas),
+        };
+        (s', m)
+    }
+
+    let rec contains_only_metas( ms : MetaSet.t, t : tm) : bool = switch(t) {
+        | Prop => true
+        | Typ => true
+        | In(t1, t2) => contains_only_metas(ms, t1) && contains_only_metas(ms, t2)
+        | Arrow(te, t1) => contains_only_metas_tele(ms, te) && contains_only_metas(ms, t1)
+        | Ap(_, s1) => contains_only_metas_subst(ms, s1)
+        | Meta(mstack, m) => contains_only_metas_meta_stack(ms, mstack) && MetaSet.mem(m, ms)
+        | Nonsense => true
+    }
+    and contains_only_metas_meta_stack(ms : MetaSet.t, mstack : meta_stack) : bool = switch(mstack) {
+        | Empty => true
+        | Wkn(_, mstack) => contains_only_metas_meta_stack(ms, mstack)
+        | Subn(_, s, mstack) => contains_only_metas_subst(ms, s) && contains_only_metas_meta_stack(ms, mstack)
+    }
+
+    and contains_only_metas_tele(ms : MetaSet.t, te : tele) : bool = switch(te) {
+        | EmptyTele => true 
+        | ConsP(te1, _, p) => contains_only_metas_tele(ms, te1) && contains_only_metas(ms, p)
+        | ConsT(te1, _, te2, t) =>contains_only_metas_tele(ms, te1) && contains_only_metas_tele(ms, te2) && contains_only_metas(ms, t)
+    }
+
+    and contains_only_metas_subst(ms : MetaSet.t, s : subst) : bool = switch(s) {
+        | EmptySubst => true 
+        | ConsSubst(s', _, te, t) => contains_only_metas_subst(ms, s') && contains_only_metas_tele(ms, te) && contains_only_metas(ms, t)
+    }
+
+    let solve_meta (s : t, m : meta, t : tm) : result(t, error) = {
+        let metas = MetaSet.remove(m, s.metas);
+        if(!MetaSet.mem(m, s.metas)) {
+            Error("Unknown has already been solved")
+        } else if(!contains_only_metas(metas, t)) {
+            Error("Solution contains unknowns that have already been solved")
+        } else {
+            try {
+                let skipped = List.map(solve_meta_judgment(m, t), s.skipped);
+                let focused = List.map(solve_meta_judgment(m, t), s.focused);
+                Ok({...s, 
+                    skipped, 
+                    focused,
+                    metas
+                })
+            } {
+            | _ => Error("malformed solution")
+            }
+        }
+    }
 
     let refine (s : t, f : judgment => result(list(judgment), error)) : result(t, error) = {
         switch(s.focused) {
             | [h, ... t] => 
-                Result.map(fh => {
-                    skipped: s.skipped,
+                Result.map(fh => {...s,
                     focused: fh @ t,
-                    root: s.root
                 }, f(h))
             | [] => Error("nothing to refine")
         }

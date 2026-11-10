@@ -1,3 +1,4 @@
+open Meta 
 
 type name = Name(string);
 
@@ -21,12 +22,18 @@ and surface_tm =
     | SurfaceAp(range, name, list(surface_subst_entry))
     | SurfaceNonsense;
 
-type tm = 
+type meta_stack = 
+    | Empty 
+    | Wkn(int, meta_stack)
+    | Subn(int, subst, meta_stack)
+
+and tm = 
     | Prop
     | Typ 
     | In(tm, tm)
     | Arrow(tele, tm)
     | Ap(term_index, subst)
+    | Meta(meta_stack, meta)
     | Nonsense
 
 and tele = 
@@ -51,12 +58,14 @@ let rec equiv(a1 : tm, a2 : tm) : bool = {
     | (In(a1, a2), In(a3, a4)) => equiv(a1, a3) && equiv(a2, a4)
     | (Arrow(a1, a2), Arrow(a3, a4)) => equiv_tele(a1, a3) && equiv(a2, a4)
     | (Ap(a1, a2), Ap(a3, a4)) => a1 == a3 && equiv_subst(a2, a4)
-    | (Prop, _) => false
-    | (Typ, _) => false
-    | (In(_), _) => false
-    | (Arrow(_), _) => false
-    | (Ap(_), _) => false
-    | (Nonsense, _) => false
+    | (Meta(ms1, m1), Meta(ms2, m2)) => ms1 == ms2 && Meta.equiv(m1, m2)
+    | (Prop, _) 
+    | (Typ, _) 
+    | (In(_), _)
+    | (Arrow(_), _)
+    | (Ap(_), _)
+    | (Nonsense, _)
+    | (Meta(_), _) => false
     }
 }
 
@@ -82,6 +91,7 @@ let rec wkn(n : int, t : tm) = switch(t) {
     | Arrow(te, t1) => Arrow(wkn_tele(n+1, te), wkn(n+1, t1))
     | Ap(Index(x, y), s1) when x >= n => Ap(Index(x+1, y), wk_subst(n, s1))
     | Ap(Index(x, y), s1) => Ap(Index(x, y), wk_subst(n, s1))
+    | Meta(ms, m) => Meta(Wkn(n, ms), m)
     | Nonsense => Nonsense
 }
 
@@ -118,6 +128,7 @@ let rec subn(n : int, s : subst, t : tm) = switch(t) {
     | Ap(Index(_n, y), s1) => 
         let s1' = sub_subst(n, s, s1);
         sub_ap(s, y, s1')
+    | Meta(ms, m) => Meta(Subn(n, s, ms), m)
     | Nonsense => Nonsense
 }
 
@@ -247,3 +258,46 @@ let type_of_judgment (j : judgment) : tm = {
     let J(_, p) = j;
     p
 }
+
+let rec apply_stack(ms : meta_stack, t : tm) : tm = switch(ms) {
+    | Empty => t 
+    | Wkn(n, ms) => wkn(n, apply_stack(ms, t))
+    | Subn(n, s, ms) => subn(n, s, apply_stack(ms, t))
+}
+
+
+let rec solve_meta_tm(m : meta, mt : tm, t : tm) : tm = switch(t) {
+    | Prop => Prop
+    | Typ => Typ
+    | In(t1, t2) => In(solve_meta_tm(m, mt, t1), solve_meta_tm(m, mt, t2))
+    | Arrow(te, t1) => Arrow(solve_meta_tele(m, mt, te), solve_meta_tm(m, mt, t1))
+    | Ap(Index(x, y), s1) => Ap(Index(x, y), solve_meta_subst(m, mt, s1))
+    | Meta(ms, m') when m == m' => apply_stack(solve_meta_meta_stack(m, mt, ms), mt)
+    | Meta(ms, m') => Meta(solve_meta_meta_stack(m, mt, ms), m')
+    | Nonsense => Nonsense
+}
+
+and solve_meta_meta_stack(m : meta, mt : tm, ms : meta_stack) : meta_stack = switch(ms) {
+    | Empty => Empty 
+    | Wkn(n, ms) => Wkn(n, solve_meta_meta_stack(m, mt, ms))
+    | Subn(n, s, ms) => Subn(n, solve_meta_subst(m, mt, s), solve_meta_meta_stack(m, mt, ms))
+}
+
+and solve_meta_tele(m : meta, mt : tm, te : tele) = switch(te) {
+    | EmptyTele => EmptyTele 
+    | ConsP(te1, y, p) => ConsP(solve_meta_tele(m, mt, te1), y, solve_meta_tm(m, mt, p))
+    | ConsT(te1, y, te2, t) => ConsT(solve_meta_tele(m, mt, te1), y, solve_meta_tele(m, mt, te2), solve_meta_tm(m, mt, t))
+}
+
+and solve_meta_subst(m : meta, mt : tm, s : subst) = switch(s) {
+    | EmptySubst => EmptySubst 
+    | ConsSubst(s', y, te, t) => ConsSubst(solve_meta_subst(m, mt, s'), y, solve_meta_tele(m, mt, te), solve_meta_tm(m, mt, t))
+}
+
+let rec solve_meta_ctx(m : meta, mt : tm, c : ctx) : ctx = switch(c) {
+    | Empty => Empty
+    | Cons(c', te) => Cons(solve_meta_ctx(m, mt, c'), solve_meta_tele(m, mt, te))
+}
+
+let solve_meta_judgment(m : meta, t : tm, J(c, p) : judgment) : judgment = 
+    J(solve_meta_ctx(m, t, c), solve_meta_tm(m, t, p))

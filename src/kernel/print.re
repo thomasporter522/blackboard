@@ -1,4 +1,6 @@
+open Meta
 open Term
+
 
 let string_of_index(Index(x, y) : term_index) = "!!" ++ string_of_int(x) ++ "." ++ string_of_int(y)
 
@@ -45,6 +47,7 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
         if (lp >= fst(ap_prec) || rp >= snd(ap_prec)) { wrap(c, outer_a) } else {
             string_of_var(c, i) ++ " " ++ string_of_subst(c, s)
         }
+    | Meta(_, m) => "{" ++ Meta.string_of_meta(m) ++ "}"
     | Nonsense => "<some nonsense>"
     }
 

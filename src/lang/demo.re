@@ -1,7 +1,7 @@
-open Term
+open Kernel.Term
 // open Lang_printing
-open Deriv.PartialDerivation
-open Deriv
+open Kernel.Deriv.PartialDerivation
+open Kernel.Deriv
 
 let probe(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_type(s));
 let probes(s: t) = print_endline("CTX:\n" ++ string_of_goal_ctx(s) ++ "\nGOAL:\n" ++ string_of_goal_types(s));

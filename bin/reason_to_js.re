@@ -65,8 +65,8 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
         val underline = if (Lytr.Blackboard.BlackboardParser.format_of_error_kind(x.kind) == Underline) {Js.bool(true)} else {Js.bool(false)};
     }];
     let f3(x : list(string)) : list(Js.t(Js.js_string)) = List.map(s => Js.string(s), x);
-    let f5(r : (Lang.Term.judgment, (int, int))) : goal = {
-        let (cs, g) = Lang.Print.strings_of_judgment(fst(r));
+    let f5(r : (Kernel.Term.judgment, (int, int))) : goal = {
+        let (cs, g) = Kernel.Print.strings_of_judgment(fst(r));
         [%js {as _; 
             val statement = Js.string(g); 
             val context = Js.array(Array.of_list(List.map(Js.string, cs)));
@@ -76,7 +76,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
     let f4(r : Lang.Demo.report) : list(goal) = {
         List.map(f5, r.open_goals);
     };
-    let f7(e : Lang.Term.ranged_error) : error = [%js {as _; 
+    let f7(e : Kernel.Term.ranged_error) : error = [%js {as _; 
         val message = Js.string(e.message);
         val range = f1(e.range);
         val underline = Js.bool(true);
