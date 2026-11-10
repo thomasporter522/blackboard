@@ -259,45 +259,81 @@ let type_of_judgment (j : judgment) : tm = {
     p
 }
 
+
+module MetaMap = Map.Make(Meta);
+module MetaSet = Set.Make(Meta);
+
+let rec contains_only_metas( ms : MetaSet.t, t : tm) : bool = switch(t) {
+    | Prop => true
+    | Typ => true
+    | In(t1, t2) => contains_only_metas(ms, t1) && contains_only_metas(ms, t2)
+    | Arrow(te, t1) => contains_only_metas_tele(ms, te) && contains_only_metas(ms, t1)
+    | Ap(_, s1) => contains_only_metas_subst(ms, s1)
+    | Meta(mstack, m) => contains_only_metas_meta_stack(ms, mstack) && MetaSet.mem(m, ms)
+    | Nonsense => true
+}
+and contains_only_metas_meta_stack(ms : MetaSet.t, mstack : meta_stack) : bool = switch(mstack) {
+    | Empty => true
+    | Wkn(_, mstack) => contains_only_metas_meta_stack(ms, mstack)
+    | Subn(_, s, mstack) => contains_only_metas_subst(ms, s) && contains_only_metas_meta_stack(ms, mstack)
+}
+
+and contains_only_metas_tele(ms : MetaSet.t, te : tele) : bool = switch(te) {
+    | EmptyTele => true 
+    | ConsP(te1, _, p) => contains_only_metas_tele(ms, te1) && contains_only_metas(ms, p)
+    | ConsT(te1, _, te2, t) =>contains_only_metas_tele(ms, te1) && contains_only_metas_tele(ms, te2) && contains_only_metas(ms, t)
+}
+
+and contains_only_metas_subst(ms : MetaSet.t, s : subst) : bool = switch(s) {
+    | EmptySubst => true 
+    | ConsSubst(s', _, te, t) => contains_only_metas_subst(ms, s') && contains_only_metas_tele(ms, te) && contains_only_metas(ms, t)
+}
+
 let rec apply_stack(ms : meta_stack, t : tm) : tm = switch(ms) {
     | Empty => t 
     | Wkn(n, ms) => wkn(n, apply_stack(ms, t))
     | Subn(n, s, ms) => subn(n, s, apply_stack(ms, t))
 }
 
+let rec solve_meta_meta(sol : MetaMap.t(tm), ms : meta_stack, m : meta) : tm =  {
+    let ms' = solve_meta_meta_stack(sol, ms);
+    switch(MetaMap.find_opt(m, sol)) {
+    | None => Meta(ms', m)
+    | Some(t) => apply_stack(ms', t)
+    }
+}
 
-let rec solve_meta_tm(m : meta, mt : tm, t : tm) : tm = switch(t) {
+and solve_meta_tm(sol : MetaMap.t(tm), t : tm) : tm = switch(t) {
     | Prop => Prop
     | Typ => Typ
-    | In(t1, t2) => In(solve_meta_tm(m, mt, t1), solve_meta_tm(m, mt, t2))
-    | Arrow(te, t1) => Arrow(solve_meta_tele(m, mt, te), solve_meta_tm(m, mt, t1))
-    | Ap(Index(x, y), s1) => Ap(Index(x, y), solve_meta_subst(m, mt, s1))
-    | Meta(ms, m') when m == m' => apply_stack(solve_meta_meta_stack(m, mt, ms), mt)
-    | Meta(ms, m') => Meta(solve_meta_meta_stack(m, mt, ms), m')
+    | In(t1, t2) => In(solve_meta_tm(sol, t1), solve_meta_tm(sol, t2))
+    | Arrow(te, t1) => Arrow(solve_meta_tele(sol, te), solve_meta_tm(sol, t1))
+    | Ap(Index(x, y), s1) => Ap(Index(x, y), solve_meta_subst(sol, s1))
+    | Meta(ms, m)  => solve_meta_meta(sol, ms, m)
     | Nonsense => Nonsense
 }
 
-and solve_meta_meta_stack(m : meta, mt : tm, ms : meta_stack) : meta_stack = switch(ms) {
+and solve_meta_meta_stack(sol : MetaMap.t(tm), ms : meta_stack) : meta_stack = switch(ms) {
     | Empty => Empty 
-    | Wkn(n, ms) => Wkn(n, solve_meta_meta_stack(m, mt, ms))
-    | Subn(n, s, ms) => Subn(n, solve_meta_subst(m, mt, s), solve_meta_meta_stack(m, mt, ms))
+    | Wkn(n, ms) => Wkn(n, solve_meta_meta_stack(sol, ms))
+    | Subn(n, s, ms) => Subn(n, solve_meta_subst(sol, s), solve_meta_meta_stack(sol, ms))
 }
 
-and solve_meta_tele(m : meta, mt : tm, te : tele) = switch(te) {
+and solve_meta_tele(sol : MetaMap.t(tm), te : tele) = switch(te) {
     | EmptyTele => EmptyTele 
-    | ConsP(te1, y, p) => ConsP(solve_meta_tele(m, mt, te1), y, solve_meta_tm(m, mt, p))
-    | ConsT(te1, y, te2, t) => ConsT(solve_meta_tele(m, mt, te1), y, solve_meta_tele(m, mt, te2), solve_meta_tm(m, mt, t))
+    | ConsP(te1, y, p) => ConsP(solve_meta_tele(sol, te1), y, solve_meta_tm(sol, p))
+    | ConsT(te1, y, te2, t) => ConsT(solve_meta_tele(sol, te1), y, solve_meta_tele(sol, te2), solve_meta_tm(sol, t))
 }
 
-and solve_meta_subst(m : meta, mt : tm, s : subst) = switch(s) {
+and solve_meta_subst(sol : MetaMap.t(tm), s : subst) = switch(s) {
     | EmptySubst => EmptySubst 
-    | ConsSubst(s', y, te, t) => ConsSubst(solve_meta_subst(m, mt, s'), y, solve_meta_tele(m, mt, te), solve_meta_tm(m, mt, t))
+    | ConsSubst(s', y, te, t) => ConsSubst(solve_meta_subst(sol, s'), y, solve_meta_tele(sol, te), solve_meta_tm(sol, t))
 }
 
-let rec solve_meta_ctx(m : meta, mt : tm, c : ctx) : ctx = switch(c) {
+let rec solve_meta_ctx(sol : MetaMap.t(tm), c : ctx) : ctx = switch(c) {
     | Empty => Empty
-    | Cons(c', te) => Cons(solve_meta_ctx(m, mt, c'), solve_meta_tele(m, mt, te))
+    | Cons(c', te) => Cons(solve_meta_ctx(sol, c'), solve_meta_tele(sol, te))
 }
 
-let solve_meta_judgment(m : meta, t : tm, J(c, p) : judgment) : judgment = 
-    J(solve_meta_ctx(m, t, c), solve_meta_tm(m, t, p))
+let solve_meta_judgment(sol : MetaMap.t(tm), J(c, p) : judgment) : judgment = 
+    J(solve_meta_ctx(sol, c), solve_meta_tm(sol, p))

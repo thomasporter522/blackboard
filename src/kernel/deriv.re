@@ -30,16 +30,16 @@ module PartialDerivation : {
     module MetaSet = Set.Make(Meta);
     
     type t = {
-        next_meta : int,
-        metas : MetaSet.t,
+        solved_metas : MetaMap.t(tm),
+        unsolved_metas : MetaSet.t,
         skipped : list(judgment),
         focused : list(judgment),
         root : judgment
     }
 
     let init (j : judgment) : t = {
-        next_meta: 0,
-        metas: MetaSet.empty,
+        solved_metas : MetaMap.empty,
+        unsolved_metas : MetaSet.empty,
         skipped : [],
         focused : [j],
         root : j
@@ -81,58 +81,36 @@ module PartialDerivation : {
     }
 
     let fresh_meta (s : t) : (t, meta) = {
-        let m = Meta.mint(s.next_meta);
+        let m = Meta.mint(MetaMap.cardinal(s.solved_metas) + MetaSet.cardinal(s.unsolved_metas));
         let s' = {...s,
-            next_meta: s.next_meta + 1,
-            metas: MetaSet.add(m, s.metas),
+            unsolved_metas: MetaSet.add(m, s.unsolved_metas),
         };
         (s', m)
     }
 
-    let rec contains_only_metas( ms : MetaSet.t, t : tm) : bool = switch(t) {
-        | Prop => true
-        | Typ => true
-        | In(t1, t2) => contains_only_metas(ms, t1) && contains_only_metas(ms, t2)
-        | Arrow(te, t1) => contains_only_metas_tele(ms, te) && contains_only_metas(ms, t1)
-        | Ap(_, s1) => contains_only_metas_subst(ms, s1)
-        | Meta(mstack, m) => contains_only_metas_meta_stack(ms, mstack) && MetaSet.mem(m, ms)
-        | Nonsense => true
-    }
-    and contains_only_metas_meta_stack(ms : MetaSet.t, mstack : meta_stack) : bool = switch(mstack) {
-        | Empty => true
-        | Wkn(_, mstack) => contains_only_metas_meta_stack(ms, mstack)
-        | Subn(_, s, mstack) => contains_only_metas_subst(ms, s) && contains_only_metas_meta_stack(ms, mstack)
-    }
-
-    and contains_only_metas_tele(ms : MetaSet.t, te : tele) : bool = switch(te) {
-        | EmptyTele => true 
-        | ConsP(te1, _, p) => contains_only_metas_tele(ms, te1) && contains_only_metas(ms, p)
-        | ConsT(te1, _, te2, t) =>contains_only_metas_tele(ms, te1) && contains_only_metas_tele(ms, te2) && contains_only_metas(ms, t)
-    }
-
-    and contains_only_metas_subst(ms : MetaSet.t, s : subst) : bool = switch(s) {
-        | EmptySubst => true 
-        | ConsSubst(s', _, te, t) => contains_only_metas_subst(ms, s') && contains_only_metas_tele(ms, te) && contains_only_metas(ms, t)
-    }
-
     let solve_meta (s : t, m : meta, t : tm) : result(t, error) = {
-        let metas = MetaSet.remove(m, s.metas);
-        if(!MetaSet.mem(m, s.metas)) {
-            Error("Unknown has already been solved")
-        } else if(!contains_only_metas(metas, t)) {
-            Error("Solution contains unknowns that have already been solved")
-        } else {
-            try {
-                let skipped = List.map(solve_meta_judgment(m, t), s.skipped);
-                let focused = List.map(solve_meta_judgment(m, t), s.focused);
+        try {
+            let unsolved_metas = MetaSet.remove(m, s.unsolved_metas);
+            let t = solve_meta_tm(s.solved_metas, t);
+            if(!MetaSet.mem(m, s.unsolved_metas)) {
+                Error("Unknown has already been solved")
+            } else if(!contains_only_metas(unsolved_metas, t)) {
+                Error("Solution contains unknowns that have already been solved")
+            } else {
+                let sol = MetaMap.of_list([(m, t)]);
+                let solved_metas_updated = MetaMap.map(solve_meta_tm(sol), s.solved_metas);
+                let solved_metas = MetaMap.add(m, t, solved_metas_updated);
+                let skipped = List.map(solve_meta_judgment(sol), s.skipped);
+                let focused = List.map(solve_meta_judgment(sol), s.focused);
                 Ok({...s, 
+                    solved_metas,
+                    unsolved_metas,
                     skipped, 
                     focused,
-                    metas
                 })
-            } {
-            | _ => Error("malformed solution")
             }
+        } {
+        | _ => Error("malformed solution")
         }
     }
 
@@ -147,6 +125,7 @@ module PartialDerivation : {
     }
 
     let weaken (s : t, ty : tm) : result(t, error) = refine(s, j => {
+        let ty = solve_meta_tm(s.solved_metas, ty);
         switch(j) {
         | J(Cons(c, _), ty_goal) when equiv(ty_goal, wk(ty)) => Ok([J(c, ty)])
         | _ => Error("weaken failure")
@@ -154,6 +133,7 @@ module PartialDerivation : {
     })
 
     let cut (s : t, z : name, lemma : tm)  : result(t, error) = refine(s, j => {
+        let lemma = solve_meta_tm(s.solved_metas, lemma);
         let J(c, goal) = j;
         Ok([J(c, lemma), J(Cons(c, ConsP(EmptyTele, z, wk(lemma))), wk(goal))])
     })
@@ -171,6 +151,7 @@ module PartialDerivation : {
 
 
     let in_formation (s : t, ty2 : tm) : result(t, error) = refine(s, j => {
+        let ty2 = solve_meta_tm(s.solved_metas, ty2);
         switch(j) {
         | J(c, In(In(a, ty1), Prop)) => Ok([J(c, In(ty1, Typ)), J(c, In(a, ty2))])
         | J(_, In(In(_), _)) => Error("in_formation failure: not inhabiting prop")
@@ -223,6 +204,9 @@ module PartialDerivation : {
     }
 
     let arrow_elimination (s : t, te : tele, p : tm, su : subst) : result(t, error) = refine(s, j => {
+        let te = solve_meta_tele(s.solved_metas, te);
+        let p = solve_meta_tm(s.solved_metas, p);
+        let su = solve_meta_subst(s.solved_metas, su);
         let J(c, ty) = j;
         try {
             if(equiv(ty, sub(su, p))) { Ok([J(c, Arrow(te, p))] @ subst_tele(c, su, sub_tele(su, te))) } 
