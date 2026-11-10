@@ -76,7 +76,7 @@ and subst_of_surface (c : ctx, s : list(surface_subst_entry)) : (subst, list(ran
 let goal_of_surface_signature(c : ctx, te : list(surface_tele_entry)) : tm = {
     let (te', _) = contained_tele_of_surface(Cons(Cons(c, EmptyTele), EmptyTele), te);
     let m_prop = ConsT(EmptyTele, Name("M"), EmptyTele, Prop);
-    let portal = ConsT(EmptyTele, Name("_"), te', var(2, 0));
+    let portal = ConsP(EmptyTele, Name("_"), Arrow(te', var(2, 0)));
     Arrow(m_prop, Arrow(portal, var(1, 0)))
 }
 

@@ -66,7 +66,7 @@ let js_parser(s : string, cursor_position : int) : parse_result = {
     }];
     let f3(x : list(string)) : list(Js.t(Js.js_string)) = List.map(s => Js.string(s), x);
     let f5(r : (Lang.Term.judgment, (int, int))) : goal = {
-        let (cs, g) = Lang.Lang_printing.strings_of_judgment(fst(r));
+        let (cs, g) = Lang.Print.strings_of_judgment(fst(r));
         [%js {as _; 
             val statement = Js.string(g); 
             val context = Js.array(Array.of_list(List.map(Js.string, cs)));

@@ -25,8 +25,6 @@ let string_of_var(c : ctx, i : term_index) : string = {
 // precedences:
 let colon_prec = (5, 5)
 let arrow_prec = (11, 10)
-let lam_prec = (-1, 15)
-let strictap_prec = (20, -1)
 let ap_prec = (20, 21)
 
 let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string = {
@@ -56,15 +54,42 @@ let rec prec_string_of_term(lp: int, rp : int, c : ctx, outer_a : tm) : string =
     prec_string_of_term(0, 0, c, a)
 }
 
+and string_of_tele_p(z, c, p) = {
+    if(z == "_") { 
+        string_of_term(c, p)
+    } else { 
+        "(" ++ z ++ " ; " ++ string_of_term(c, p) ++ ")"
+    }
+}
+
+and string_of_tele_t(z, te1, c, ty) = {
+   "(" ++ z ++ (te1 == EmptyTele ? "" : " ") ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
+}
+
 and string_of_tele(c : ctx, te : tele) : string = switch(te) {
     | EmptyTele => ""
-    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ")  ++ "(" ++ z ++ " ; " ++ string_of_term(c, p) ++ ")"
-    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ "(" ++ z ++ (te1 == EmptyTele ? "" : " ") ++ string_of_tele(Cons(c, te1), te1) ++ " : " ++ string_of_term(Cons(c, te1), ty) ++ ")"
+    | ConsP(te, Name(z), p) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ")  ++ string_of_tele_p(z, c, p)
+    | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ string_of_tele_t(z, te1, c, ty)
+}
+
+and string_of_sub(z, c, te, t) = {
+    if(z == "_") { 
+        string_of_term(Cons(c, te), t)
+    } else { 
+        "("  ++ z ++ (te == EmptyTele ? "" : " ") 
+        ++ string_of_tele(Cons(c, te), te) 
+        ++ " := " 
+        ++ string_of_term(Cons(c, te), t) 
+        ++ ")"
+    }
 }
 
 and string_of_subst(c : ctx, s : subst) : string = switch(s) {
     | EmptySubst => ""
-    | ConsSubst(s', Name(z), te, t) => string_of_subst(c, s') ++ (s' == EmptySubst ? "" : " ") ++ "("  ++ z ++ (te == EmptyTele ? "" : " ") ++ string_of_tele(Cons(c, te), te) ++ " := " ++ string_of_term(Cons(c, te), t) ++ ")"
+    | ConsSubst(s', Name(z), te, t) => 
+        string_of_subst(c, s') 
+        ++ (s' == EmptySubst ? "" : " ") 
+        ++ string_of_sub(z, c, te, t)
 }
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {

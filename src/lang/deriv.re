@@ -1,5 +1,5 @@
 open Term
-open Lang_printing
+open Print
 
 module PartialDerivation : {
     type t; 
@@ -14,7 +14,7 @@ module PartialDerivation : {
     let hyp : (t, hyp_index) => result(t, error);
     let in_formation : (t, tm) => result(t, error);
     let prop_formation : t => result(t, error);
-    let typ_formation : t => result(t, error);
+    let typ_formation : t => result(t, error);    
     let arrow_formation : t => result(t, error);
     let arrow_introduction : t => result(t, error);
     let arrow_elimination : (t, tele, tm, subst) => result(t, error);

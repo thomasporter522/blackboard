@@ -119,49 +119,50 @@ and elab_term_span(t : Language.abstract_span) : (Lang.Term.surface_tm, list(err
 
 and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     switch(t) {
-    | Atom(Hole, r) => (Hole(r), [])
-    | Atom(Interaction, r) => (Hole(r), [])
-    | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
-    | Atom(Check,r) => (Tactic(r, Check, []), [])
-    | Parens(_, s) => elab_demo_span(s)
-    | Direct2(r, d1, _, d2) =>
-        let* d1' = elab_demo_span(d1);
-        let* d2' = elab_demo(d2);
-        (Lang.Demo.Tactic(r, Direct, [d1', d2']), [])
-    | Direct1(r, _, d) =>
-        let* d' = elab_demo(d);
-        (Lang.Demo.Tactic(r, Direct, [d']), [])
-    | Ap(r, t1, _, t2) =>
-        let* t1' = elab_demo(t1);
-        let* t2' = elab_demo(t2);
-        (Lang.Demo.Use(r, t1', t2'), [])
-    | Given(r, x, ty, _, d) => 
-        let* x' = elab_id_span(x);
-        let* ty' = elab_term_span(ty);
-        let* d' = elab_demo(d);
-        switch(x') {
-        | None => (d', [])
-        | Some(x'') => (Lang.Demo.Given(r, Name(x''), ty', Obvious(r), d'), [])
-        }
-    | Witness(r, t, _, d) => 
-        let* t' = elab_term_span(t);
-        let* d' = elab_demo(d);
-        (Lang.Demo.Tactic(r, Witness(t'), [Obvious(r), d']), [])
-    | Infix(At, r, t1, _, _, t2) => 
-        let* t1' = elab_demo(t1);
-        let* t2' = elab_term(t2);
-        (Lang.Demo.At(r, t1', t2', Obvious(r)), [])
-    | Atom(Prop,_) 
-    | Atom(Type,_) 
-    | Infix(In, _, _, _, _, _) 
-    | Infix(Colon, _, _, _, _, _) 
-    | Infix(Semicolon, _, _, _, _, _) 
-    | Infix(Assign, _, _, _, _, _) 
-    | Infix(Arrow, _, _, _, _, _)
-    | Assume(_) 
-    | Construct(_) 
-    | Prove(_) 
-    | Commas(_) => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
+    | _ => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
+    // | Atom(Hole, r) => (Hole(r), [])
+    // | Atom(Interaction, r) => (Hole(r), [])
+    // | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
+    // | Atom(Check,r) => (Tactic(r, Check, []), [])
+    // | Parens(_, s) => elab_demo_span(s)
+    // | Direct2(r, d1, _, d2) =>
+    //     let* d1' = elab_demo_span(d1);
+    //     let* d2' = elab_demo(d2);
+    //     (Lang.Demo.Tactic(r, Direct, [d1', d2']), [])
+    // | Direct1(r, _, d) =>
+    //     let* d' = elab_demo(d);
+    //     (Lang.Demo.Tactic(r, Direct, [d']), [])
+    // | Ap(r, t1, _, t2) =>
+    //     let* t1' = elab_demo(t1);
+    //     let* t2' = elab_demo(t2);
+    //     (Lang.Demo.Use(r, t1', t2'), [])
+    // | Given(r, x, ty, _, d) => 
+    //     let* x' = elab_id_span(x);
+    //     let* ty' = elab_term_span(ty);
+    //     let* d' = elab_demo(d);
+    //     switch(x') {
+    //     | None => (d', [])
+    //     | Some(x'') => (Lang.Demo.Given(r, Name(x''), ty', Obvious(r), d'), [])
+    //     }
+    // | Witness(r, t, _, d) => 
+    //     let* t' = elab_term_span(t);
+    //     let* d' = elab_demo(d);
+    //     (Lang.Demo.Tactic(r, Witness(t'), [Obvious(r), d']), [])
+    // | Infix(At, r, t1, _, _, t2) => 
+    //     let* t1' = elab_demo(t1);
+    //     let* t2' = elab_term(t2);
+    //     (Lang.Demo.At(r, t1', t2', Obvious(r)), [])
+    // | Atom(Prop,_) 
+    // | Atom(Type,_) 
+    // | Infix(In, _, _, _, _, _) 
+    // | Infix(Colon, _, _, _, _, _) 
+    // | Infix(Semicolon, _, _, _, _, _) 
+    // | Infix(Assign, _, _, _, _, _) 
+    // | Infix(Arrow, _, _, _, _, _)
+    // | Assume(_) 
+    // | Construct(_) 
+    // | Prove(_) 
+    // | Commas(_) => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
     }
 }
 
