@@ -7,12 +7,16 @@ type range = (int, int)
 type hyp_index = HypIndex(int, int)
 type term_index = Index(int, int)
 
+type subst_args = 
+    | EmptySubstArgs 
+    | ConsSubstArgs(subst_args, name)
+
 type surface_tele_entry = 
     | SurfaceTeleEntryP(name, surface_tm)
     | SurfaceTeleEntryT(list(name), list(surface_tele_entry), surface_tm)
 
 and surface_subst_entry = 
-    | SurfaceSubstEntry(list(name), list(surface_tele_entry), surface_tm)
+    | SurfaceSubstEntry(name, subst_args, surface_tm)
 
 and surface_tm =
     | SurfaceProp(range)
@@ -43,13 +47,18 @@ and tele =
     
 and subst =
     | EmptySubst
-    | ConsSubst(subst, name, tele, tm);
+    | ConsSubst(subst, name, subst_args, tm);
 
 type ctx = 
     | Empty 
     | Cons(ctx, tele)
 
 let var(x, y) = Ap(Index(x, y), EmptySubst)
+
+let rec tele_of_subst_args(args) = switch(args) {
+    | EmptySubstArgs => EmptyTele 
+    | ConsSubstArgs(xs, x) => ConsT(tele_of_subst_args(xs), x, EmptyTele, Nonsense)
+};
 
 let rec equiv(a1 : tm, a2 : tm) : bool = {
     switch(a1, a2) {
@@ -77,9 +86,17 @@ and equiv_tele(a1 : tele, a2 : tele) : bool = switch(a1, a2) {
     | (ConsP(_), _)
     | (ConsT(_), _) => false
 }
+
+and equiv_subst_arg(xs1, xs2): bool = switch(xs1, xs2) {
+    | (EmptySubstArgs, EmptySubstArgs) => true 
+    | (ConsSubstArgs(xs1', _), ConsSubstArgs(xs2', _)) => equiv_subst_arg(xs1', xs2')
+    | (EmptySubstArgs, _)
+    | (ConsSubstArgs(_), _) => false
+}
+
 and equiv_subst(a1 : subst, a2 : subst) : bool = switch(a1, a2) {
     | (EmptySubst, EmptySubst) => true 
-    | (ConsSubst(a1, _, a2, a3), ConsSubst(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_tele(a2, a5) && equiv(a3, a6)
+    | (ConsSubst(a1, _, a2, a3), ConsSubst(a4, _, a5, a6)) => equiv_subst(a1, a4) && equiv_subst_arg(a2, a5) && equiv(a3, a6)
     | (EmptySubst, _)
     | (ConsSubst(_), _) => false
 }
@@ -103,7 +120,7 @@ and wkn_tele(n : int, te : tele) = switch(te) {
 
 and wk_subst(n : int, s : subst) = switch(s) {
     | EmptySubst => EmptySubst 
-    | ConsSubst(s', y, te, t) => ConsSubst(wk_subst(n, s'), y, wkn_tele(n+1, te), wkn(n+1, t))
+    | ConsSubst(s', y, arg_names, t) => ConsSubst(wk_subst(n, s'), y, arg_names, wkn(n+1, t))
 }
 
 let wk = wkn(0)
@@ -148,9 +165,9 @@ and subn_tele(n : int, s : subst, te : tele) = switch(te) {
 
 and sub_subst(n : int, s : subst, s1 : subst) = switch(s1) {
     | EmptySubst => EmptySubst 
-    | ConsSubst(s1', y, te, t) => 
+    | ConsSubst(s1', y, arg_names, t) => 
         let s' = wk_subst(0, s);
-        ConsSubst(sub_subst(n, s, s1'), y, subn_tele(n+1, s', te), subn(n+1, s', t))
+        ConsSubst(sub_subst(n, s, s1'), y, arg_names, subn(n+1, s', t))
 }
 
 let sub = subn(0)
@@ -286,7 +303,7 @@ and contains_only_metas_tele(ms : MetaSet.t, te : tele) : bool = switch(te) {
 
 and contains_only_metas_subst(ms : MetaSet.t, s : subst) : bool = switch(s) {
     | EmptySubst => true 
-    | ConsSubst(s', _, te, t) => contains_only_metas_subst(ms, s') && contains_only_metas_tele(ms, te) && contains_only_metas(ms, t)
+    | ConsSubst(s', _, _, t) => contains_only_metas_subst(ms, s') && contains_only_metas(ms, t)
 }
 
 let rec apply_stack(ms : meta_stack, t : tm) : tm = switch(ms) {
@@ -327,7 +344,7 @@ and solve_meta_tele(sol : MetaMap.t(tm), te : tele) = switch(te) {
 
 and solve_meta_subst(sol : MetaMap.t(tm), s : subst) = switch(s) {
     | EmptySubst => EmptySubst 
-    | ConsSubst(s', y, te, t) => ConsSubst(solve_meta_subst(sol, s'), y, solve_meta_tele(sol, te), solve_meta_tm(sol, t))
+    | ConsSubst(s', y, arg_names, t) => ConsSubst(solve_meta_subst(sol, s'), y, arg_names, solve_meta_tm(sol, t))
 }
 
 let rec solve_meta_ctx(sol : MetaMap.t(tm), c : ctx) : ctx = switch(c) {

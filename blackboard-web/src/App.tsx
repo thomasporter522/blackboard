@@ -17,6 +17,8 @@ import Markdown from 'react-markdown'
 
 import { blackboardTheme } from "./CodeTheme.tsx"
 
+const lock_size = 5;
+
 const init_text = 
 `construct 
 and (p1 p2 : prop) : prop,
@@ -123,7 +125,7 @@ function decorateInteractions(state : EditorState) {
 }
 
 function decorateLocks(state : EditorState) {
-  return Decoration.set([Decoration.line({class: "locked"}).range(state.doc.line(5).from)])
+  return Decoration.set([Decoration.line({class: "locked"}).range(state.doc.line(lock_size).from)])
 }
 
 const delimiterExtension = EditorView.decorations.compute([parseInfoField], state => decorateDelims(state))
@@ -211,7 +213,7 @@ const getlockLines = (targetState:EditorState):Array<{from:number|undefined, to:
   return [
   {
     from: undefined, //same as targetState.doc.line(0).from or 0
-    to: targetState.doc.line(5).to
+    to: targetState.doc.line(lock_size).to
   }
   ]
 }

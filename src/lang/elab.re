@@ -12,7 +12,7 @@ let consTs (te : tele, zs : list(name), args : tele, t : tm) : tele = {
     List.fold_left(f, te, zs)
 }
 
-let consSubsts (s : subst, zs : list(name), args : tele, t : tm) : subst = {
+let consSubsts (s : subst, zs : list(name), args : subst_args, t : tm) : subst = {
     let f(acc : subst, z : name) : subst = ConsSubst(acc, z, args, t);
     List.fold_left(f, s, zs)
 }
@@ -64,11 +64,10 @@ and tele_of_surface (c : ctx, te : list(surface_tele_entry)) : (tele, list(range
 }
 
 and subst_of_surface (c : ctx, s : list(surface_subst_entry)) : (subst, list(ranged_error)) = {
-    let f (acc : (subst, list(ranged_error)), SurfaceSubstEntry(zs, te, t) : surface_subst_entry) : (subst, list(ranged_error)) = {
+    let f (acc : (subst, list(ranged_error)), SurfaceSubstEntry(z, args, t) : surface_subst_entry) : (subst, list(ranged_error)) = {
         let** acc' = acc;
-        let** te' = contained_tele_of_surface(c, te);
-        let** t' = tm_of_surface(Cons(c, te'), t);
-        (consSubsts(acc', zs, te', t'), [])
+        let** t' = tm_of_surface(Cons(c, tele_of_subst_args(args)), t);
+        (ConsSubst(acc', z, args, t'), [])
     };
     List.fold_left(f, (EmptySubst, []), s)
 }

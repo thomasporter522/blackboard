@@ -41,19 +41,32 @@ let rec elab_id_list(t: Language.abstract_term) = switch(t) {
     | _ => ([], [err("Invalid variable", whole_range(t))])
 }
 
+and elab_subst_entry_lhs(t : Language.abstract_term) : (Option.t((Term.name, Term.subst_args)), list(error)) = {
+    switch(t) {
+    | Atom(Ident(z), _) => (Some((Name(z), EmptySubstArgs)), [])
+    | Ap(_, t, _, Atom(Ident(arg), _)) => 
+        let* t' = elab_subst_entry_lhs(t);
+        switch(t') {
+        | None => (None, [])
+        | Some((z, args)) => (Some((z, Term.ConsSubstArgs(args, Name(arg)))), [])
+        }
+    | _ => (None, [err("Invalid telescope LHS", whole_range(t))])
+    }
+}
+
 and elab_subst_entry(t : Language.abstract_term) : (Option.t(Term.surface_subst_entry), list(error)) = {
     switch(t) {
     | Parens(_, t) => elab_subst_entry_span(t);
     | Infix(Assign, _, t1, _, _, t2)  => 
-        let* t1' = elab_entry_lhs(t1);
+        let* t1' = elab_subst_entry_lhs(t1);
         let* t2' = elab_term(t2);
         switch(t1') {
         | None => (None, [])
-        | Some((zs, args)) => (Some(Term.SurfaceSubstEntry(zs, args, t2')), [])
+        | Some((z, args)) => (Some(Term.SurfaceSubstEntry(z, args, t2')), [])
         }
     | _ => 
         let* t' = elab_term(t);
-        (Some(Term.SurfaceSubstEntry([Name("_")], [], t')), [])
+        (Some(Term.SurfaceSubstEntry(Name("_"), EmptySubstArgs, t')), [])
     }
 }
 

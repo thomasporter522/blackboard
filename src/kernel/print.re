@@ -20,6 +20,8 @@ let rec text_of_index(c : ctx, i : term_index, original : term_index) : string =
 let show_indices = false;
 // let show_indices = true;
 
+let string_of_name(Name(x)) = x;
+
 let string_of_var(c : ctx, i : term_index) : string = {
     text_of_index(c, i, i) ++ (show_indices ? "." ++ string_of_index(i) : "")
 }
@@ -75,12 +77,18 @@ and string_of_tele(c : ctx, te : tele) : string = switch(te) {
     | ConsT(te, Name(z), te1, ty) => string_of_tele(c, te) ++ (te == EmptyTele ? "" : " ") ++ string_of_tele_t(z, te1, c, ty)
 }
 
-and string_of_sub(z, c, te, t) = {
+and string_of_subst_args(xs : subst_args) = switch(xs) {
+    | EmptySubstArgs => ""
+    | ConsSubstArgs(xs', x) => string_of_subst_args(xs') ++ " " ++ string_of_name(x)
+}
+
+and string_of_sub(z, c, args : subst_args, t) = {
+    let te = tele_of_subst_args(args);
     if(z == "_") { 
         string_of_term(Cons(c, te), t)
     } else { 
-        "("  ++ z ++ (te == EmptyTele ? "" : " ") 
-        ++ string_of_tele(Cons(c, te), te) 
+        "("  ++ z ++ (args == EmptySubstArgs ? "" : " ") 
+        ++ string_of_subst_args(args)
         ++ " := " 
         ++ string_of_term(Cons(c, te), t) 
         ++ ")"
@@ -89,10 +97,10 @@ and string_of_sub(z, c, te, t) = {
 
 and string_of_subst(c : ctx, s : subst) : string = switch(s) {
     | EmptySubst => ""
-    | ConsSubst(s', Name(z), te, t) => 
+    | ConsSubst(s', Name(z), args, t) => 
         string_of_subst(c, s') 
         ++ (s' == EmptySubst ? "" : " ") 
-        ++ string_of_sub(z, c, te, t)
+        ++ string_of_sub(z, c, args, t)
 }
 
 let rec string_of_ctx(c : ctx) : string = switch(c) {

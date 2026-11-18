@@ -196,10 +196,17 @@ module PartialDerivation : {
         }
     })
 
+    let rec compatible_args(args , te) : bool = switch(args, te) {
+        | (EmptySubstArgs, EmptyTele) => true
+        | (ConsSubstArgs(args', _), ConsP(te', _, _)) => compatible_args(args', te')
+        | (ConsSubstArgs(args', _), ConsT(te', _, _, _)) => compatible_args(args', te')
+        | _ => false
+    }
+
     let rec subst_tele(c : ctx, s : subst, te : tele) = switch(s, te) {
         | (EmptySubst, EmptyTele) => []
         | (s, ConsP(te', _, p)) => subst_tele(c, s, te') @ [J(c, p)]
-        | (ConsSubst(s', _, te1, t), ConsT(te', _, te2, ty)) when equiv_tele(te1, te2) => subst_tele(c, s', te') @ [J(Cons(c, te2), In(t, ty))]
+        | (ConsSubst(s', _, args, t), ConsT(te', _, te2, ty)) when compatible_args(args, te2) => subst_tele(c, s', te') @ [J(Cons(c, te2), In(t, ty))]
         | _ => failwith("misaligned")
     }
 
