@@ -137,6 +137,14 @@ and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     | Atom(Hole, r) => (Hole(r), [])
     | Atom(Interaction, r) => (Hole(r), [])
     | Parens(_, s) => elab_demo_span(s)
+    // | Given(r, x, ty, _, d) => 
+    //     let* x' = elab_id_span(x);
+    //     let* ty' = elab_term_span(ty);
+    //     let* d' = elab_demo(d);
+    //     switch(x') {
+    //     | None => (d', [])
+    //     | Some(x'') => (Lang.Demo.Primitive(r, Lang.Demo.ArrowIntro(Name(x''), ty', Obvious(r), d')), [])
+    //     }
     | _ => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
     // | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
     // | Atom(Check,r) => (Tactic(r, Check, []), [])
@@ -151,14 +159,6 @@ and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     //     let* t1' = elab_demo(t1);
     //     let* t2' = elab_demo(t2);
     //     (Lang.Demo.Use(r, t1', t2'), [])
-    // | Given(r, x, ty, _, d) => 
-    //     let* x' = elab_id_span(x);
-    //     let* ty' = elab_term_span(ty);
-    //     let* d' = elab_demo(d);
-    //     switch(x') {
-    //     | None => (d', [])
-    //     | Some(x'') => (Lang.Demo.Given(r, Name(x''), ty', Obvious(r), d'), [])
-    //     }
     // | Witness(r, t, _, d) => 
     //     let* t' = elab_term_span(t);
     //     let* d' = elab_demo(d);

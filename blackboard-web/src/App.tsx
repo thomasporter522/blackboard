@@ -22,8 +22,8 @@ const lock_size = 5;
 const init_text = 
 `construct 
 and (p1 p2 : prop) : prop,
-andi : (p1 p2 : prop) -> p1 -> p2 -> and p1 p2,
-ande : (p1 p2 : prop) -> (h : and p1 p2) -> (M : prop) -> (p1 -> p2 -> M) -> M
+andi ; (p1 p2 : prop) -> p1 -> p2 -> and p1 p2,
+ande ; (p1 p2 : prop) -> and p1 p2 -> (M : prop) -> (p1 -> p2 -> M) -> M
 by 
 ?
 end 

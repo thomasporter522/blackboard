@@ -24,14 +24,14 @@ type primitive =
     | PropForm
     | TypForm
     | ArrowForm(list(demo))
-    | ArrowIntro(list(demo))
+    | ArrowIntro(Option.t(list(surface_tele_entry)), list(demo), demo)
     | ArrowElim(list(surface_tele_entry), surface_tm, list(surface_subst_entry), list(demo))
     | ElabArrowElim(tele, tm, subst, list(demo))
     | ApForm(list(demo))
 
 and demo = 
     | Hole(range)
-    | Primitive(primitive)
+    | Primitive(range, primitive)
     | Claim(range, name, surface_tm, demo, demo)
     | Suffices(range, name, surface_tm, demo, demo)
     | Obvious(range)
