@@ -631,160 +631,180 @@ let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
-let check_demo(s : t, _d : demo) : (t, report) = {
-    let s' = Result.get_ok(skip(s));
-    let j = Result.get_ok(focused(s));
-    (s', mk_report([(j, (0, 1))], []))
-}
-//     switch(d) {
-//     | Hole(r) =>
-//         let s' = Result.get_ok(skip(s));
-//         let j = Result.get_ok(focused(s));
-//         (s', mk_report([(j, r)], []))
-//     | HypProp(r, x, d) =>
-//         let c = goal_ctx(s);
-//         let-& n = (s, arrange(index_of_name(c, x), r));
-//         check_demo(s, ElabHypProp(r, n, d))
-//     | ElabHypProp(r, n, d) => 
-//         let-& s = (s, arrange(hyp_prop(s, n), r));
-//         check_demo(s, d)
-//     | HypTyp(r, x, d) =>
-//         let c = goal_ctx(s);
-//         let-& n = (s, arrange(index_of_name(c, x), r));
-//         check_demo(s, ElabHypTyp(r, n, d))
-//     | ElabHypTyp(r, n, d) =>
-//         switch(goal_type(s)) {
-//         | In(Var(n'), _) when n' == n => 
-//             let-& s = (s, arrange(hyp_typ(s), r));
-//             check_demo(s, d)
-//         | In(Var(_), _) => skip_and_error(s, err("typ-of failure: wrong variable", r))
-//         | _ => skip_and_error(s, err("typ-of failure: not a variable membership", r))
-//         }
-//     | InForm(r, ty, d1, d2) =>
-//         let-& s = (s, arrange(in_formation(s, ty), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     | Claim(r, x, ty, d1, d2) => {
-//         let c = goal_ctx(s);
-//         let-** ty_elab = tm_of_surface(c, ty);
-//         let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     }
-//     | Suffices(r, x, ty, d1, d2) => {
-//         let c = goal_ctx(s);
-//         let-** ty_elab = tm_of_surface(c, ty);
-//         let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
-//         let-& s = (s, arrange(swap(s), r)); 
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     }
-//     | PropForm(r) => pure(s, prop_formation(s), r)
-//     | TypForm(r) => pure(s, typ_formation(s), r)
-//     | PropArrowForm(r, x, d1, d2) => 
-//         let-& s = (s, arrange(prop_arrow_formation(s, x), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     | TypArrowForm(r, x, d1, d2) => 
-//         let-& s = (s, arrange(typ_arrow_formation(s, x), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     | ApTyp(r, x, ty1, ty2, d1, d2) => {
-//         let c = goal_ctx(s);
-//         let-** ty1_elab = tm_of_surface(c, ty1);
-//         let-** ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
-//         check_demo(s, ElabApTyp(r, x, ty1_elab, ty2_elab, d1, d2))
-//     }
-//     | ElabApTyp(r, x, ty1, ty2, d1, d2) => {
-//         let-& s = (s, arrange(ap(s, x, ty1, ty2), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     }
-//     | At(r, d1, a, d2) => {
-//         let c = goal_ctx(s);
-//         let-** a_elab = tm_of_surface(c, a);
-//         check_demo(s, ElabAt(r, d1, a_elab, d2))
-//     }
-//     | ElabAt(r, d1, a, d2) => {
-//         let c = goal_ctx(s);
-//         let-& d1_ty = (s, infer_proven_ty(c, d1));
-//         let-& s = (s, arrange(at_ty(s, d1_ty, a), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     }
-//     | Given(r, x, ty, d1, d2) => {
-//         let c = goal_ctx(s);
-//         let-** ty_elab = tm_of_surface(c, ty);
-//         check_demo(s, ElabGiven(r, x, ty_elab, d1, d2));
-//     }
-//     | ElabGiven(r, x, ty_elab, d1, d2) => {
-//         let-& s = (s, arrange(given_type(s, x, ty_elab), r));
-//         let-* s = check_demo(s, d1);
-//         check_demo(s, d2)
-//     }
-//     | Use(r, d1, d2) => {
-//         let c = goal_ctx(s);
-//         let-& d1_ty = (s, infer_proven_ty(c, d1));
-//         switch(d1_ty) {
-//         | Arrow(_, _, ty_1, _)  => {
-//             let-& s = (s, arrange(implies_elimination(s, ty_1), r));
-//             let-* s = check_demo(s, d1);
-//             check_demo(s, d2)
-//         }
-//         | _ => skip_and_error(s, err("not an arrow", r)) 
-//         }
-//     }
-//     | Obvious(r) => pure(s, obvious(s), r);
-//     | Tactic(r, Check, ds) => {
-//         if(ds != []) {
-//             skip_and_error(s, err("side conditions not supported yet", r))
-//         } else {
-//             pure(s, check(s), r);
-//         }
-//     }
-//     | Tactic(r, Schema(Definition), ds) => {
-//         if (ds != []) {
-//             skip_and_error(s, err("side conditions not supported yet", r))
-//         } else {
-//             pure(s, cooler_definition(s), r);
-//         }
-//     }
-//     | Tactic(r, Direct, ds) => switch(ds) {
-//         | [d1] => 
-//             let-& s = (s, arrange(better_direct(s), r));
-//             let-* s = check_demo(s, d1);
-//             pure(s, empty_direct(s), r)
-//         | [d1, d2] =>
-//             let-& s = (s, arrange(better_direct(s), r));
-//             let-* s = check_demo(s, d1);
-//             check_demo(s, d2)
-//         | _ => skip_and_error(s, err("wrong number of args to direct", r))
-//     }
-//     | Tactic(r, Witness(a), ds) => switch(ds) {
-//         | [d1, d2] =>
-//             let c = goal_ctx(s);
-//             let-** a_elab = tm_of_surface(c, a);
-//             let-& s = (s, arrange(witness(s, a_elab), r));
-//             let-* s = check_demo(s, d1);
-//             check_demo(s, d2)
-//         | _ => skip_and_error(s, err("wrong number of args to witness", r))
-//     }
-//     | Tactic(r, GivenAll, ds) => switch(ds) {
-//         | [d] => 
-//             let-& s = (s, arrange(givenall(s), r));
-//             check_demo(s, d)
-//             // switch(headnormalize(goal_type(s))) {
-//             // | Arrow(_, x, _, _) when x != "_" => {
-//             //     let-& s = (s, given(s, x));
-//             //     let-* s = check_demo(s, Obvious);
-//             //     check_demo(s,  Tactic(GivenAll, [d]));
-//             // }
-//             // | _ => check_demo(s, d)
-//             // }
-//         | _ => skip_and_error(s, err("wrong number of args to givenall", r))
-//     }
-//     | Nonsense(_) => skip_and_no_error(s)
+let check_demo(s : t, d : demo) : (t, report) =
+//     let s' = Result.get_ok(skip(s));
+//     let j = Result.get_ok(focused(s));
+//     (s', mk_report([(j, (0, 1))], []))
 // }
+    switch(d) {
+    | Hole(r) =>
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, r)], []))
+    | Primitive(_) => 
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, (0, 1))], []))
+    | Claim(_) => 
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, (0, 1))], []))
+    | Suffices(_) => 
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, (0, 1))], []))
+    | Obvious(_) => 
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, (0, 1))], []))
+    | Tactic(_) => 
+        let s' = Result.get_ok(skip(s));
+        let j = Result.get_ok(focused(s));
+        (s', mk_report([(j, (0, 1))], []))
+    // | HypProp(r, x, d) =>
+    //     let c = goal_ctx(s);
+    //     let-& n = (s, arrange(index_of_name(c, x), r));
+    //     check_demo(s, ElabHypProp(r, n, d))
+    // | ElabHypProp(r, n, d) => 
+    //     let-& s = (s, arrange(hyp_prop(s, n), r));
+    //     check_demo(s, d)
+    // | HypTyp(r, x, d) =>
+    //     let c = goal_ctx(s);
+    //     let-& n = (s, arrange(index_of_name(c, x), r));
+    //     check_demo(s, ElabHypTyp(r, n, d))
+    // | ElabHypTyp(r, n, d) =>
+    //     switch(goal_type(s)) {
+    //     | In(Var(n'), _) when n' == n => 
+    //         let-& s = (s, arrange(hyp_typ(s), r));
+    //         check_demo(s, d)
+    //     | In(Var(_), _) => skip_and_error(s, err("typ-of failure: wrong variable", r))
+    //     | _ => skip_and_error(s, err("typ-of failure: not a variable membership", r))
+    //     }
+    // | InForm(r, ty, d1, d2) =>
+    //     let-& s = (s, arrange(in_formation(s, ty), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // | Claim(r, x, ty, d1, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-** ty_elab = tm_of_surface(c, ty);
+    //     let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // }
+    // | Suffices(r, x, ty, d1, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-** ty_elab = tm_of_surface(c, ty);
+    //     let-& s = (s, arrange(cut(s, x, ty_elab), r)); 
+    //     let-& s = (s, arrange(swap(s), r)); 
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // }
+    // | PropForm(r) => pure(s, prop_formation(s), r)
+    // | TypForm(r) => pure(s, typ_formation(s), r)
+    // | PropArrowForm(r, x, d1, d2) => 
+    //     let-& s = (s, arrange(prop_arrow_formation(s, x), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // | TypArrowForm(r, x, d1, d2) => 
+    //     let-& s = (s, arrange(typ_arrow_formation(s, x), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // | ApTyp(r, x, ty1, ty2, d1, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-** ty1_elab = tm_of_surface(c, ty1);
+    //     let-** ty2_elab = tm_of_surface(Cons(c, x, ty1_elab), ty2);
+    //     check_demo(s, ElabApTyp(r, x, ty1_elab, ty2_elab, d1, d2))
+    // }
+    // | ElabApTyp(r, x, ty1, ty2, d1, d2) => {
+    //     let-& s = (s, arrange(ap(s, x, ty1, ty2), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // }
+    // | At(r, d1, a, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-** a_elab = tm_of_surface(c, a);
+    //     check_demo(s, ElabAt(r, d1, a_elab, d2))
+    // }
+    // | ElabAt(r, d1, a, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-& d1_ty = (s, infer_proven_ty(c, d1));
+    //     let-& s = (s, arrange(at_ty(s, d1_ty, a), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // }
+    // | Given(r, x, ty, d1, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-** ty_elab = tm_of_surface(c, ty);
+    //     check_demo(s, ElabGiven(r, x, ty_elab, d1, d2));
+    // }
+    // | ElabGiven(r, x, ty_elab, d1, d2) => {
+    //     let-& s = (s, arrange(given_type(s, x, ty_elab), r));
+    //     let-* s = check_demo(s, d1);
+    //     check_demo(s, d2)
+    // }
+    // | Use(r, d1, d2) => {
+    //     let c = goal_ctx(s);
+    //     let-& d1_ty = (s, infer_proven_ty(c, d1));
+    //     switch(d1_ty) {
+    //     | Arrow(_, _, ty_1, _)  => {
+    //         let-& s = (s, arrange(implies_elimination(s, ty_1), r));
+    //         let-* s = check_demo(s, d1);
+    //         check_demo(s, d2)
+    //     }
+    //     | _ => skip_and_error(s, err("not an arrow", r)) 
+    //     }
+    // }
+    // | Obvious(r) => pure(s, obvious(s), r);
+    // | Tactic(r, Check, ds) => {
+    //     if(ds != []) {
+    //         skip_and_error(s, err("side conditions not supported yet", r))
+    //     } else {
+    //         pure(s, check(s), r);
+    //     }
+    // }
+    // | Tactic(r, Schema(Definition), ds) => {
+    //     if (ds != []) {
+    //         skip_and_error(s, err("side conditions not supported yet", r))
+    //     } else {
+    //         pure(s, cooler_definition(s), r);
+    //     }
+    // }
+    // | Tactic(r, Direct, ds) => switch(ds) {
+    //     | [d1] => 
+    //         let-& s = (s, arrange(better_direct(s), r));
+    //         let-* s = check_demo(s, d1);
+    //         pure(s, empty_direct(s), r)
+    //     | [d1, d2] =>
+    //         let-& s = (s, arrange(better_direct(s), r));
+    //         let-* s = check_demo(s, d1);
+    //         check_demo(s, d2)
+    //     | _ => skip_and_error(s, err("wrong number of args to direct", r))
+    // }
+    // | Tactic(r, Witness(a), ds) => switch(ds) {
+    //     | [d1, d2] =>
+    //         let c = goal_ctx(s);
+    //         let-** a_elab = tm_of_surface(c, a);
+    //         let-& s = (s, arrange(witness(s, a_elab), r));
+    //         let-* s = check_demo(s, d1);
+    //         check_demo(s, d2)
+    //     | _ => skip_and_error(s, err("wrong number of args to witness", r))
+    // }
+    // | Tactic(r, GivenAll, ds) => switch(ds) {
+    //     | [d] => 
+    //         let-& s = (s, arrange(givenall(s), r));
+    //         check_demo(s, d)
+    //         // switch(headnormalize(goal_type(s))) {
+    //         // | Arrow(_, x, _, _) when x != "_" => {
+    //         //     let-& s = (s, given(s, x));
+    //         //     let-* s = check_demo(s, Obvious);
+    //         //     check_demo(s,  Tactic(GivenAll, [d]));
+    //         // }
+    //         // | _ => check_demo(s, d)
+    //         // }
+    //     | _ => skip_and_error(s, err("wrong number of args to givenall", r))
+    // }
+    | Nonsense(_) => skip_and_no_error(s)
+}
 
 // // and definition(s : t) : result(t, error) = {
 // //     let (c, ty_goal, _) = goal_tuple(s);

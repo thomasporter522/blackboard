@@ -121,12 +121,12 @@ and elab_term_span(t : Language.abstract_span) : (Term.surface_tm, list(error)) 
 
 and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     switch(t) {
+    | Atom(Hole, r) => (Hole(r), [])
+    | Atom(Interaction, r) => (Hole(r), [])
+    | Parens(_, s) => elab_demo_span(s)
     | _ => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
-    // | Atom(Hole, r) => (Hole(r), [])
-    // | Atom(Interaction, r) => (Hole(r), [])
     // | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
     // | Atom(Check,r) => (Tactic(r, Check, []), [])
-    // | Parens(_, s) => elab_demo_span(s)
     // | Direct2(r, d1, _, d2) =>
     //     let* d1' = elab_demo_span(d1);
     //     let* d2' = elab_demo(d2);
