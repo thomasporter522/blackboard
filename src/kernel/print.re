@@ -87,7 +87,7 @@ and string_of_sub(z, c, args : subst_args, t) = {
     if(z == "_") { 
         string_of_term(Cons(c, te), t)
     } else { 
-        "("  ++ z ++ (args == EmptySubstArgs ? "" : " ") 
+        "("  ++ z
         ++ string_of_subst_args(args)
         ++ " := " 
         ++ string_of_term(Cons(c, te), t) 

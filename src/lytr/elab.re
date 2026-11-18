@@ -50,7 +50,7 @@ and elab_subst_entry_lhs(t : Language.abstract_term) : (Option.t((Term.name, Ter
         | None => (None, [])
         | Some((z, args)) => (Some((z, Term.ConsSubstArgs(args, Name(arg)))), [])
         }
-    | _ => (None, [err("Invalid telescope LHS", whole_range(t))])
+    | _ => (None, [err("Invalid substitution LHS", whole_range(t))])
     }
 }
 

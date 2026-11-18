@@ -198,7 +198,7 @@ module PartialDerivation : {
 
     let rec compatible_args(args , te) : bool = switch(args, te) {
         | (EmptySubstArgs, EmptyTele) => true
-        | (ConsSubstArgs(args', _), ConsP(te', _, _)) => compatible_args(args', te')
+        | (args, ConsP(te', _, _)) => compatible_args(args, te')
         | (ConsSubstArgs(args', _), ConsT(te', _, _, _)) => compatible_args(args', te')
         | _ => false
     }
