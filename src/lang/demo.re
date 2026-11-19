@@ -1,5 +1,4 @@
 open Kernel.Term
-// open Lang_printing
 open Kernel.Deriv.PartialDerivation
 open Kernel.Deriv
 
@@ -29,9 +28,15 @@ type primitive =
     | ElabArrowElim(tele, tm, subst, list(demo))
     | ApForm(list(demo))
 
+and surface_demo_tele = 
+    | EmptySurfaceDemoTele
+    | ConsSurfaceDemoP(surface_demo_tele, name, surface_tm, demo)
+    | ConsSurfaceDemoT(surface_demo_tele, name, tele, surface_tm, demo)
+
 and demo = 
     | Hole(range)
     | Primitive(range, primitive)
+    | Given(range, surface_demo_tele, demo)
     | Seq(demo, demo)
     | Claim(range, name, surface_tm, demo, demo)
     | Suffices(range, name, surface_tm, demo, demo)
@@ -42,6 +47,18 @@ and demo =
 and tm_or_demo = 
     | Tm(surface_tm)
     | Demo(demo)
+
+type demo_tele = 
+    | EmptyDemoTele
+    | ConsDemoP(demo_tele, name, tm, demo)
+    | ConsDemoT(demo_tele, name, tele, tm, demo)
+
+let seq(d1, d2) = Seq(d1, d2);
+
+let seqs(ds) = switch(ds) {
+    | [] => failwith("empty seqs")
+    | [d, ...ds'] => List.fold_left(seq, d, ds')
+}
 
 type report = {
     open_goals : list((judgment, (int, int))),
@@ -68,11 +85,12 @@ let rec merge_report_list(rs : list(report)) : report = switch(rs){
 
 type demo_result = (t, report)
 
-
-let skip_and_error(s : t, e : ranged_error) : (t, report) {
+let skip_and_errors(s : t, es) : (t, report) {
     let s' = Result.get_ok(skip(s));
-    (s', mk_report([], [e]))
+    (s', mk_report([], es))
 }
+
+let skip_and_error(s : t, e : ranged_error) = skip_and_errors(s, [e])
 
 let skip_and_no_error(s : t) : (t, report) {
     let s' = Result.get_ok(skip(s));
@@ -636,6 +654,44 @@ let rec check_primitive(s, r, p) = switch(p) {
     | _ => failwith("Todo")
 }
 
+and given(s : t, r, dte : surface_demo_tele, d) = {
+    let (c, goal) = goal_tuple(s);
+    let rec names_of_demo_tele(dte : surface_demo_tele) : tele = switch(dte) {
+    | EmptySurfaceDemoTele => EmptyTele
+    | ConsSurfaceDemoP(dte', z, _, _)
+    | ConsSurfaceDemoT(dte', z, _, _, _) => ConsP(names_of_demo_tele(dte'), z, Nonsense)
+    };
+    let rec demo_tele_of_surface(c : ctx, dte : surface_demo_tele) : (demo_tele, list(ranged_error)) = switch(dte) {
+        | EmptySurfaceDemoTele => (EmptyDemoTele, [])
+        | ConsSurfaceDemoP(dte, z, p, d) => 
+            let** p' = Elab.tm_of_surface(c, p);
+            let** dte' = demo_tele_of_surface(c, dte);
+            (ConsDemoP(dte', z, p', d), [])
+        | _ => failwith("todo")
+    };
+    let cte = names_of_demo_tele(dte);
+    let-** dte' = demo_tele_of_surface(Cons(c, cte), dte);
+    let rec teles_aligned(te, dte) = switch(te, dte) {
+        | (EmptyTele, EmptyDemoTele) => Some([])
+        | (ConsP(te', _, p), ConsDemoP(dte', _, p', d)) when equiv(p, p') => 
+            Option.bind(teles_aligned(te', dte'), ds => Some(ds @ [d]))
+        | (ConsT(te', _, args1, t), ConsDemoT(dte', _, args2, t', d)) when equiv_tele(args1, args2) && equiv(t, t') =>
+            Option.bind(teles_aligned(te', dte'), ds => Some(ds @ [d]))
+        | _ => None
+    };
+    switch(goal) {
+    | Arrow(te, _) => {
+        switch(teles_aligned(te, dte')) {
+        | None => skip_and_error(s, err("wrong givens", r))
+        | Some(ds) => 
+            let-& s = (s, arrange(arrow_introduction(s), r));
+            check_demo(s, seqs(ds @ [d]))
+        }
+    }
+    | _ => skip_and_error(s, err("can only use given on arrow goal", r))
+    }
+}
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
@@ -653,6 +709,7 @@ and check_demo(s : t, d : demo) : (t, report) =
     | Seq(d1, d2) => 
         let-* s' = check_demo(s, d1);
         check_demo(s', d2)
+    | Given(r, entries, d) => given(s, r, entries, d)
     | Claim(_) => 
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));

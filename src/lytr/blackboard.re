@@ -11,6 +11,7 @@ module BlackboardLanguage : Language = {
         | Default
         | Sig
         | Demo
+        | DemoSig
         | Program
 
     type form = form_of(context);
@@ -165,15 +166,15 @@ module BlackboardLanguage : Language = {
         // ("11_=>_10", (_c => (Domain, [], Term), infix_of(Lambda))),
         ("30_@_31", (_c => (Domain, [], Term), infix_of(At))),
         prefix_form("arrowintro", Demo, ArrowIntro),
-        ("given_:_,_0", (_c => (Default, [Ident, Term], Demo), 
+        ("given_._0", (_c => (Default, [DemoSig], Demo), 
             (_, _, middle, last, r) => {
-                let (x, t) = switch(middle) {
-                | [x, t] => (x, t)
+                let ds = switch(middle) {
+                | [ds] => ds
                 | _ => failwith("given missing args")
                 };
                 let (ss, rest) = Option.get(last);
                 let r' = (fst(r), fst(range_of_some_rc(last)));
-                Given(r', x, t, ss, rest)
+                Given(r', ds, ss, rest)
             })),
         ("witness_,_0", (_c => (Default, [Term], Demo), 
             (_, _, middle, last, r) => {

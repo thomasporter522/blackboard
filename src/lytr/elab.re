@@ -1,4 +1,5 @@
 open Lang.Program
+open Lang.Demo
 module Term = Kernel.Term;
 
 type error = Term.ranged_error;
@@ -132,53 +133,114 @@ and elab_term_span(t : Language.abstract_span) : (Term.surface_tm, list(error)) 
     }
 }
 
-and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
+and elab_demo_entry(t : Language.abstract_term) : (Option.t(surface_demo_tele => surface_demo_tele), list(error)) = {
+    switch(t) {
+    | Parens(_, t) => elab_demo_entry_span(t);
+    | Infix(Colon, _, x, _, _, t) => 
+        let* x' = elab_entry_lhs(x);
+        let* t' = elab_term(t);
+        switch(x') {
+        | None => (None, [])
+        | Some((zs, args)) => (Some(dte => ConsSurfaceDemoT(dte, zs, args, t', a)), [])
+        }
+    | Infix(Semicolon, r, Atom(Ident(z), _), _, _, t) => 
+        let* t' = elab_term(t);
+        (Some(dte => ConsSurfaceDemoP(dte, Name(z), t', Obvious(r))), [])
+    | _ => (None, [err("Invalid given", whole_range(t))])
+    }
+}
+
+and elab_demo_entry_span(t : Language.abstract_span) : (Option.t(surface_demo_tele => surface_demo_tele), list(error)) = {
+    switch(t) {
+    | Empty(_) => (None, [])
+    | Single(_ss1, t, _ss2, _r) => elab_demo_entry(t)
+    | Multiple([], _, _) => failwith("impossible")
+    | Multiple([t,..._], _, r) => 
+        let* t' = elab_demo_entry(t);
+        (t', [err("Multiple entries", r)])
+    }
+}
+
+and elab_demo_tele(t : Language.abstract_term) : (Option.t(surface_demo_tele), list(error)) = {
+    switch(t) {
+    | Parens(_, t) => elab_demo_tele_span(t);
+    | Commas(_, first, _, middle, _, last) => 
+        let middles = List.map(elab_demo_entry_span, middle);
+        let (first', first_errors) = elab_demo_entry(first);
+        let (last', last_errors) = elab_demo_entry(last);
+        let middle_terms = List.map(fst, middles);
+        let middle_errors = List.concat_map(snd, middles);
+        let folder(a, f) = switch(f) {
+            | None => a 
+            | Some(f) => f(a)
+        }
+        let dte = List.fold_left(folder, EmptySurfaceDemoTele, [first'] @  middle_terms @ [last']);
+        (Some(dte), first_errors @ middle_errors @ last_errors)
+    | _ => 
+        let* x' = elab_demo_entry(t);
+        switch(x') {
+        | None => (None, [])
+        | Some(t') => (Some(t'(EmptySurfaceDemoTele)), [])
+        }
+    }
+}
+
+and elab_demo_tele_span(t : Language.abstract_span) : (Option.t(surface_demo_tele), list(error)) = {
+    switch(t) {
+    | Empty(_, r) => (None, [err("Missing term", r)])
+    | Single(_, t, _, _) => elab_demo_tele(t)
+    | Multiple([], _, _) => failwith("impossible")
+    | Multiple([t,..._], _, r) => 
+        let* t' = elab_demo_tele(t);
+        (t', [err("Multiple terms", r)])
+    }
+}
+
+and elab_demo(t : Language.abstract_term) : (demo, list(error)) = {
     switch(t) {
     | Atom(Hole, r) => (Hole(r), [])
     | Atom(Interaction, r) => (Hole(r), [])
     | Parens(_, s) => elab_demo_span(s)
     | Prefix(ArrowIntro, r, _, d) => 
         let* d' = elab_demo(d);
-        (Lang.Demo.Primitive(r, Lang.Demo.ArrowIntro(d')), [])
+        (Primitive(r, ArrowIntro(d')), [])
     | Commas(_, first, _, middle, _, last) => 
         let middles = List.map(elab_demo_span, middle);
         let (first', first_errors) = elab_demo(first);
         let (last', last_errors) = elab_demo(last);
         let middle_demos = List.map(fst, middles);
         let middle_errors = List.concat_map(snd, middles);
-        let seq(d1, d2) = Lang.Demo.Seq(d1, d2);
-        let demo = List.fold_left(seq, first', middle_demos @ [last']);
+        let demo = seqs([first'] @ middle_demos @ [last']);
         (demo, first_errors @ middle_errors @ last_errors)
-    // | Given(r, x, ty, _, d) => 
-    //     let* x' = elab_id_span(x);
-    //     let* ty' = elab_term_span(ty);
-    //     let* d' = elab_demo(d);
-    //     switch(x') {
-    //     | None => (d', [])
-    //     | Some(x'') => (Lang.Demo.Primitive(r, Lang.Demo.ArrowIntro(Name(x''), ty', Obvious(r), d')), [])
-    //     }
+    | Given(r, dte, _, d) => 
+        let* dte' = elab_demo_tele_span(dte);
+        let* d' = elab_demo(d);
+        switch(dte') {
+        | None => (d', [])
+        | Some(dte'') => (Given(r, dte'', d'), [])
+        }
     | _ => (Nonsense(whole_range(t)), [err("Invalid demonstration", whole_range(t))])
     // | Atom(Ident(x), r) => (HypProp(r, Name(x), Obvious(r)), [])
     // | Atom(Check,r) => (Tactic(r, Check, []), [])
     // | Direct2(r, d1, _, d2) =>
     //     let* d1' = elab_demo_span(d1);
     //     let* d2' = elab_demo(d2);
-    //     (Lang.Demo.Tactic(r, Direct, [d1', d2']), [])
+    //     (Tactic(r, Direct, [d1', d2']), [])
     // | Direct1(r, _, d) =>
     //     let* d' = elab_demo(d);
-    //     (Lang.Demo.Tactic(r, Direct, [d']), [])
+    //     (Tactic(r, Direct, [d']), [])
     // | Ap(r, t1, _, t2) =>
     //     let* t1' = elab_demo(t1);
     //     let* t2' = elab_demo(t2);
-    //     (Lang.Demo.Use(r, t1', t2'), [])
+    //     (Use(r, t1', t2'), [])
     // | Witness(r, t, _, d) => 
     //     let* t' = elab_term_span(t);
     //     let* d' = elab_demo(d);
-    //     (Lang.Demo.Tactic(r, Witness(t'), [Obvious(r), d']), [])
+    //     (Tactic(r, Witness(t'), [Obvious(r), d']), [])
     // | Infix(At, r, t1, _, _, t2) => 
     //     let* t1' = elab_demo(t1);
     //     let* t2' = elab_term(t2);
-    //     (Lang.Demo.At(r, t1', t2', Obvious(r)), [])
+    //     (At(r, t1', t2', Obvious(r)), [])
     // | Atom(Prop,_) 
     // | Atom(Type,_) 
     // | Infix(In, _, _, _, _, _) 
@@ -193,7 +255,7 @@ and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     }
 }
 
-and elab_demo_span(t : Language.abstract_span) : (Lang.Demo.demo, list(error)) = {
+and elab_demo_span(t : Language.abstract_span) : (demo, list(error)) = {
     switch(t) {
     | Empty(_, r) => (Hole(r), [])
     | Single(_ss1, t, _ss2, _r) => elab_demo(t)

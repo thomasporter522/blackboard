@@ -49,7 +49,7 @@ type abstract_term =
     | Assume(range, abstract_span, abstract_span, list(secondary), abstract_term)
     | Construct(range, abstract_span, abstract_span, list(secondary), abstract_term)
     | Prove(range, abstract_span, abstract_span, list(secondary), abstract_term)
-    | Given(range, abstract_span, abstract_span, list(secondary), abstract_term)
+    | Given(range, abstract_span, list(secondary), abstract_term)
     | Witness(range, abstract_span, list(secondary), abstract_term)
     | Direct2(range, abstract_span, list(secondary), abstract_term)
     // | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
@@ -77,7 +77,7 @@ let rec whole_range(a : abstract_term) : range = switch(a) {
     | Assume(r, _, _, _, t)
     | Construct(r, _, _, _, t) 
     | Prove(r, _, _, _, t) 
-    | Given(r, _, _, _, t)
+    | Given(r, _, _, t)
     | Witness(r, _, _, t)
     | Direct2(r, _, _, t) => combine_ranges(r, whole_range(t))
 }

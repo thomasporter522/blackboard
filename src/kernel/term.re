@@ -354,3 +354,9 @@ let rec solve_meta_ctx(sol : MetaMap.t(tm), c : ctx) : ctx = switch(c) {
 
 let solve_meta_judgment(sol : MetaMap.t(tm), J(c, p) : judgment) : judgment = 
     J(solve_meta_ctx(sol, c), solve_meta_tm(sol, p))
+
+let (let**) (f : ('a, list('b)), b : 'a => ('c, list('b))) : ('c, list('b)) = {
+    let (a, l1) = f;
+    let (c, l2) = b(a);
+    (c, l1 @ l2)
+}

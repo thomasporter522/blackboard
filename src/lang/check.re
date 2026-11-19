@@ -1,5 +1,4 @@
 open Program 
-open Elab
 open Demo
 
 let check_surface_program (p : surface_program) : program_check_report = {

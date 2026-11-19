@@ -126,15 +126,19 @@ and string_of_subst(c : ctx, s : subst) : string = switch(s) {
         ++ string_of_sub(z, c, args, t)
 }
 
-let rec string_of_ctx(c : ctx) : string = switch(c) {
-    | Empty => ""
-    | Cons(c', te) => string_of_ctx(c') ++ (c' == Empty ? "" : ",\n")  ++ string_of_tele(0, 0, Cons(c', te), te)
+let rec strings_of_tele(c : ctx, te : tele) = switch(te) {
+    | EmptyTele => []
+    | ConsP(te', Name(z), p) => strings_of_tele(c, te') @ [string_of_tele_p(0, 0, z, c, p)]
+    | ConsT(te', Name(z), te1, ty) => strings_of_tele(c, te')  @ [string_of_tele_t(0, 0, z, te1, c, ty)]
 }
 
 let rec strings_of_ctx(c : ctx) : list(string) = switch(c) {
     | Empty => []
-    | Cons(c', te) => strings_of_ctx(c') @ [string_of_tele(0, 0, Cons(c', te), te)]
+    | Cons(c', te) => strings_of_ctx(c') @ strings_of_tele(Cons(c', te), te)
 }
+
+let string_of_ctx(c : ctx) : string = 
+    String.concat("\n", strings_of_ctx(c))
 
 let strings_of_judgment(j : judgment) : (list(string), string) = {
     switch(j) {
