@@ -35,10 +35,15 @@ type atom =
     | Type 
     | Check
 
+type prefix = 
+    | Direct1 
+    | ArrowIntro
+
 type abstract_term =
     | Atom(atom, range)
     | Parens(range, abstract_span)
     | Infix(infix, range, abstract_term, list(secondary), list(secondary), abstract_term)
+    | Prefix(prefix, range, list(secondary), abstract_term)
     | Commas(range, abstract_term, list(secondary), list(abstract_span), list(secondary), abstract_term)
     | Ap(range, abstract_term, list(secondary), abstract_term)
     | Assume(range, abstract_span, abstract_span, list(secondary), abstract_term)
@@ -47,7 +52,6 @@ type abstract_term =
     | Given(range, abstract_span, abstract_span, list(secondary), abstract_term)
     | Witness(range, abstract_span, list(secondary), abstract_term)
     | Direct2(range, abstract_span, list(secondary), abstract_term)
-    | Direct1(range, list(secondary), abstract_term)
     // | Term(term_head, abstract_left_child, list(abstract_span), abstract_right_child)
 
 and abstract_span = 
@@ -69,13 +73,13 @@ let rec whole_range(a : abstract_term) : range = switch(a) {
     | Commas(_, t1,_, _, _, t2) 
     | Ap(_, t1, _, t2)
     | Infix(_, _, t1, _, _, t2) => combine_ranges(whole_range(t1), whole_range(t2))
+    | Prefix(_, r, _, t) => combine_ranges(r, whole_range(t))
     | Assume(r, _, _, _, t)
     | Construct(r, _, _, _, t) 
     | Prove(r, _, _, _, t) 
     | Given(r, _, _, _, t)
     | Witness(r, _, _, t)
-    | Direct2(r, _, _, t)
-    | Direct1(r, _, t) => combine_ranges(r, whole_range(t))
+    | Direct2(r, _, _, t) => combine_ranges(r, whole_range(t))
 }
 
 let rec secondaries_range(ss : list(secondary)) : Option.t(range) = switch(ss) {

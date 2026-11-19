@@ -24,7 +24,7 @@ type primitive =
     | PropForm
     | TypForm
     | ArrowForm(list(demo))
-    | ArrowIntro(Option.t(list(surface_tele_entry)), list(demo), demo)
+    | ArrowIntro(demo)
     | ArrowElim(list(surface_tele_entry), surface_tm, list(surface_subst_entry), list(demo))
     | ElabArrowElim(tele, tm, subst, list(demo))
     | ApForm(list(demo))
@@ -32,6 +32,7 @@ type primitive =
 and demo = 
     | Hole(range)
     | Primitive(range, primitive)
+    | Seq(demo, demo)
     | Claim(range, name, surface_tm, demo, demo)
     | Suffices(range, name, surface_tm, demo, demo)
     | Obvious(range)
@@ -628,10 +629,17 @@ let (let-**) = ((x, es) : ('a, list(ranged_error)), f: 'a => demo_result): demo_
 //     }
 // }
 
+let rec check_primitive(s, r, p) = switch(p) {
+    | ArrowIntro(d) => 
+        let-& s = (s, arrange(arrow_introduction(s), r));
+        check_demo(s, d)
+    | _ => failwith("Todo")
+}
+
 // precondition: the [s.focused] is nonempty
 // invariant: the root of returned PD.t is the same as that of [s]
 // invariant: the focused of returned PD.t is the tail of that of [s]
-let check_demo(s : t, d : demo) : (t, report) =
+and check_demo(s : t, d : demo) : (t, report) =
 //     let s' = Result.get_ok(skip(s));
 //     let j = Result.get_ok(focused(s));
 //     (s', mk_report([(j, (0, 1))], []))
@@ -641,10 +649,10 @@ let check_demo(s : t, d : demo) : (t, report) =
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));
         (s', mk_report([(j, r)], []))
-    | Primitive(_) => 
-        let s' = Result.get_ok(skip(s));
-        let j = Result.get_ok(focused(s));
-        (s', mk_report([(j, (0, 1))], []))
+    | Primitive(r, p) => check_primitive(s, r, p)
+    | Seq(d1, d2) => 
+        let-* s' = check_demo(s, d1);
+        check_demo(s', d2)
     | Claim(_) => 
         let s' = Result.get_ok(skip(s));
         let j = Result.get_ok(focused(s));
@@ -828,9 +836,11 @@ let check_demo(s : t, d : demo) : (t, report) =
 // //     }
 // // }
 
-
 let check_demo_root(root : judgment, d : demo, complete_range : (int, int), tidy : bool) : report = {
     let (s, r) = check_demo(init(root), d);
-    assert(verify(s,root));
-    if(complete(s) && tidy) { {...r, completes : r.completes @ [complete_range]} } else r
+    let r' = verify(s,root) ? r : {...r, errors: r.errors @ [{
+        message : "open goals remain", 
+        range : complete_range
+    }]};
+    if(complete(s) && tidy) { {...r', completes : r'.completes @ [complete_range]} } else r'
 }

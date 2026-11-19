@@ -117,7 +117,7 @@ and elab_term(t : Language.abstract_term) : (Term.surface_tm, list(error)) = {
     | Given(_)  
     | Witness(_)
     | Direct2(_)
-    | Direct1(_) => (SurfaceNonsense, [err("Invalid term", whole_range(t))])
+    | Prefix(_) => (SurfaceNonsense, [err("Invalid term", whole_range(t))])
     }
 }
 
@@ -137,6 +137,18 @@ and elab_demo(t : Language.abstract_term) : (Lang.Demo.demo, list(error)) = {
     | Atom(Hole, r) => (Hole(r), [])
     | Atom(Interaction, r) => (Hole(r), [])
     | Parens(_, s) => elab_demo_span(s)
+    | Prefix(ArrowIntro, r, _, d) => 
+        let* d' = elab_demo(d);
+        (Lang.Demo.Primitive(r, Lang.Demo.ArrowIntro(d')), [])
+    | Commas(_, first, _, middle, _, last) => 
+        let middles = List.map(elab_demo_span, middle);
+        let (first', first_errors) = elab_demo(first);
+        let (last', last_errors) = elab_demo(last);
+        let middle_demos = List.map(fst, middles);
+        let middle_errors = List.concat_map(snd, middles);
+        let seq(d1, d2) = Lang.Demo.Seq(d1, d2);
+        let demo = List.fold_left(seq, first', middle_demos @ [last']);
+        (demo, first_errors @ middle_errors @ last_errors)
     // | Given(r, x, ty, _, d) => 
     //     let* x' = elab_id_span(x);
     //     let* ty' = elab_term_span(ty);

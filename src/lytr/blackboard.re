@@ -140,14 +140,23 @@ module BlackboardLanguage : Language = {
 
     let atom_of(head, _, _, _, _, r) = Atom(head,r);
 
+    let atom_form(s: string, t: atom) = (s, (_c => (Default, [], Default), atom_of(t)));
+
+    let prefix_form(s, sort, p) = (s ++ "_0", (_c => (Default, [], sort), 
+            (_, _, _, last, r) => {
+                let (ss, rest) = Option.get(last);
+                let r' = (fst(r), fst(range_of_some_rc(last)));
+                Prefix(p, r', ss, rest)
+            }));
+
     let mixfix_form_summaries : list((string, (context => (context, list(context), context), builder_type(context)))) = 
         [
         ("(_)", (c => (Default, [c], Default), 
             (_, _, m, _, r) => Parens(r, List.hd(m)))),
-        ("?", (_c => (Default, [], Default), atom_of(Hole))),
-        ("prop", (_c => (Default, [], Default), atom_of(Prop))),
-        ("type", (_c => (Default, [], Default), atom_of(Type))),
-        ("check", (_c => (Default, [], Default), atom_of(Check))),
+        atom_form("?", Hole),
+        atom_form("prop", Prop),
+        atom_form("type", Type),
+        atom_form("check", Check),
         ("11_:_10", (_c => (Ident, [], Term), infix_of(Colon))),
         ("11_;_10", (_c => (Ident, [], Term), infix_of(Semicolon))),
         ("20_:=_21", (_c => (Term, [], Term), infix_of(Assign))),
@@ -155,6 +164,7 @@ module BlackboardLanguage : Language = {
         ("11_->_10", (_c => (Domain, [], Term), infix_of(Arrow))),
         // ("11_=>_10", (_c => (Domain, [], Term), infix_of(Lambda))),
         ("30_@_31", (_c => (Domain, [], Term), infix_of(At))),
+        prefix_form("arrowintro", Demo, ArrowIntro),
         ("given_:_,_0", (_c => (Default, [Ident, Term], Demo), 
             (_, _, middle, last, r) => {
                 let (x, t) = switch(middle) {
@@ -185,12 +195,7 @@ module BlackboardLanguage : Language = {
                 let r' = (fst(r), fst(range_of_some_rc(last)));
                 Direct2(r', t, ss, rest)
             })),
-        ("direct_0", (_c => (Default, [], Demo), 
-            (_, _, _, last, r) => {
-                let (ss, rest) = Option.get(last);
-                let r' = (fst(r), fst(range_of_some_rc(last)));
-                Direct1(r', ss, rest)
-            })),
+        prefix_form("arrowintro", Demo, Direct1),
         ("construct_by_end_0", (_c => (Default, [Sig, Demo], Program), 
             (_, _, middle, last, r) => {
                 let (sg, d) = switch(middle) {
